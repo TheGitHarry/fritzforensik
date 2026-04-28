@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            artifact_glob: "dist/legacy_export-*-linux-x86_64"
+          - os: windows-2022
+            artifact_glob: "dist/legacy_export-*-windows-x86_64.exe"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "pyinstaller>=6" "certifi" "requests>=2.31" pytest
+
+      - name: Run unit tests
+        run: python -m pytest
+
+      - name: Build binary
+        run: python scripts/build.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: legacy_export-${{ matrix.os }}
+          path: ${{ matrix.artifact_glob }}
+          if-no-files-found: error
