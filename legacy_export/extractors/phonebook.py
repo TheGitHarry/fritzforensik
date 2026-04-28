@@ -1,6 +1,7 @@
 """Telefonbuch — Liste aller Bücher via data.lua, Export via firmwarecfg."""
 from __future__ import annotations
 
+import json
 import re
 import xml.etree.ElementTree as ET
 
@@ -9,15 +10,28 @@ from ..client import FritzClient
 DATA_PATH = "/data.lua"
 FIRMWARECFG_PATH = "/cgi-bin/firmwarecfg"
 
+# Neuere FRITZ!OS-Stände rendern bookLi als HTML-Tab-Inhalt; die Buchliste
+# steckt dort als JS-Initialisierung `g_books = [...]`.
+_GBOOKS_RE = re.compile(r"g_books\s*=\s*(\[.*?\])\s*;", re.DOTALL)
 
-def _list_phonebooks(client: FritzClient) -> list[dict]:
-    resp = client.post(DATA_PATH, data={"page": "bookLi", "xhr": "1"})
-    resp.raise_for_status()
+
+def _parse_books_payload(text: str) -> list[dict]:
+    """Akzeptiert sowohl JSON-Antworten (data.phonebooks) als auch HTML mit g_books."""
     try:
-        data = resp.json()
+        data = json.loads(text)
     except ValueError:
-        return []
-    books_raw = ((data.get("data") or {}).get("phonebooks")) or []
+        data = None
+    if isinstance(data, dict):
+        books_raw = ((data.get("data") or {}).get("phonebooks")) or []
+    else:
+        m = _GBOOKS_RE.search(text)
+        if not m:
+            return []
+        try:
+            books_raw = json.loads(m.group(1))
+        except ValueError:
+            return []
+
     books: list[dict] = []
     for entry in books_raw:
         if not isinstance(entry, dict):
@@ -30,6 +44,15 @@ def _list_phonebooks(client: FritzClient) -> list[dict]:
             continue
         books.append({"id": book_id, "name": entry.get("name", "")})
     return books
+
+
+def _list_phonebooks(client: FritzClient) -> list[dict]:
+    resp = client.post(
+        DATA_PATH,
+        data={"page": "bookLi", "xhr": "1", "xhrId": "all", "lang": "de"},
+    )
+    resp.raise_for_status()
+    return _parse_books_payload(resp.text)
 
 
 def _export_phonebook(client: FritzClient, book_id: int) -> str:

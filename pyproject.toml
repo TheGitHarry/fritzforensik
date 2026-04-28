@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "legacy_export"
+version = "0.2.0"
+description = "Forensic live-data extractor for AVM FRITZ!Box"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["requests>=2.31"]
+
+[project.scripts]
+legacy_export = "legacy_export.__main__:main"
+
+[project.optional-dependencies]
+dev = ["pyinstaller>=6", "pytest>=7", "certifi"]
+
+[tool.setuptools]
+packages = ["legacy_export", "legacy_export.extractors"]
+py-modules = []
+
+[tool.pytest.ini_options]
+markers = [
+    "network: Tests, die echte LAN-Verbindung benötigen (default deselected)",
+]
+addopts = "-m 'not network'"

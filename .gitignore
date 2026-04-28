@@ -9,3 +9,9 @@ export/
 /tmp/
 .pytest_cache/
 .coverage
+
+# PyInstaller-Build-Artefakte
+build/
+dist/
+*.spec
+_MEI*

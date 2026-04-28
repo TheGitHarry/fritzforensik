@@ -29,5 +29,14 @@ def extract(client: FritzClient) -> list[dict]:
                 }
             )
         elif isinstance(row, dict):
-            events.append(row)
+            events.append(
+                {
+                    "date": row.get("date", ""),
+                    "time": row.get("time", ""),
+                    "message": row.get("msg", row.get("message", "")),
+                    "id": row.get("id", ""),
+                    "category": row.get("group", row.get("category", "")),
+                    "raw": row,
+                }
+            )
     return events

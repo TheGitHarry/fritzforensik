@@ -13,6 +13,8 @@ _SAFE = re.compile(r"[^A-Za-z0-9._-]+")
 
 
 def _slug(value: str) -> str:
+    if "://" in value:
+        value = value.split("://", 1)[1]
     return _SAFE.sub("_", value).strip("_") or "host"
 
 
@@ -30,6 +32,8 @@ def write(
     type_name: str,
     records: list[dict],
     timestamp: str | None = None,
+    discovery_meta: dict | None = None,
+    extra_meta: dict | None = None,
 ) -> Path:
     """Schreibt Records als JSON + .sha256-Sidecar. Gibt JSON-Pfad zurück."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -37,7 +41,7 @@ def write(
     filename = f"legacy_export_{_slug(host)}_{ts}_{type_name}.json"
     json_path = output_dir / filename
 
-    payload = {
+    payload: dict = {
         "tool": "legacy_export",
         "version": __version__,
         "host": host,
@@ -45,6 +49,10 @@ def write(
         "type": type_name,
         "records": records,
     }
+    if discovery_meta:
+        payload["discovery"] = discovery_meta
+    if extra_meta:
+        payload.update(extra_meta)
     body = json.dumps(payload, indent=2, ensure_ascii=False).encode("utf-8")
     json_path.write_bytes(body)
 
