@@ -40,8 +40,6 @@ def main() -> int:
         name,
         "--collect-data",
         "certifi",
-        "--runtime-tmpdir",
-        ".",
         "--distpath",
         str(REPO_ROOT / "dist"),
         "--workpath",
@@ -50,8 +48,15 @@ def main() -> int:
         str(REPO_ROOT / "build"),
         "--clean",
         "--noconfirm",
-        str(target),
     ]
+    # `--runtime-tmpdir .` legt den Bootstrap-Extract neben das Binary statt
+    # in den OS-Default. Auf Linux/macOS unproblematisch und gibt zero
+    # host trace beim USB-Stick-Einsatz. Auf Windows bricht es im
+    # Drive-Root (F:\) wegen Permissions, daher dort weglassen — der
+    # Default %TEMP% wird ohnehin beim Reboot aufgeräumt.
+    if not sys.platform.startswith("win"):
+        cmd += ["--runtime-tmpdir", "."]
+    cmd.append(str(target))
     print(" ".join(cmd))
     return subprocess.call(cmd, cwd=REPO_ROOT)
 
