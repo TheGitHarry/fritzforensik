@@ -175,9 +175,13 @@ def test_discover_returns_single_fritzbox():
     assert len(boxes) == 1
     assert boxes[0].ip == "192.168.178.1"
     assert "FRITZ!Box" in boxes[0].model_name
-    # Validate that M-SEARCH was actually sent
-    assert len(fake.sent) == 1
-    assert b"M-SEARCH" in fake.sent[0][0]
+    # Beide M-SEARCH-Pakete müssen rausgegangen sein (IGD-ST + ssdp:all),
+    # damit Mesh-Master, die nur auf ssdp:all antworten, gefunden werden.
+    assert len(fake.sent) == 2
+    sts = [pkt for pkt, _ in fake.sent]
+    assert all(b"M-SEARCH" in pkt for pkt in sts)
+    assert any(b"ST: urn:schemas-upnp-org:device:InternetGatewayDevice:1" in pkt for pkt in sts)
+    assert any(b"ST: ssdp:all" in pkt for pkt in sts)
 
 
 def test_discover_filters_out_repeater_via_xml():
@@ -250,9 +254,9 @@ def test_discover_falls_back_to_per_interface_send_on_oserror():
     assert len(boxes) == 1
     assert boxes[0].ip == "192.168.178.1"
     # Per-Interface-Send muss IP_MULTICAST_IF gesetzt haben — verifizieren wir
-    # indirekt: der erste Socket war "schlecht", der zweite hat M-SEARCH gesendet.
-    assert len(good.sent) == 1
-    assert b"M-SEARCH" in good.sent[0][0]
+    # indirekt: der erste Socket war "schlecht", der zweite hat beide M-SEARCH-Pakete gesendet.
+    assert len(good.sent) == 2
+    assert all(b"M-SEARCH" in pkt for pkt, _ in good.sent)
 
 
 def test_discover_with_explicit_iface_swallows_oserror():

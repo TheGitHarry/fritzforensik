@@ -15,20 +15,34 @@ from dataclasses import asdict, dataclass
 
 SSDP_MULTICAST = "239.255.255.250"
 SSDP_PORT = 1900
-SSDP_ST = "urn:schemas-upnp-org:device:InternetGatewayDevice:1"
+SSDP_ST_IGD = "urn:schemas-upnp-org:device:InternetGatewayDevice:1"
+SSDP_ST_ALL = "ssdp:all"
 DEFAULT_TIMEOUT = 3.0
 DEFAULT_XML_TIMEOUT = 2.0
 
 log = logging.getLogger(__name__)
 
-M_SEARCH = (
-    "M-SEARCH * HTTP/1.1\r\n"
-    f"HOST: {SSDP_MULTICAST}:{SSDP_PORT}\r\n"
-    'MAN: "ssdp:discover"\r\n'
-    "MX: 2\r\n"
-    f"ST: {SSDP_ST}\r\n"
-    "\r\n"
-).encode("ascii")
+
+def _build_msearch(st: str) -> bytes:
+    return (
+        "M-SEARCH * HTTP/1.1\r\n"
+        f"HOST: {SSDP_MULTICAST}:{SSDP_PORT}\r\n"
+        'MAN: "ssdp:discover"\r\n'
+        "MX: 2\r\n"
+        f"ST: {st}\r\n"
+        "\r\n"
+    ).encode("ascii")
+
+
+# Zwei M-SEARCH-Pakete pro Lauf: gezieltes IGD-ST fängt Standard-FRITZ!Box,
+# `ssdp:all` fängt Mesh-Master, die auf spezifische STs nicht antworten,
+# aber jede SSDP-Anfrage beantworten. Filter via SERVER-Header (AVM) bleibt.
+M_SEARCH_PACKETS: tuple[bytes, ...] = (
+    _build_msearch(SSDP_ST_IGD),
+    _build_msearch(SSDP_ST_ALL),
+)
+# Backwards-Compat-Alias für externe Importe
+M_SEARCH = M_SEARCH_PACKETS[0]
 
 
 @dataclass
@@ -133,7 +147,8 @@ def _msearch_once(timeout: float, iface: str | None) -> list[tuple[bytes, tuple]
             socket.inet_aton(iface),
         )
     try:
-        sock.sendto(M_SEARCH, (SSDP_MULTICAST, SSDP_PORT))
+        for packet in M_SEARCH_PACKETS:
+            sock.sendto(packet, (SSDP_MULTICAST, SSDP_PORT))
         responses: list[tuple[bytes, tuple]] = []
         while True:
             try:

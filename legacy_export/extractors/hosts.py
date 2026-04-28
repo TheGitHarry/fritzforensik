@@ -1,0 +1,163 @@
+"""Hosts-Liste — TR-064 X_AVM-DE_GetHostListPath, XML-Fetch.
+
+Liefert pro Host (LAN/WLAN/Guest) einen Record mit MAC, IP, Name, Aktiv-Flag,
+Interface-Typ, Port-Speed, Lease-Restzeit, WAN-Access-Status, Modell-Hint und
+Gast-/VPN-/Disallow-Flags. Reicher als data.lua/netDev (= wifi-Extractor):
+TR-064 liefert AVM-Vendor-Felder, die in der UI nur indirekt sichtbar sind.
+
+Pfad: TR-064 `X_AVM-DE_GetHostListPath` → relativer URL inkl. eigener SID →
+XML-Fetch direkt auf Box-Host. Fallback auf Index-Iteration via
+`GetGenericHostEntry` falls TR-064 die Path-Variante nicht beherrscht
+(alte Firmware) — dabei deutlich weniger Felder.
+"""
+from __future__ import annotations
+
+import logging
+import xml.etree.ElementTree as ET
+
+from ..client import FritzClient, Tr064Disabled, Tr064Error
+
+log = logging.getLogger(__name__)
+
+HOSTS_SERVICE = "urn:dslforum-org:service:Hosts:1"
+HOSTS_CONTROL = "/upnp/control/hosts"
+PATH_ACTION = "X_AVM-DE_GetHostListPath"
+PATH_RESULT_KEY = "NewX_AVM-DE_HostListPath"
+COUNT_ACTION = "GetHostNumberOfEntries"
+COUNT_RESULT_KEY = "NewHostNumberOfEntries"
+GENERIC_ACTION = "GetGenericHostEntry"
+
+# Felder im <Item>-XML der HostList-JSON-äh-XML-Datei. AVM liefert hier XML
+# trotz „Liste" — Schema dokumentiert in der TR-064-Spez.
+_ITEM_FIELDS = (
+    "Index",
+    "IPAddress",
+    "AddressSource",
+    "LeaseTimeRemaining",
+    "MACAddress",
+    "InterfaceType",
+    "Active",
+    "HostName",
+    "X_AVM-DE_Port",
+    "X_AVM-DE_Speed",
+    "X_AVM-DE_UpdateAvailable",
+    "X_AVM-DE_UpdateSuccessful",
+    "X_AVM-DE_InfoURL",
+    "X_AVM-DE_Model",
+    "X_AVM-DE_URL",
+    "X_AVM-DE_Guest",
+    "X_AVM-DE_RequestClient",
+    "X_AVM-DE_VPN",
+    "X_AVM-DE_WANAccess",
+    "X_AVM-DE_Disallow",
+    "X_AVM-DE_IsMeshable",
+    "X_AVM-DE_Priority",
+    "X_AVM-DE_FriendlyName",
+    "X_AVM-DE_FriendlyNameIsWriteable",
+)
+
+
+def _split_path_query(url_path: str) -> tuple[str, dict[str, str]]:
+    if "?" not in url_path:
+        return url_path, {}
+    path, _, query = url_path.partition("?")
+    params = dict(p.split("=", 1) for p in query.split("&") if "=" in p)
+    return path, params
+
+
+def _get_hostlist_path(client: FritzClient) -> str | None:
+    try:
+        resp = client.tr064_call(HOSTS_SERVICE, HOSTS_CONTROL, PATH_ACTION)
+    except Tr064Disabled as e:
+        log.info("TR-064 GetHostListPath nicht zugänglich: %s", e)
+        return None
+    except Tr064Error as e:
+        log.warning("TR-064 GetHostListPath fehlgeschlagen: %s", e)
+        return None
+    return (resp.get(PATH_RESULT_KEY) or "").strip() or None
+
+
+def _fetch_hostlist_xml(client: FritzClient, hostlist_path: str) -> bytes | None:
+    path, params = _split_path_query(hostlist_path)
+    resp = client.session.get(client.base_url + path, params=params, timeout=30)
+    resp.raise_for_status()
+    return resp.content
+
+
+def _parse_hostlist_xml(xml_bytes: bytes) -> list[dict]:
+    """XML-Format: <List><Item>... <MACAddress/>...</Item>...</List>."""
+    try:
+        root = ET.fromstring(xml_bytes)
+    except ET.ParseError as e:
+        log.warning("HostList-XML nicht parsebar: %s", e)
+        return []
+    records: list[dict] = []
+    for item in root.iter("Item"):
+        record: dict = {}
+        for field in _ITEM_FIELDS:
+            value = item.findtext(field)
+            if value is not None:
+                record[field] = value.strip()
+        if record:
+            record["source"] = "tr064_path"
+            records.append(record)
+    return records
+
+
+def _iterate_generic_entries(client: FritzClient) -> list[dict]:
+    """Alt-Firmware-Fallback: Index-für-Index via GetGenericHostEntry.
+
+    Liefert deutlich weniger Felder, aber wenigstens MAC/IP/Name/Active.
+    """
+    try:
+        resp = client.tr064_call(HOSTS_SERVICE, HOSTS_CONTROL, COUNT_ACTION)
+    except (Tr064Disabled, Tr064Error) as e:
+        log.warning("TR-064 GetHostNumberOfEntries fehlgeschlagen: %s", e)
+        return []
+    try:
+        count = int((resp.get(COUNT_RESULT_KEY) or "0").strip())
+    except ValueError:
+        return []
+    records: list[dict] = []
+    for idx in range(count):
+        try:
+            entry = client.tr064_call(
+                HOSTS_SERVICE,
+                HOSTS_CONTROL,
+                GENERIC_ACTION,
+                args={"NewIndex": str(idx)},
+            )
+        except (Tr064Disabled, Tr064Error) as e:
+            log.warning("GetGenericHostEntry[%d] fehlgeschlagen: %s", idx, e)
+            continue
+        records.append(
+            {
+                "Index": str(idx),
+                "IPAddress": entry.get("NewIPAddress", ""),
+                "AddressSource": entry.get("NewAddressSource", ""),
+                "LeaseTimeRemaining": entry.get("NewLeaseTimeRemaining", ""),
+                "MACAddress": entry.get("NewMACAddress", ""),
+                "InterfaceType": entry.get("NewInterfaceType", ""),
+                "Active": entry.get("NewActive", ""),
+                "HostName": entry.get("NewHostName", ""),
+                "source": "tr064_generic",
+            }
+        )
+    return records
+
+
+def extract(client: FritzClient) -> list[dict]:
+    """Vollständige Hosts-Liste der Box, inkl. Mesh-Repeater-Clients."""
+    path = _get_hostlist_path(client)
+    if path:
+        try:
+            xml_bytes = _fetch_hostlist_xml(client, path)
+        except Exception as e:
+            log.warning("Hosts-XML-Fetch fehlgeschlagen: %s", e)
+            xml_bytes = None
+        if xml_bytes:
+            records = _parse_hostlist_xml(xml_bytes)
+            if records:
+                return records
+    log.info("Hosts: Path-Variante leer/nicht verfügbar — Fallback auf Index-Iteration.")
+    return _iterate_generic_entries(client)

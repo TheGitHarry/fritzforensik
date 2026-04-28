@@ -3,6 +3,12 @@ from .phonebook import extract as extract_phonebook
 from .wifi import extract as extract_wifi
 from .events import extract as extract_events
 from .tam import extract as extract_tam
+from .mesh import extract as extract_mesh
+from .hosts import extract as extract_hosts
+from .wan import extract as extract_wan
+from .dhcp import extract as extract_dhcp
+from .portforward import extract as extract_portforward
+from .storage import extract as extract_storage
 
 EXTRACTORS = {
     "calls": extract_calls,
@@ -10,6 +16,12 @@ EXTRACTORS = {
     "wifi": extract_wifi,
     "events": extract_events,
     "tam": extract_tam,
+    "mesh": extract_mesh,
+    "hosts": extract_hosts,
+    "wan": extract_wan,
+    "dhcp": extract_dhcp,
+    "portforward": extract_portforward,
+    "storage": extract_storage,
 }
 
 # Extractoren, die einen audio_dir-Parameter akzeptieren und ein
