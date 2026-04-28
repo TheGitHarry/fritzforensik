@@ -216,3 +216,48 @@ def test_discover_dedups_duplicate_responses():
          patch("legacy_export.discover._fetch_device_xml", return_value=FRITZBOX_IGD_XML):
         boxes = discover(timeout=0.1)
     assert len(boxes) == 1
+
+
+class _UnreachableSocket(_FakeSocket):
+    """Wie _FakeSocket, aber sendto wirft WSAEHOSTUNREACH wie auf Windows."""
+
+    def sendto(self, data, addr):
+        raise OSError(10065, "host unreachable")
+
+
+def test_discover_swallows_oserror_when_no_iface_fallback():
+    # Regression: WinError 10065 bei sendto ohne nutzbare Schnittstelle darf
+    # keinen Traceback erzeugen — discover() liefert leere Liste.
+    fake = _UnreachableSocket([])
+    with patch("legacy_export.discover.socket.socket", return_value=fake), \
+         patch("legacy_export.discover._local_ipv4_interfaces", return_value=[]):
+        boxes = discover(timeout=0.1)
+    assert boxes == []
+
+
+def test_discover_falls_back_to_per_interface_send_on_oserror():
+    # Erst-Aufruf (OS-Routing, iface=None) wirft, Folge-Aufruf (iface=IP) liefert.
+    bad = _UnreachableSocket([])
+    good = _FakeSocket([(AVM_BOX_RESPONSE, ("192.168.178.1", 1900))])
+    sockets = iter([bad, good])
+    with patch("legacy_export.discover.socket.socket", lambda *a, **k: next(sockets)), \
+         patch(
+             "legacy_export.discover._local_ipv4_interfaces",
+             return_value=["192.168.178.20"],
+         ), \
+         patch("legacy_export.discover._fetch_device_xml", return_value=FRITZBOX_IGD_XML):
+        boxes = discover(timeout=0.1)
+    assert len(boxes) == 1
+    assert boxes[0].ip == "192.168.178.1"
+    # Per-Interface-Send muss IP_MULTICAST_IF gesetzt haben — verifizieren wir
+    # indirekt: der erste Socket war "schlecht", der zweite hat M-SEARCH gesendet.
+    assert len(good.sent) == 1
+    assert b"M-SEARCH" in good.sent[0][0]
+
+
+def test_discover_with_explicit_iface_swallows_oserror():
+    # Bei --iface IP soll ein OSError ebenfalls keinen Traceback erzeugen.
+    bad = _UnreachableSocket([])
+    with patch("legacy_export.discover.socket.socket", return_value=bad):
+        boxes = discover(timeout=0.1, iface="192.168.178.20")
+    assert boxes == []

@@ -7,16 +7,19 @@ auf "FRITZ!Box" prüfen — filtert FRITZ!Repeater zuverlässig raus.
 """
 from __future__ import annotations
 
+import logging
 import socket
 import urllib.request
 import xml.etree.ElementTree as ET
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 
 SSDP_MULTICAST = "239.255.255.250"
 SSDP_PORT = 1900
 SSDP_ST = "urn:schemas-upnp-org:device:InternetGatewayDevice:1"
 DEFAULT_TIMEOUT = 3.0
 DEFAULT_XML_TIMEOUT = 2.0
+
+log = logging.getLogger(__name__)
 
 M_SEARCH = (
     "M-SEARCH * HTTP/1.1\r\n"
@@ -100,18 +103,25 @@ def _is_fritzbox(box: DiscoveredBox) -> bool:
     return "FRITZ!Box" in haystack
 
 
-def discover(
-    timeout: float = DEFAULT_TIMEOUT,
-    iface: str | None = None,
-    enrich: bool = True,
-) -> list[DiscoveredBox]:
-    """Sendet SSDP M-SEARCH und sammelt FRITZ!Box-Antworten.
+def _local_ipv4_interfaces() -> list[str]:
+    """Best-effort-Enumeration lokaler IPv4-Adressen (ohne Loopback).
 
-    `iface`: Source-IP der zu nutzenden Netzwerk-Schnittstelle für Multicast
-    (z.B. "192.168.2.228"). Default: OS-Routing.
+    Wird auf Windows als Fallback genutzt, wenn das OS-Routing keine
+    Schnittstelle für Multicast wählt (typisch: WSAEHOSTUNREACH=10065).
+    """
+    ips: set[str] = set()
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ips.add(info[4][0])
+    except OSError:
+        pass
+    return sorted(ip for ip in ips if not ip.startswith("127."))
 
-    `enrich`: LOCATION-XML pro Antwort fetchen für friendly_name/model_*.
-    Verlangsamt Discovery um Sekunden, ermöglicht aber Repeater-Filter.
+
+def _msearch_once(timeout: float, iface: str | None) -> list[tuple[bytes, tuple]]:
+    """Sendet einmal M-SEARCH und sammelt Antworten bis Timeout.
+
+    OSError wird hochgereicht — Aufrufer entscheidet über Fallback.
     """
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 4)
@@ -124,36 +134,90 @@ def discover(
         )
     try:
         sock.sendto(M_SEARCH, (SSDP_MULTICAST, SSDP_PORT))
-        seen: dict[str, DiscoveredBox] = {}
+        responses: list[tuple[bytes, tuple]] = []
         while True:
             try:
                 data, addr = sock.recvfrom(8192)
             except socket.timeout:
                 break
-            headers = parse_ssdp_response(data)
-            if headers is None:
-                continue
-            ip = addr[0]
-            if ip in seen:
-                continue
-            box = DiscoveredBox(
-                ip=ip,
-                server=headers.get("SERVER", ""),
-                location=headers.get("LOCATION", ""),
-            )
-            if enrich and box.location:
-                try:
-                    info = parse_device_xml(
-                        _fetch_device_xml(box.location, DEFAULT_XML_TIMEOUT)
-                    )
-                    box.friendly_name = info.get("friendly_name", "")
-                    box.model_name = info.get("model_name", "")
-                    box.model_description = info.get("model_description", "")
-                except Exception:
-                    pass
-            if not _is_fritzbox(box):
-                continue
-            seen[ip] = box
-        return list(seen.values())
+            responses.append((data, addr))
+        return responses
     finally:
         sock.close()
+
+
+def _collect_responses(timeout: float, iface: str | None) -> list[tuple[bytes, tuple]]:
+    """M-SEARCH mit Windows-Fallback: bei OSError pro Schnittstelle nachprobieren."""
+    if iface:
+        try:
+            return _msearch_once(timeout, iface)
+        except OSError as e:
+            log.warning("SSDP-Sendto auf --iface %s fehlgeschlagen: %s", iface, e)
+            return []
+    try:
+        return _msearch_once(timeout, None)
+    except OSError as e:
+        candidates = _local_ipv4_interfaces()
+        if not candidates:
+            log.warning(
+                "SSDP-Sendto via OS-Routing fehlgeschlagen (%s) und keine "
+                "lokale IPv4-Schnittstelle gefunden.", e
+            )
+            return []
+        log.warning(
+            "SSDP-Sendto via OS-Routing fehlgeschlagen (%s); "
+            "probiere lokale Schnittstellen: %s",
+            e,
+            ", ".join(candidates),
+        )
+        responses: list[tuple[bytes, tuple]] = []
+        for ip in candidates:
+            try:
+                responses.extend(_msearch_once(timeout, ip))
+            except OSError as e2:
+                log.debug("SSDP-Sendto auf %s fehlgeschlagen: %s", ip, e2)
+        return responses
+
+
+def discover(
+    timeout: float = DEFAULT_TIMEOUT,
+    iface: str | None = None,
+    enrich: bool = True,
+) -> list[DiscoveredBox]:
+    """Sendet SSDP M-SEARCH und sammelt FRITZ!Box-Antworten.
+
+    `iface`: Source-IP der zu nutzenden Netzwerk-Schnittstelle für Multicast
+    (z.B. "192.168.2.228"). Default: OS-Routing, mit Windows-Fallback auf
+    Per-Interface-Send wenn das Routing scheitert (WSAEHOSTUNREACH).
+
+    `enrich`: LOCATION-XML pro Antwort fetchen für friendly_name/model_*.
+    Verlangsamt Discovery um Sekunden, ermöglicht aber Repeater-Filter.
+    """
+    responses = _collect_responses(timeout, iface)
+    seen: dict[str, DiscoveredBox] = {}
+    for data, addr in responses:
+        headers = parse_ssdp_response(data)
+        if headers is None:
+            continue
+        ip = addr[0]
+        if ip in seen:
+            continue
+        box = DiscoveredBox(
+            ip=ip,
+            server=headers.get("SERVER", ""),
+            location=headers.get("LOCATION", ""),
+        )
+        if enrich and box.location:
+            try:
+                info = parse_device_xml(
+                    _fetch_device_xml(box.location, DEFAULT_XML_TIMEOUT)
+                )
+                box.friendly_name = info.get("friendly_name", "")
+                box.model_name = info.get("model_name", "")
+                box.model_description = info.get("model_description", "")
+            except Exception:
+                pass
+        if not _is_fritzbox(box):
+            continue
+        seen[ip] = box
+    return list(seen.values())
