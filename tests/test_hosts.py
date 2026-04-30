@@ -80,6 +80,8 @@ def test_extract_uses_tr064_path():
 
 def test_extract_falls_back_to_generic_iteration_when_path_disabled():
     client = MagicMock()
+    # Port-49000-WebUI-Fallback soll durchfallen → Stage 3 (Generic-Iteration)
+    client.session.get.side_effect = OSError("no webui fallback")
     # Erster Call (Path-Action) wirft Tr064Disabled, dann Count + zwei Generic-Calls
     client.tr064_call.side_effect = [
         Tr064Disabled("aus", error_code=606),
@@ -113,6 +115,7 @@ def test_extract_falls_back_to_generic_iteration_when_path_disabled():
 def test_extract_returns_empty_when_everything_disabled():
     client = MagicMock()
     client.tr064_call.side_effect = Tr064Disabled("aus")
+    client.session.get.side_effect = OSError("no webui fallback")
     assert hosts_mod.extract(client) == []
 
 

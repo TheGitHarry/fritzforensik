@@ -111,6 +111,7 @@ def test_extract_uses_tr064_path_when_available():
     client = MagicMock()
     client.tr064_call.return_value = {"NewX_AVM-DE_MeshListPath": "/meshlist.lua?sid=abc&hkid=xyz"}
     client.base_url = "https://192.168.2.1"
+    client.tr064_url.return_value = "http://192.168.2.1:49000/meshlist.lua"
     fake_resp = MagicMock()
     fake_resp.json.return_value = MESH_PAYLOAD
     fake_resp.raise_for_status.return_value = None
@@ -119,7 +120,6 @@ def test_extract_uses_tr064_path_when_available():
     assert any(r["record_type"] == "node" for r in records)
     # TR-064 muss genau einmal angefragt werden, Web-UI-Fallback NICHT genutzt
     client.tr064_call.assert_called_once()
-    client.get.assert_not_called()
     # session.get muss mit Pfad-eigener SID aufgerufen worden sein, nicht mit Session-SID
     args, kwargs = client.session.get.call_args
     assert "/meshlist.lua" in args[0]
@@ -132,27 +132,28 @@ def test_extract_falls_back_to_webui_when_tr064_disabled():
     fake_resp = MagicMock()
     fake_resp.json.return_value = MESH_PAYLOAD
     fake_resp.raise_for_status.return_value = None
-    client.get.return_value = fake_resp
+    client.session.get.return_value = fake_resp
     records = mesh_mod.extract(client)
     assert any(r["record_type"] == "node" for r in records)
-    client.get.assert_called_once_with("/meshlist.lua")
+    # Fallback nutzt session.get auf Port-49000-URL, nicht client.get
+    client.session.get.assert_called_once()
 
 
 def test_extract_returns_empty_when_both_paths_fail():
     client = MagicMock()
     client.tr064_call.side_effect = Tr064Disabled("aus")
-    client.get.side_effect = OSError("network down")
+    client.session.get.side_effect = OSError("network down")
     assert mesh_mod.extract(client) == []
 
 
 def test_extract_returns_empty_when_tr064_path_empty():
     client = MagicMock()
     client.tr064_call.return_value = {"NewX_AVM-DE_MeshListPath": ""}
-    # Ohne TR-064-Pfad → Web-UI-Fallback wird genutzt
+    # Ohne TR-064-Pfad → Web-UI-Fallback wird genutzt (auf Port 49000)
     fake_resp = MagicMock()
     fake_resp.json.return_value = MESH_PAYLOAD
     fake_resp.raise_for_status.return_value = None
-    client.get.return_value = fake_resp
+    client.session.get.return_value = fake_resp
     records = mesh_mod.extract(client)
     assert any(r["record_type"] == "node" for r in records)
-    client.get.assert_called_once()
+    client.session.get.assert_called_once()
