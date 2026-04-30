@@ -1,10 +1,12 @@
 # legacy_export
 
-Minimales Python-CLI zum Live-Abzug forensisch relevanter Daten aus einer
-laufenden FRITZ!Box: Anrufliste, Telefonbuch, WLAN-Geräteliste,
-System-Ereignislog, Anrufbeantworter-Aufnahmen.
+Python-CLI zum Live-Abzug forensisch relevanter Daten aus einer laufenden
+FRITZ!Box. Deckt Anrufliste, Telefonbuch, WLAN-Geräteliste, Ereignislog
+(alle Kategorien), Anrufbeantworter, Mesh-Topologie, Hosts, WAN-Status,
+DHCP-Konfiguration, Port-Forwards, USB-Storage, erweiterte Supportdaten
+und TR-069-Konfiguration ab.
 
-Authentifizierung erfolgt über das offizielle AVM Web-UI-SID-Verfahren
+Authentifizierung über das offizielle AVM Web-UI-SID-Verfahren
 (PBKDF2-Challenge-Response, mit MD5-Fallback für ältere Firmware-Stände).
 Die Box wird per SSDP-Auto-Discovery im LAN gefunden, kann aber auch
 explizit per `--host` adressiert werden.
@@ -28,27 +30,28 @@ single-file Binaries für Linux und Windows — siehe Abschnitt
 
 ## Nutzung
 
-Auto-Discovery (kein `--host` nötig, wenn nur eine Box im LAN ist):
+Ohne Argumente: Auto-Discovery läuft, bei genau einer Box wird direkt
+nach Benutzername und Passwort gefragt und der vollständige Abzug startet:
+
+```bash
+./legacy_export
+```
+
+Bei mehreren Boxen im Netz wird eine Liste ausgegeben und `--host` wird
+verlangt:
 
 ```bash
 export FRITZ_PW='dein-passwort'
-python legacy_export.py --user admin --all
-```
-
-Mit explizitem Host (z.B. wenn mehrere Boxen im Netz sind oder UPnP
-deaktiviert ist):
-
-```bash
-python legacy_export.py --host https://192.168.178.1 --user admin --all
+python legacy_export.py --host 192.168.178.1 --user admin
 ```
 
 Einzelne Datenarten gezielt abziehen:
 
 ```bash
-python legacy_export.py --host 192.168.178.1 --user admin --calls --wifi
+python legacy_export.py --host 192.168.178.1 --user admin --calls --wifi --tr069
 ```
 
-Nur Discovery laufen lassen (für Setup-Sanity-Check, JSON-Liste auf stdout):
+Nur Discovery (JSON-Liste auf stdout, z.B. für Scripting):
 
 ```bash
 python legacy_export.py --discover
@@ -57,23 +60,83 @@ python legacy_export.py --discover
 Wird `FRITZ_PW` nicht gesetzt, fragt das Tool das Passwort interaktiv ab
 (`getpass`). Das Passwort darf **nie** als CLI-Argument übergeben werden.
 
-`--host` akzeptiert sowohl `fritz.box` (Default-Schema `http://`, kann zur
-HTTPS-Umleitung führen) als auch explizit `https://192.168.178.1`. Bei
-Boxen mit selbstsigniertem oder eigener-CA-signiertem Zertifikat (das im
-System-Trust-Store nicht hinterlegt ist) bricht die TLS-Prüfung sonst ab —
-in dem Fall `--insecure` setzen.
+`--host` akzeptiert sowohl `fritz.box` als auch explizit
+`https://192.168.178.1`. Bei Boxen mit selbstsigniertem Zertifikat
+`--insecure` setzen.
 
 `--iface` setzt die Source-IP für SSDP-Multicast bei Multi-Interface-Hosts
-(z.B. `--iface 192.168.2.228`). IPv6-Discovery wird derzeit nicht
-unterstützt.
+(z.B. `--iface 192.168.2.228`).
 
 `--output` ist optional: Default ist `./export/` neben dem Skript bzw.
-neben dem PyInstaller-Binary. Pro Lauf wird zusätzlich eine Logdatei
+neben dem PyInstaller-Binary. Pro Lauf wird eine Logdatei
 `legacy_export_<timestamp>.log` im selben Verzeichnis abgelegt.
+
+## Extractoren
+
+| Flag | Protokoll | Inhalt |
+|---|---|---|
+| `--calls` | Web-UI | Anrufliste (CSV-Export) |
+| `--phonebook` | Web-UI | Alle Telefonbücher (XML-Export) |
+| `--wifi` | Web-UI | WLAN-Geräteliste inkl. inaktiver Geräte |
+| `--events` | Web-UI | Ereignislog aller Kategorien (sys/net/wlan/fon/usb) |
+| `--tam` | TR-064 + Web-UI-Fallback | Anrufbeantworter-Metadaten + Audio-WAVs |
+| `--mesh` | TR-064 + Web-UI-Fallback | Mesh-Topologie |
+| `--hosts` | TR-064 + Index-Fallback | Alle bekannten Hosts |
+| `--wan` | TR-064 | WAN-Status, externe IP, Traffic-Counter, DSL-Daten |
+| `--dhcp` | TR-064 | DHCP-Serverkonfiguration |
+| `--portforward` | TR-064 | Port-Forwarding-Regeln |
+| `--storage` | TR-064 | USB-/NAS-Storage-Konfiguration und User |
+| `--supportdata` | Web-UI | Erweiterte Supportdaten (vollständiger Text-Dump) |
+| `--tr069` | TR-064 | TR-069-Konfiguration (ACS-URL, Fernwartungsstatus) |
+
+Ohne explizite Auswahl werden alle Extractoren ausgeführt (`--all`).
+
+### TR-064-Abhängigkeit
+
+Extractoren die TR-064 nutzen (`--wan`, `--dhcp`, `--portforward`,
+`--storage`, `--tr069`) benötigen:
+*Heimnetz → Netzwerk → Netzwerkeinstellungen → "Zugriff für Anwendungen
+zulassen"* + *"Statusinformationen über UPnP übertragen"*.
+
+Ist TR-064 beim Start nicht erreichbar, erscheint eine Warnung mit der
+Liste der betroffenen Extractoren. Extractoren mit Web-UI-Fallback (`--tam`,
+`--mesh`) laufen in jedem Fall durch.
+
+### Anrufbeantworter (`--tam`)
+
+Audio-Aufnahmen werden als WAV in das Subverzeichnis `tam_audio/`
+geschrieben. Zwei Wege werden unterstützt:
+
+- **Primär TR-064** (`X_AVM-DE_TAM:1`): Der `<New>`-Flag jeder Nachricht
+  wird vor und nach dem Download erfasst; falls die Box implizit auf
+  "gelesen" markiert, wird der Status über `MarkMessage(MarkedAsRead=0)`
+  wiederhergestellt (`tam_state_preserved: true`).
+- **Fallback Web-UI**: Wird aktiv wenn TR-064 deaktiviert ist. Read-Status
+  kann nicht zurückgesetzt werden (`tam_state_preserved: false`).
+
+### Ereignislog (`--events`)
+
+Der Extractor ruft alle Filterkategorien ab (`all`, `sys`, `net`, `wlan`,
+`fon`, `usb`) und dedupliziert nach `(date, time, message)`. Jeder Eintrag
+enthält ein `found_in_filters`-Array — Einträge die eine Firmware nur in
+einer Kategorie liefert, gehen nicht verloren.
+
+### Erweiterte Supportdaten (`--supportdata`)
+
+POST auf `/cgi-bin/firmwarecfg` mit `getextendedsupdatadata=1`. Kein
+TR-064 erforderlich. Der vollständige Text-Dump (Logs, VPN, SIP, ältere
+Konfigzustände) wird als `content`-Feld im JSON-Record abgelegt.
+
+### TR-069-Konfiguration (`--tr069`)
+
+Liest via TR-064 `ManagementServer:1#GetInfo` die TR-069-Konfiguration:
+ACS-URL (ISP-Fernwartungsserver), ob Fernwartung aktiv ist, Verbindungs-
+intervall und ConnectionRequestURL. Ist TR-064 nicht verfügbar, gibt der
+Extractor eine leere Liste zurück.
 
 ## Output
 
-Pro Extractor entstehen zwei Dateien im Ausgabeverzeichnis:
+Pro Extractor entstehen zwei Dateien:
 
 ```
 legacy_export_<host>_<timestamp>_<typ>.json
@@ -81,54 +144,22 @@ legacy_export_<host>_<timestamp>_<typ>.json.sha256
 ```
 
 Die JSON-Datei enthält ein einheitliches Hüllformat (`tool`, `version`,
-`host`, `extracted_at`, `type`, `records`, optional `discovery`). Bei
-Auto-Discovery ist im `discovery`-Feld die Roh-Antwort der Box als
-Audit-Trail abgelegt (`discovery_method: "ssdp"` oder `"manual"`). Der
-zugehörige `.sha256` ist ein Sidecar im Standard-`sha256sum`-Format zur
-späteren Integritätsprüfung.
-
-### Anrufbeantworter (`--tam`)
-
-Audio-Aufnahmen werden als WAV in das Subverzeichnis `tam_audio/`
-geschrieben (Dateiname `tam<slot>_msg<index>.wav`); pro Nachricht steht
-im JSON-Record der relative Pfad und die SHA256-Prüfsumme der
-Audio-Bytes. Es werden zwei Wege unterstützt:
-
-- **Primär TR-064** (`X_AVM-DE_TAM:1` auf Port 49000, HTTP Digest mit
-  Box-User/Passwort). Vor und nach dem Audio-Download wird der
-  `<New>`-Flag jeder Nachricht erfasst; falls die Box implizit auf
-  "gelesen" markiert, wird über `MarkMessage(MarkedAsRead=0)` der
-  ursprüngliche Status wiederhergestellt. Im Hüllformat:
-  `tam_method: "tr064"`, `tam_state_preserved: true/false`,
-  `tam_state_mutations: [...]`.
-- **Fallback Web-UI** (über die SID-Auth des bestehenden Stacks). Wird
-  nur aktiv, wenn TR-064 auf der Box deaktiviert ist (UPnPError 401/606
-  ohne `WWW-Authenticate`-Challenge). In dem Fall ist
-  `tam_state_preserved: false` und `tam_state_warning` dokumentiert,
-  dass der read-Status nicht zurückgesetzt werden kann.
-
-**TR-064 aktivieren** (für die forensisch saubere Variante):
-*Heimnetz → Netzwerk → Netzwerkeinstellungen → "Zugriff für Anwendungen
-zulassen"* + *"Statusinformationen über UPnP übertragen"*.
+`host`, `extracted_at`, `type`, `records`, optional `discovery`). Der
+`.sha256`-Sidecar liegt im Standard-`sha256sum`-Format zur
+Integritätsprüfung.
 
 ## USB-Stick-Distribution
 
-Für den Forensik-Feldeinsatz gibt es single-file Binaries (Linux und
-Windows x86_64), die ohne installiertes Python auskommen. Build per
-GitHub Actions auf Tag-Push (`v*`); Artefakte sind am Release angeheftet.
+Single-file Binaries für Linux und Windows x86_64 ohne installiertes
+Python. Build via GitHub Actions auf Tag-Push (`v*`); Artefakte sind am
+jeweiligen Tag hinterlegt.
 
-Lokaler Build (Linux):
+Lokaler Build:
 
 ```bash
-bash scripts/build-linux.sh
+python scripts/build.py
 # Ergebnis: dist/legacy_export-<version>-linux-x86_64
-```
-
-Lokaler Build (Windows):
-
-```cmd
-scripts\build-windows.bat
-REM Ergebnis: dist\legacy_export-<version>-windows-x86_64.exe
+#           dist/legacy_export-<version>-windows-x86_64.exe  (nur auf Windows)
 ```
 
 Empfohlenes Stick-Layout:
@@ -140,25 +171,22 @@ USB:/
   export/                                     (wird automatisch erstellt)
 ```
 
-Beim Doppelklick-Start landet `export/` neben dem Binary, nicht im
-zufälligen `cwd`. Der PyInstaller-Bootstrap-Extract wird ebenfalls auf
-den Stick geschrieben (`--runtime-tmpdir .`), damit zero Spuren auf dem
-Host-System bleiben — Trade-off: erstmaliger Cold-Start dauert wenige
-Sekunden länger als bei Extract nach `/tmp`.
+`export/` landet neben dem Binary, nicht im zufälligen `cwd`. Der
+PyInstaller-Bootstrap-Extract wird ebenfalls auf den Stick geschrieben
+(`--runtime-tmpdir .`), damit keine Spuren auf dem Host-System bleiben.
 
-**Empfehlung Dateisystem**: NTFS oder exFAT, nicht FAT32 (4-GB-Limit
-und keine Sonderzeichen-Toleranz, falls Captures größer werden).
+**Empfehlung Dateisystem**: NTFS oder exFAT, nicht FAT32.
 
 ## Exit-Codes
 
-| Code | Bedeutung                                                       |
-|------|-----------------------------------------------------------------|
-| 0    | Alle gewählten Extractoren erfolgreich                          |
-| 1    | Auth-Fehler (falsches Passwort, Box gesperrt)                   |
-| 2    | Box nicht erreichbar (Netzwerk/HTTP-Fehler, Output-Dir read-only) |
-| 3    | Mindestens ein Extractor fehlgeschlagen                         |
-| 4    | Mehrere Boxen via Discovery gefunden — `--host` explizit setzen |
-| 5    | Keine Box via Discovery gefunden — `--host` explizit setzen     |
+| Code | Bedeutung |
+|------|-----------|
+| 0 | Alle gewählten Extractoren erfolgreich |
+| 1 | Auth-Fehler (falsches Passwort, Box gesperrt) |
+| 2 | Box nicht erreichbar (Netzwerk/HTTP-Fehler, Output-Dir read-only) |
+| 3 | Mindestens ein Extractor fehlgeschlagen |
+| 4 | Mehrere Boxen via Discovery gefunden — `--host` explizit setzen |
+| 5 | Keine Box via Discovery gefunden — `--host` explizit setzen |
 
 ## Tests
 
@@ -166,6 +194,5 @@ und keine Sonderzeichen-Toleranz, falls Captures größer werden).
 python -m pytest
 ```
 
-Die Tests laufen vollständig offline ohne FRITZ!Box (auth-Vektoren und
-SSDP-Parser/-Discovery mit gemocktem Socket). Live-LAN-Tests sind als
-`@pytest.mark.network` markiert und im Default-Lauf deselektiert.
+Die Tests laufen vollständig offline ohne FRITZ!Box. Live-LAN-Tests sind
+als `@pytest.mark.network` markiert und im Default-Lauf deselektiert.
