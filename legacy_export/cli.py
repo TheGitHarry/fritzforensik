@@ -76,6 +76,26 @@ def _build_parser() -> argparse.ArgumentParser:
     return p
 
 
+_HELP_HINT = (
+    "Wichtige Optionen:\n"
+    "  --host IP        Ziel-Box (überspringt Auto-Discovery)\n"
+    "  --user NAME      FRITZ!Box-Benutzername\n"
+    "  --output DIR     Ausgabeverzeichnis (Default: ./export)\n"
+    "  --discover       Nur Discovery-Lauf (JSON auf stdout, für Scripting)\n"
+    "  --iface IP       Multicast-Schnittstelle\n"
+    "  --insecure       TLS-Zertifikat nicht prüfen\n"
+    "  -v, --verbose    Mehr Logausgabe\n"
+    "  --help           Alle Optionen anzeigen\n"
+)
+
+
+def _is_implicit_discover(args: argparse.Namespace) -> bool:
+    """True wenn kein Action-Argument gesetzt — kein --host, --user, --discover, kein Extractor."""
+    if args.discover or args.host or args.user or args.all:
+        return False
+    return not any(getattr(args, name, False) for name in EXTRACTORS)
+
+
 def _selected_extractors(args: argparse.Namespace) -> list[str]:
     selected = [name for name in EXTRACTORS if getattr(args, name)]
     if args.all or not selected:
@@ -170,6 +190,44 @@ def main(argv: list[str] | None = None) -> int:
         log.info("Discovery: %d FRITZ!Box(en) gefunden", len(boxes))
         return EXIT_OK
 
+    if _is_implicit_discover(args):
+        try:
+            boxes = discover.discover(iface=args.iface)
+        except OSError as e:
+            sys.stdout.write(f"Discovery-Fehler: {e}\n")
+            return EXIT_NO_DISCOVERY
+
+        if not boxes:
+            sys.stdout.write(
+                "Keine FRITZ!Box im LAN gefunden.\n"
+                "Tipp: Multicast-Schnittstelle per --iface IP wählen oder --host direkt setzen.\n\n"
+            )
+            sys.stdout.write(_HELP_HINT)
+            return EXIT_NO_DISCOVERY
+
+        if len(boxes) > 1:
+            sys.stdout.write("Mehrere FRITZ!Boxen gefunden — bitte --host wählen:\n")
+            for b in boxes:
+                label = b.friendly_name or b.model_name or "FRITZ!Box"
+                sys.stdout.write(f"  {b.ip}  —  {label}\n")
+            sys.stdout.write("\n")
+            sys.stdout.write(_HELP_HINT)
+            return EXIT_AMBIGUOUS
+
+        # Genau eine Box: direkt starten
+        box = boxes[0]
+        label = box.friendly_name or box.model_name or "FRITZ!Box"
+        sys.stdout.write(f"Gefundene FRITZ!Box: {box.ip}  —  {label}\n\n")
+        try:
+            args.user = input("Benutzername: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            sys.stdout.write("\nAbgebrochen.\n")
+            return EXIT_AUTH
+        if not args.user:
+            sys.stdout.write("Kein Benutzername eingegeben.\n")
+            return EXIT_AUTH
+        args.host = box.url_https()
+
     if not args.user:
         log.error("--user ist erforderlich (außer bei --discover)")
         return EXIT_AUTH
@@ -196,6 +254,13 @@ def main(argv: list[str] | None = None) -> int:
     except requests.RequestException as e:
         log.error("Box nicht erreichbar: %s", e)
         return EXIT_NETWORK
+
+    if not client.tr064_available():
+        log.warning(
+            "TR-064 nicht verfügbar (Port 49000 nicht erreichbar oder deaktiviert). "
+            "Extractoren ohne Web-UI-Fallback werden fehlschlagen: "
+            "hosts, wan, dhcp, portforward, storage"
+        )
 
     failures: list[str] = []
     try:

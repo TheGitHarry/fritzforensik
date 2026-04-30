@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 STORAGE_SERVICE = "urn:dslforum-org:service:X_AVM-DE_Storage:1"
 STORAGE_CONTROL = "/upnp/control/x_storage"
 MAX_USERS = 32
-_OOB_CODES = {713, 714, 820}
+_OOB_CODES = {402, 713, 714, 820}
 
 
 def _info_record(client: FritzClient) -> dict | None:

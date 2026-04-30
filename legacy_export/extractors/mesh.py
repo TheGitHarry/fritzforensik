@@ -138,12 +138,12 @@ def extract(client: FritzClient) -> list[dict]:
         try:
             payload = _fetch_meshlist_json_tr064(client, mesh_path)
         except Exception as e:
-            log.warning("Mesh-Fetch via TR-064-Pfad fehlgeschlagen: %s", e)
+            log.info("Mesh-Fetch via TR-064-Pfad fehlgeschlagen: %s", e)
     if payload is None:
         try:
             payload = _fetch_meshlist_json_webui(client)
         except Exception as e:
-            log.warning("Mesh-Fetch via Web-UI-Fallback fehlgeschlagen: %s", e)
+            log.info("Mesh-Fetch via Web-UI-Fallback fehlgeschlagen: %s", e)
             return []
     if not isinstance(payload, dict):
         return []

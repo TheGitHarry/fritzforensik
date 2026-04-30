@@ -34,7 +34,7 @@ def extract(client: FritzClient) -> list[dict]:
         log.info("TR-064 GetPortMappingNumberOfEntries nicht zugänglich: %s", e)
         return []
     except Tr064Error as e:
-        log.warning("TR-064 GetPortMappingNumberOfEntries fehlgeschlagen: %s", e)
+        log.info("TR-064 GetPortMappingNumberOfEntries nicht verfügbar: %s", e)
         return []
     try:
         count = int((count_resp.get(COUNT_RESULT_KEY) or "0").strip())

@@ -132,6 +132,14 @@ class FritzClient:
         # via HTTPDigestAuth automatisch — wir landen hier nur bei wirklich gescheiterter Auth.
         raise Tr064Error(f"TR-064 unexpected HTTP {resp.status_code}: {resp.text[:200]}")
 
+    def tr064_available(self) -> bool:
+        """Prüft ob TR-064 erreichbar ist (GET /tr64desc.xml auf Port 49000, unauthenticated)."""
+        try:
+            resp = self.session.get(self.tr064_url("/tr64desc.xml"), timeout=5)
+            return resp.status_code == 200
+        except requests.RequestException:
+            return False
+
     def close(self) -> None:
         auth.logout(self.base_url, self.sid, self.session)
         self.session.close()

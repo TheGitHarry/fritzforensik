@@ -9,6 +9,8 @@ from .wan import extract as extract_wan
 from .dhcp import extract as extract_dhcp
 from .portforward import extract as extract_portforward
 from .storage import extract as extract_storage
+from .supportdata import extract as extract_supportdata
+from .tr069 import extract as extract_tr069
 
 EXTRACTORS = {
     "calls": extract_calls,
@@ -22,6 +24,8 @@ EXTRACTORS = {
     "dhcp": extract_dhcp,
     "portforward": extract_portforward,
     "storage": extract_storage,
+    "supportdata": extract_supportdata,
+    "tr069": extract_tr069,
 }
 
 # Extractoren, die einen audio_dir-Parameter akzeptieren und ein
