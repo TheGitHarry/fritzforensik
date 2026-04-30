@@ -45,11 +45,10 @@ def _split_path_query(url_path: str) -> tuple[str, dict[str, str]]:
 
 
 def _fetch_meshlist_json_tr064(client: FritzClient, mesh_path: str) -> dict | None:
-    """JSON via TR-064-gelieferten Pfad (eigene SID darin, nicht überschreiben)."""
+    """JSON via TR-064-gelieferten Pfad auf Port 49000 (SID darin gehört dorthin)."""
     path, params = _split_path_query(mesh_path)
-    # client.get würde die Session-SID an die Query hängen — nicht erwünscht,
-    # weil der Pfad seine eigene fresh-SID mitbringt. Daher direkt session.get.
-    resp = client.session.get(client.base_url + path, params=params, timeout=30)
+    # meshlist.lua gilt nur auf Port 49000, nicht auf Port 80 (→ 404).
+    resp = client.session.get(client.tr064_url(path), params=params, timeout=30)
     resp.raise_for_status()
     try:
         return resp.json()
@@ -59,8 +58,14 @@ def _fetch_meshlist_json_tr064(client: FritzClient, mesh_path: str) -> dict | No
 
 
 def _fetch_meshlist_json_webui(client: FritzClient) -> dict | None:
-    """Fallback: meshlist.lua direkt mit Session-SID."""
-    resp = client.get(WEBUI_FALLBACK_PATH)
+    """Fallback: meshlist.lua auf Port 49000 mit WebUI-SID.
+
+    Funktioniert auch ohne TR-064-Berechtigung des Users, da meshlist.lua
+    auf Port 49000 nur eine gültige Session-SID (WebUI oder TR-064) benötigt.
+    """
+    resp = client.session.get(
+        client.tr064_url(WEBUI_FALLBACK_PATH), params={"sid": client.sid}, timeout=30
+    )
     resp.raise_for_status()
     try:
         return resp.json()

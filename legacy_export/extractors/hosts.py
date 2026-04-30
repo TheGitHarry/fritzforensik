@@ -26,6 +26,7 @@ PATH_RESULT_KEY = "NewX_AVM-DE_HostListPath"
 COUNT_ACTION = "GetHostNumberOfEntries"
 COUNT_RESULT_KEY = "NewHostNumberOfEntries"
 GENERIC_ACTION = "GetGenericHostEntry"
+WEBUI_HOSTLIST_PATH = "/devicehostlist.lua"
 
 # Felder im <Item>-XML der HostList-JSON-äh-XML-Datei. AVM liefert hier XML
 # trotz „Liste" — Schema dokumentiert in der TR-064-Spez.
@@ -79,7 +80,8 @@ def _get_hostlist_path(client: FritzClient) -> str | None:
 
 def _fetch_hostlist_xml(client: FritzClient, hostlist_path: str) -> bytes | None:
     path, params = _split_path_query(hostlist_path)
-    resp = client.session.get(client.base_url + path, params=params, timeout=30)
+    # devicehostlist.lua gilt nur auf Port 49000, nicht auf Port 80 (→ 404).
+    resp = client.session.get(client.tr064_url(path), params=params, timeout=30)
     resp.raise_for_status()
     return resp.content
 
@@ -146,18 +148,48 @@ def _iterate_generic_entries(client: FritzClient) -> list[dict]:
     return records
 
 
+def _fetch_hostlist_xml_webui(client: FritzClient) -> bytes | None:
+    """Fallback: devicehostlist.lua auf Port 49000 mit WebUI-SID.
+
+    Liefert dasselbe vollständige XML wie der TR-064-Pfad, funktioniert
+    aber auch ohne TR-064-Berechtigung des Users.
+    """
+    resp = client.session.get(
+        client.tr064_url(WEBUI_HOSTLIST_PATH), params={"sid": client.sid}, timeout=30
+    )
+    resp.raise_for_status()
+    return resp.content
+
+
 def extract(client: FritzClient) -> list[dict]:
     """Vollständige Hosts-Liste der Box, inkl. Mesh-Repeater-Clients."""
+    # 1. Versuch: TR-064-Pfad (liefert den reichsten Datensatz mit AVM-Feldern)
     path = _get_hostlist_path(client)
     if path:
         try:
             xml_bytes = _fetch_hostlist_xml(client, path)
         except Exception as e:
-            log.warning("Hosts-XML-Fetch fehlgeschlagen: %s", e)
+            log.warning("Hosts-XML-Fetch (TR-064-Pfad) fehlgeschlagen: %s", e)
             xml_bytes = None
         if xml_bytes:
             records = _parse_hostlist_xml(xml_bytes)
             if records:
                 return records
-    log.info("Hosts: Path-Variante leer/nicht verfügbar — Fallback auf Index-Iteration.")
+
+    # 2. Versuch: devicehostlist.lua direkt auf Port 49000 (kein TR-064-Recht nötig)
+    log.info("Hosts: TR-064-Pfad leer/nicht verfügbar — Fallback auf Port-49000-WebUI.")
+    try:
+        xml_bytes = _fetch_hostlist_xml_webui(client)
+    except Exception as e:
+        log.info("Hosts-XML-Fetch (Port-49000-WebUI) fehlgeschlagen: %s", e)
+        xml_bytes = None
+    if xml_bytes:
+        records = _parse_hostlist_xml(xml_bytes)
+        for r in records:
+            r["source"] = "port49000_webui"
+        if records:
+            return records
+
+    # 3. Letzter Ausweg: GetGenericHostEntry (nur bei sehr alter Firmware nötig)
+    log.info("Hosts: Port-49000-WebUI fehlgeschlagen — Fallback auf Index-Iteration.")
     return _iterate_generic_entries(client)

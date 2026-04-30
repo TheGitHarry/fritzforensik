@@ -133,10 +133,16 @@ class FritzClient:
         raise Tr064Error(f"TR-064 unexpected HTTP {resp.status_code}: {resp.text[:200]}")
 
     def tr064_available(self) -> bool:
-        """Prüft ob TR-064 erreichbar ist (GET /tr64desc.xml auf Port 49000, unauthenticated)."""
+        """Prüft ob Port 49000 erreichbar ist (beliebige HTTP-Antwort genügt).
+
+        Verschiedene Box-Modelle nutzen unterschiedliche Descriptor-Pfade
+        (/tr64desc.xml, /l2tpv3.xml, /fboxdesc.xml …). Jede HTTP-Antwort
+        zeigt, dass der Port offen ist — ob der User TR-064-Berechtigung
+        hat, klärt sich beim ersten SOAP-Aufruf.
+        """
         try:
-            resp = self.session.get(self.tr064_url("/tr64desc.xml"), timeout=5)
-            return resp.status_code == 200
+            self.session.get(self.tr064_url("/tr64desc.xml"), timeout=5)
+            return True
         except requests.RequestException:
             return False
 

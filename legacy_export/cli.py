@@ -14,7 +14,7 @@ import requests
 from . import __version__, discover, output
 from .auth import AuthError
 from .client import FritzClient
-from .extractors import EXTRACTORS, EXTRACTORS_WITH_AUDIO
+from .extractors import EXTRACTORS, EXTRACTORS_WITH_AUDIO, EXTRACTORS_WITH_DIR
 
 EXIT_OK = 0
 EXIT_AUTH = 1
@@ -257,9 +257,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if not client.tr064_available():
         log.warning(
-            "TR-064 nicht verfügbar (Port 49000 nicht erreichbar oder deaktiviert). "
-            "Extractoren ohne Web-UI-Fallback werden fehlschlagen: "
-            "hosts, wan, dhcp, portforward, storage"
+            "TR-064-Port 49000 nicht erreichbar. "
+            "Extractoren ohne TR-064 oder Port-49000-Fallback werden leere Ergebnisse liefern: "
+            "wan, dhcp, portforward, storage"
         )
 
     failures: list[str] = []
@@ -270,6 +270,8 @@ def main(argv: list[str] | None = None) -> int:
                 if name in EXTRACTORS_WITH_AUDIO:
                     audio_dir = output_dir / f"{name}_audio"
                     records, extra_meta = EXTRACTORS[name](client, audio_dir)
+                elif name in EXTRACTORS_WITH_DIR:
+                    records, extra_meta = EXTRACTORS[name](client, output_dir)
                 else:
                     records = EXTRACTORS[name](client)
                     extra_meta = None

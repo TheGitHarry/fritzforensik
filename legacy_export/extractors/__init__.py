@@ -31,3 +31,7 @@ EXTRACTORS = {
 # Extractoren, die einen audio_dir-Parameter akzeptieren und ein
 # (records, extra_meta)-Tupel statt nur records zurückgeben.
 EXTRACTORS_WITH_AUDIO = {"tam"}
+
+# Extractoren, die output_dir (das Hauptverzeichnis) akzeptieren und ein
+# (records, extra_meta)-Tupel zurückgeben. Werden für Rohdatei-Ablage genutzt.
+EXTRACTORS_WITH_DIR = {"supportdata"}
