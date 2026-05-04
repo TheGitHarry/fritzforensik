@@ -98,6 +98,28 @@ def login(
     return LoginResult(sid=sid, blocktime=blocktime)
 
 
+def fetch_users(base_url: str, session: requests.Session) -> list[str]:
+    """Gibt die Benutzerliste aus login_sid.lua zurück.
+
+    Leere Liste bei Netzwerkfehler, Parse-Fehler oder fehlender Users-Sektion
+    (ältere Firmware ohne Users-Element).
+    """
+    try:
+        resp = session.get(base_url + LOGIN_PATH, timeout=10)
+        resp.raise_for_status()
+        root = ET.fromstring(resp.text)
+    except (requests.RequestException, ET.ParseError):
+        return []
+    users_node = root.find("Users")
+    if users_node is None:
+        return []
+    return [
+        u.text.strip()
+        for u in users_node.findall("User")
+        if u.text and u.text.strip()
+    ]
+
+
 def logout(base_url: str, sid: str, session: requests.Session) -> None:
     """Höflich abmelden — Box gibt Session-Slot zurück."""
     try:

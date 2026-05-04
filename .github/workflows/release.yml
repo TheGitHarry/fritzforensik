@@ -14,6 +14,8 @@ jobs:
         include:
           - os: ubuntu-22.04
             artifact_glob: "dist/legacy_export-*-linux-x86_64"
+          - os: ubuntu-22.04-arm
+            artifact_glob: "dist/legacy_export-*-linux-aarch64"
           - os: windows-2022
             artifact_glob: "dist/legacy_export-*-windows-x86_64.exe"
     runs-on: ${{ matrix.os }}
@@ -39,4 +41,29 @@ jobs:
         with:
           name: legacy_export-${{ matrix.os }}
           path: ${{ matrix.artifact_glob }}
+          if-no-files-found: error
+
+  build-arm32:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: uraimo/run-on-arch-action@v2
+        name: Build on armv7 (QEMU)
+        with:
+          arch: armv7
+          distro: ubuntu22.04
+          githubToken: ${{ github.token }}
+          install: |
+            apt-get update -q -y
+            apt-get install -y python3-pip python3-dev binutils
+            pip3 install "pyinstaller>=6" certifi "requests>=2.31" pytest
+          run: |
+            python3 -m pytest
+            python3 scripts/build.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: legacy_export-linux-arm32
+          path: dist/legacy_export-*-linux-armv7l
           if-no-files-found: error

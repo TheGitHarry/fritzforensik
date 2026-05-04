@@ -20,7 +20,7 @@ def main() -> int:
     from legacy_export import __version__
 
     if sys.platform.startswith("linux"):
-        os_tag = "linux-x86_64"
+        os_tag = f"linux-{platform.machine()}"
     elif sys.platform.startswith("win"):
         os_tag = "windows-x86_64"
     elif sys.platform == "darwin":

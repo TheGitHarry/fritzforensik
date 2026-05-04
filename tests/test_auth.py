@@ -8,10 +8,15 @@ from __future__ import annotations
 
 import pytest
 
+from unittest.mock import MagicMock
+
+import requests
+
 from legacy_export.auth import (
     AuthError,
     _parse_session_xml,
     calculate_response,
+    fetch_users,
 )
 
 PBKDF2_CHALLENGE = "2$60000$5a1711d73a4ef25e$6000$72a06aabd2db5fc4"
@@ -79,3 +84,51 @@ def test_authentication_error_is_runtime_error():
     assert issubclass(AuthError, RuntimeError)
     with pytest.raises(AuthError):
         raise AuthError("test")
+
+
+def _mock_session(xml: str) -> MagicMock:
+    resp = MagicMock()
+    resp.text = xml
+    resp.raise_for_status = lambda: None
+    session = MagicMock()
+    session.get.return_value = resp
+    return session
+
+
+def test_fetch_users_single_user():
+    xml = (
+        "<SessionInfo><SID>0000000000000000</SID>"
+        "<Challenge>2$60000$aa$6000$bb</Challenge><BlockTime>0</BlockTime>"
+        "<Users last='fritz0287'><User last='1'>fritz0287</User></Users>"
+        "</SessionInfo>"
+    )
+    assert fetch_users("http://fritz.box", _mock_session(xml)) == ["fritz0287"]
+
+
+def test_fetch_users_multiple_users():
+    xml = (
+        "<SessionInfo><SID>0000000000000000</SID><Challenge>c</Challenge>"
+        "<BlockTime>0</BlockTime>"
+        "<Users><User>alice</User><User>bob</User></Users></SessionInfo>"
+    )
+    assert fetch_users("http://fritz.box", _mock_session(xml)) == ["alice", "bob"]
+
+
+def test_fetch_users_no_users_section():
+    xml = "<SessionInfo><SID>x</SID><Challenge>c</Challenge><BlockTime>0</BlockTime></SessionInfo>"
+    assert fetch_users("http://fritz.box", _mock_session(xml)) == []
+
+
+def test_fetch_users_network_error():
+    session = MagicMock()
+    session.get.side_effect = requests.RequestException("timeout")
+    assert fetch_users("http://fritz.box", session) == []
+
+
+def test_fetch_users_malformed_xml():
+    resp = MagicMock()
+    resp.text = "not xml at all <<<"
+    resp.raise_for_status = lambda: None
+    session = MagicMock()
+    session.get.return_value = resp
+    assert fetch_users("http://fritz.box", session) == []

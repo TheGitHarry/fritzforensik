@@ -12,7 +12,7 @@ from pathlib import Path
 import requests
 
 from . import __version__, discover, output
-from .auth import AuthError
+from .auth import AuthError, fetch_users
 from .client import FritzClient
 from .extractors import EXTRACTORS, EXTRACTORS_WITH_AUDIO, EXTRACTORS_WITH_DIR
 
@@ -101,6 +101,20 @@ def _selected_extractors(args: argparse.Namespace) -> list[str]:
     if args.all or not selected:
         return list(EXTRACTORS)
     return selected
+
+
+def _autodetect_user(base_url: str, verify_tls: bool) -> str | None:
+    """Fragt die Box nach ihrer Benutzerliste; gibt den Namen zurück wenn genau einer vorhanden."""
+    session = requests.Session()
+    session.verify = verify_tls
+    if not verify_tls:
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    try:
+        users = fetch_users(base_url, session)
+    finally:
+        session.close()
+    return users[0] if len(users) == 1 else None
 
 
 def _resolve_password(env_name: str) -> str:
@@ -218,24 +232,35 @@ def main(argv: list[str] | None = None) -> int:
         box = boxes[0]
         label = box.friendly_name or box.model_name or "FRITZ!Box"
         sys.stdout.write(f"Gefundene FRITZ!Box: {box.ip}  —  {label}\n\n")
-        try:
-            args.user = input("Benutzername: ").strip()
-        except (EOFError, KeyboardInterrupt):
-            sys.stdout.write("\nAbgebrochen.\n")
-            return EXIT_AUTH
-        if not args.user:
-            sys.stdout.write("Kein Benutzername eingegeben.\n")
-            return EXIT_AUTH
         args.host = box.url_https()
-
-    if not args.user:
-        log.error("--user ist erforderlich (außer bei --discover)")
-        return EXIT_AUTH
+        detected = _autodetect_user(args.host, verify_tls=not args.insecure)
+        if detected:
+            log.info("Einzelner Benutzer erkannt: %s — wird automatisch verwendet", detected)
+            args.user = detected
+        else:
+            try:
+                args.user = input("Benutzername: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                sys.stdout.write("\nAbgebrochen.\n")
+                return EXIT_AUTH
+            if not args.user:
+                sys.stdout.write("Kein Benutzername eingegeben.\n")
+                return EXIT_AUTH
 
     target_url, discovery_meta, exit_code = _resolve_target(args)
     if exit_code != EXIT_OK:
         return exit_code
     assert target_url is not None
+
+    if not args.user:
+        detected = _autodetect_user(target_url, verify_tls=not args.insecure)
+        if detected:
+            log.info("Einzelner Benutzer erkannt: %s — wird automatisch verwendet", detected)
+            args.user = detected
+
+    if not args.user:
+        log.error("--user ist erforderlich (außer bei --discover)")
+        return EXIT_AUTH
 
     password = _resolve_password(args.password_env)
     if not password:
