@@ -1,9 +1,9 @@
 """Supportdaten — POST /cgi-bin/firmwarecfg, multipart/form-data.
 
-Drei Varianten (je nach Firmware-Support):
-  * SupportDataEnhanced — erweiterter Diagnosebericht (bevorzugt)
-  * SupportData         — Standard-Diagnosebericht (Fallback)
+Drei Varianten (je nach Firmware-Support), Reihenfolge nicht-interaktiv → interaktiv:
+  * SupportData         — Standard-Diagnosebericht
   * MeshSupportData     — Mesh-Topologie-Diagnosedaten
+  * SupportDataEnhanced — erweiterter Diagnosebericht, erfordert Tasten-Bestätigung an der Box
 
 Ablage: Rohdatei als `supportdata_<typ>_<ts>.txt` + SHA256-Sidecar im output_dir.
 Das JSON-Record enthält nur Metadaten (Typ, Pfad, Größe, Hash).
@@ -13,6 +13,7 @@ from __future__ import annotations
 import datetime as _dt
 import hashlib
 import logging
+import sys
 from pathlib import Path
 
 from ..client import FritzClient
@@ -22,9 +23,9 @@ log = logging.getLogger(__name__)
 FIRMWARECFG_PATH = "/cgi-bin/firmwarecfg"
 
 _VARIANTS: list[tuple[str, str]] = [
-    ("SupportDataEnhanced", "enhanced"),
     ("SupportData",         "standard"),
     ("MeshSupportData",     "mesh"),
+    ("SupportDataEnhanced", "enhanced"),
 ]
 
 
@@ -66,6 +67,21 @@ def extract(
     missing: list[str] = []
 
     for field_name, short_name in _VARIANTS:
+        if field_name == "SupportDataEnhanced":
+            sys.stderr.write(
+                "\n"
+                "HINWEIS: Erweiterte Supportdaten benötigen eine Bestätigung an der FRITZ!Box.\n"
+                "  1. Drücken Sie einen der Knöpfe an der FRITZ!Box.\n"
+                "  2. Klicken Sie im erscheinenden Bestätigungsdialog auf OK.\n"
+                "  Dann weiter mit Enter ...\n"
+            )
+            try:
+                input()
+            except (EOFError, KeyboardInterrupt):
+                log.warning("Erweiterte Supportdaten übersprungen (Abbruch durch Nutzer).")
+                missing.append(short_name)
+                continue
+
         content = _fetch_one(client, field_name)
         if content is None:
             log.info("Supportdaten '%s': nicht verfügbar oder kein Recht.", field_name)
