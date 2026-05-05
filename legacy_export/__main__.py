@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import sys
 
-from legacy_export.cli import main
+from legacy_export.cli import _pause_if_double_clicked, main
 
 if __name__ == "__main__":
-    sys.exit(main())
+    rc = main()
+    _pause_if_double_clicked()
+    sys.exit(rc)

@@ -37,8 +37,10 @@ nach Benutzername und Passwort gefragt und der vollständige Abzug startet:
 ./legacy_export
 ```
 
-Bei mehreren Boxen im Netz wird eine Liste ausgegeben und `--host` wird
-verlangt:
+Bei mehreren Boxen im Netz erscheint eine nummerierte Auswahlliste mit
+zusätzlicher Option *"keine"* (= Abbruch). Auswahl per Nummer + Enter,
+dann läuft der Abzug für die gewählte Box weiter. Alternativ Box
+explizit per `--host` adressieren:
 
 ```bash
 export FRITZ_PW='dein-passwort'
@@ -61,8 +63,11 @@ Wird `FRITZ_PW` nicht gesetzt, fragt das Tool das Passwort interaktiv ab
 (`getpass`). Das Passwort darf **nie** als CLI-Argument übergeben werden.
 
 `--host` akzeptiert sowohl `fritz.box` als auch explizit
-`https://192.168.178.1`. Bei Boxen mit selbstsigniertem Zertifikat
-`--insecure` setzen.
+`https://192.168.178.1`. Selbstsignierte Box-Zertifikate werden beim
+Verbindungsaufbau automatisch erkannt — das Tool schaltet dann
+selbstständig auf TLS ohne Verifikation um (Logmeldung: *"TLS-Zertifikat
+der Box ist nicht vertrauenswürdig … schalte automatisch auf --insecure
+um."*). `--insecure` lässt sich bei Bedarf weiterhin explizit setzen.
 
 `--iface` setzt die Source-IP für SSDP-Multicast bei Multi-Interface-Hosts
 (z.B. `--iface 192.168.2.228`).
@@ -123,9 +128,23 @@ einer Kategorie liefert, gehen nicht verloren.
 
 ### Erweiterte Supportdaten (`--supportdata`)
 
-POST auf `/cgi-bin/firmwarecfg` mit `getextendedsupdatadata=1`. Kein
-TR-064 erforderlich. Der vollständige Text-Dump (Logs, VPN, SIP, ältere
-Konfigzustände) wird als `content`-Feld im JSON-Record abgelegt.
+POST auf `/cgi-bin/firmwarecfg` (multipart). Kein TR-064 erforderlich.
+Drei Varianten werden nacheinander gezogen:
+
+1. `SupportData` — Standard-Diagnosebericht.
+2. `MeshSupportData` — Mesh-Topologie-Diagnose.
+3. `SupportDataEnhanced` — erweiterter Bericht. **Erfordert physische
+   Bestätigung an der Box**: ein beliebiger Knopf an der FRITZ!Box
+   drücken und im Web-UI-Dialog auf OK klicken. Das Tool zeigt einen
+   30-s-Countdown auf der Konsole; läuft die Zeit ab, wird nur diese
+   Variante übersprungen, die anderen beiden bleiben erhalten.
+
+Pro Variante wird die Rohdatei als `supportdata_<typ>_<ts>.txt` plus
+`.sha256`-Sidecar im Output-Verzeichnis abgelegt; das JSON-Record
+enthält Typ, Dateiname, Größe und Hash. `extra_meta` listet
+`supportdata_fetched` und `supportdata_missing`, sodass im Bericht
+sichtbar bleibt, welche Variante (z.B. der Enhanced-Dump bei Timeout)
+fehlt.
 
 ### TR-069-Konfiguration (`--tr069`)
 
@@ -176,6 +195,13 @@ PyInstaller-Bootstrap-Extract wird ebenfalls auf den Stick geschrieben
 (`--runtime-tmpdir .`), damit keine Spuren auf dem Host-System bleiben.
 
 **Empfehlung Dateisystem**: NTFS oder exFAT, nicht FAT32.
+
+**Start per Doppelklick (Windows)**: das Binary öffnet beim Doppelklick
+ein Konsolenfenster, das nach Programmende **offen bleibt** (Hinweis
+*"Drücken Sie Enter zum Beenden …"*). Aus CMD/PowerShell heraus
+gestartet entfällt diese Pause. Auf Linux ist Doppelklick-Verhalten
+Sache des Dateimanagers — das Tool wird dort üblicherweise direkt aus
+dem Terminal gestartet.
 
 ## Exit-Codes
 

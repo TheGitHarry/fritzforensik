@@ -103,6 +103,82 @@ def _selected_extractors(args: argparse.Namespace) -> list[str]:
     return selected
 
 
+def _select_box(boxes: list[discover.DiscoveredBox]) -> discover.DiscoveredBox | None:
+    """Interaktive Auswahl bei mehreren Boxen.
+
+    Liefert die gewählte Box oder None falls 'keine' / Abbruch / kein TTY.
+    """
+    if not (sys.stdin and sys.stdin.isatty()):
+        return None
+    sys.stdout.write("\nMehrere FRITZ!Boxen gefunden — bitte auswählen:\n")
+    for i, b in enumerate(boxes, 1):
+        label = b.friendly_name or b.model_name or "FRITZ!Box"
+        sys.stdout.write(f"  {i}) {b.ip}  —  {label}\n")
+    none_idx = len(boxes) + 1
+    sys.stdout.write(f"  {none_idx}) keine\n\n")
+    while True:
+        try:
+            raw = input(f"Auswahl [1-{none_idx}]: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            sys.stdout.write("\nAbgebrochen.\n")
+            return None
+        if raw.isdigit():
+            idx = int(raw)
+            if idx == none_idx:
+                return None
+            if 1 <= idx <= len(boxes):
+                return boxes[idx - 1]
+        sys.stdout.write("Ungültige Eingabe.\n")
+
+
+def _probe_tls(target_url: str, args: argparse.Namespace) -> None:
+    """Schaltet automatisch auf --insecure um, wenn das Box-Zertifikat
+    nicht vertrauenswürdig ist (selbstsigniert). Nur HTTPS-Targets."""
+    if args.insecure or not target_url.startswith("https://"):
+        return
+    try:
+        requests.get(
+            target_url + "/login_sid.lua?version=2",
+            timeout=10,
+        )
+    except requests.exceptions.SSLError as e:
+        log.warning(
+            "TLS-Zertifikat der Box ist nicht vertrauenswürdig "
+            "(vermutlich selbstsigniert): %s — schalte automatisch "
+            "auf --insecure um.",
+            e,
+        )
+        args.insecure = True
+    except requests.RequestException:
+        # andere Fehler werden später beim Login sichtbar
+        pass
+
+
+def _pause_if_double_clicked() -> None:
+    """Hält die Konsole offen wenn das Binary per Windows-Doppelklick
+    gestartet wurde (sonst schließt das Fenster sofort beim Exit).
+
+    Erkennung über GetConsoleProcessList: nur unser Prozess hängt am
+    Konsolenfenster → Konsole gehört uns → kein Terminal-Aufruf.
+    """
+    if not sys.platform.startswith("win"):
+        return
+    try:
+        import ctypes
+        process_list = (ctypes.c_ulong * 4)()
+        count = ctypes.windll.kernel32.GetConsoleProcessList(process_list, 4)
+    except Exception:
+        return
+    if count > 1:
+        return
+    try:
+        sys.stderr.write("\n[Drücken Sie Enter zum Beenden ...]")
+        sys.stderr.flush()
+        sys.stdin.readline()
+    except (EOFError, KeyboardInterrupt):
+        pass
+
+
 def _autodetect_user(base_url: str, verify_tls: bool) -> str | None:
     """Fragt die Box nach ihrer Benutzerliste; gibt den Namen zurück wenn genau einer vorhanden."""
     session = requests.Session()
@@ -159,11 +235,22 @@ def _resolve_target(args: argparse.Namespace) -> tuple[str | None, dict | None, 
         return None, None, EXIT_NO_DISCOVERY
 
     if len(boxes) > 1:
-        log.error("Mehrere FRITZ!Boxen gefunden — bitte --host explizit angeben:")
-        for b in boxes:
-            label = b.friendly_name or b.model_name or "FRITZ!Box"
-            log.error("  %s — %s (%s)", b.ip, label, b.location)
-        return None, None, EXIT_AMBIGUOUS
+        chosen = _select_box(boxes)
+        if chosen is None:
+            log.error(
+                "Keine Box gewählt — Abbruch. "
+                "Alternativ --host explizit angeben."
+            )
+            return None, None, EXIT_AMBIGUOUS
+        target = chosen.url_https()
+        label = chosen.friendly_name or chosen.model_name or "FRITZ!Box"
+        log.info("Ausgewählt: %s at %s", label, chosen.ip)
+        meta = {
+            "discovery_method": "ssdp",
+            "target": target,
+            "discovered": chosen.to_dict(),
+        }
+        return target, meta, EXIT_OK
 
     box = boxes[0]
     target = box.url_https()
@@ -220,19 +307,21 @@ def main(argv: list[str] | None = None) -> int:
             return EXIT_NO_DISCOVERY
 
         if len(boxes) > 1:
-            sys.stdout.write("Mehrere FRITZ!Boxen gefunden — bitte --host wählen:\n")
-            for b in boxes:
-                label = b.friendly_name or b.model_name or "FRITZ!Box"
-                sys.stdout.write(f"  {b.ip}  —  {label}\n")
-            sys.stdout.write("\n")
-            sys.stdout.write(_HELP_HINT)
-            return EXIT_AMBIGUOUS
-
-        # Genau eine Box: direkt starten
-        box = boxes[0]
+            chosen = _select_box(boxes)
+            if chosen is None:
+                sys.stdout.write(
+                    "\nKeine Box gewählt — Abbruch. "
+                    "Alternativ --host explizit angeben:\n\n"
+                )
+                sys.stdout.write(_HELP_HINT)
+                return EXIT_AMBIGUOUS
+            box = chosen
+        else:
+            box = boxes[0]
         label = box.friendly_name or box.model_name or "FRITZ!Box"
         sys.stdout.write(f"Gefundene FRITZ!Box: {box.ip}  —  {label}\n\n")
         args.host = box.url_https()
+        _probe_tls(args.host, args)
         detected = _autodetect_user(args.host, verify_tls=not args.insecure)
         if detected:
             log.info("Einzelner Benutzer erkannt: %s — wird automatisch verwendet", detected)
@@ -251,6 +340,8 @@ def main(argv: list[str] | None = None) -> int:
     if exit_code != EXIT_OK:
         return exit_code
     assert target_url is not None
+
+    _probe_tls(target_url, args)
 
     if not args.user:
         detected = _autodetect_user(target_url, verify_tls=not args.insecure)
