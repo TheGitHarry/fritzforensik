@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 ## Was das Projekt macht
 
 `legacy_export` ist eine Python-CLI zum **Live-Abzug forensisch relevanter

@@ -6,10 +6,13 @@ MD5-Fallback für ältere Stände.
 from __future__ import annotations
 
 import hashlib
+import logging
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 
 import requests
+
+log = logging.getLogger("legacy_export")
 
 LOGIN_PATH = "/login_sid.lua?version=2"
 LOGIN_POST_PATH = "/login_sid.lua"
@@ -28,13 +31,16 @@ class LoginResult:
 
 
 def _pbkdf2_response(challenge: str, password: str) -> str:
-    _, iter1, salt1, iter2, salt2 = challenge.split("$")
-    static_hash = hashlib.pbkdf2_hmac(
-        "sha256", password.encode("utf-8"), bytes.fromhex(salt1), int(iter1)
-    )
-    dynamic_hash = hashlib.pbkdf2_hmac(
-        "sha256", static_hash, bytes.fromhex(salt2), int(iter2)
-    )
+    try:
+        _, iter1, salt1, iter2, salt2 = challenge.split("$")
+        static_hash = hashlib.pbkdf2_hmac(
+            "sha256", password.encode("utf-8"), bytes.fromhex(salt1), int(iter1)
+        )
+        dynamic_hash = hashlib.pbkdf2_hmac(
+            "sha256", static_hash, bytes.fromhex(salt2), int(iter2)
+        )
+    except ValueError as e:
+        raise AuthError(f"Unverständliche PBKDF2-Challenge der Box: {challenge!r} ({e})") from e
     return f"{salt2}${dynamic_hash.hex()}"
 
 
@@ -108,7 +114,8 @@ def fetch_users(base_url: str, session: requests.Session) -> list[str]:
         resp = session.get(base_url + LOGIN_PATH, timeout=10)
         resp.raise_for_status()
         root = ET.fromstring(resp.text)
-    except (requests.RequestException, ET.ParseError):
+    except (requests.RequestException, ET.ParseError) as e:
+        log.warning("Benutzerliste nicht lesbar (%s): %s", type(e).__name__, e)
         return []
     users_node = root.find("Users")
     if users_node is None:

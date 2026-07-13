@@ -3,7 +3,10 @@
 Drei Varianten (je nach Firmware-Support), Reihenfolge nicht-interaktiv → interaktiv:
   * SupportData         — Standard-Diagnosebericht
   * MeshSupportData     — Mesh-Topologie-Diagnosedaten
-  * SupportDataEnhanced — erweiterter Diagnosebericht, erfordert Tasten-Bestätigung an der Box
+  * SupportDataEnhanced — erweiterter Diagnosebericht. Bei Boxen mit
+    deaktivierter "erweiterter Sicherheit" ohne Tastendruck abrufbar;
+    sonst erst nach Tasten-Bestätigung an der Box. Wir versuchen daher
+    erst ohne Bestätigung und fragen nur bei Bedarf interaktiv nach.
 
 Ablage: Rohdatei als `supportdata_<typ>_<ts>.txt` + SHA256-Sidecar im output_dir.
 Das JSON-Record enthält nur Metadaten (Typ, Pfad, Größe, Hash).
@@ -123,6 +126,49 @@ def _fetch_one(client: FritzClient, field_name: str) -> bytes | None:
     return resp.content
 
 
+def _fetch_enhanced(client: FritzClient) -> bytes | None:
+    """Erweiterte Supportdaten — erst ohne, dann ggf. mit Tasten-Bestätigung.
+
+    1. Direktversuch: Boxen mit deaktivierter "erweiterter Sicherheit"
+       liefern die Daten sofort, ohne Tastendruck.
+    2. Liefert die Box stattdessen die Bestätigungsseite (HTML → None),
+       weist der Direktversuch die Box gleichzeitig an, das Zeitfenster
+       für den Tastendruck zu öffnen. Wir fragen interaktiv nach und
+       rufen nach der Bestätigung erneut ab.
+    """
+    content = _fetch_one(client, "SupportDataEnhanced")
+    if content is not None:
+        log.info(
+            "Erweiterte Supportdaten ohne Tastendruck erhalten "
+            "(erweiterte Sicherheit auf der Box deaktiviert)."
+        )
+        return content
+
+    sys.stderr.write(
+        "\n"
+        "HINWEIS: Erweiterte Supportdaten benötigen eine Bestätigung an der FRITZ!Box.\n"
+        "  1. Drücken Sie einen der Knöpfe an der FRITZ!Box.\n"
+        "  2. Klicken Sie im erscheinenden Bestätigungsdialog auf OK.\n"
+        f"  Sie haben {ENHANCED_TIMEOUT_S} s; danach wird übersprungen.\n"
+    )
+    try:
+        confirmed = _wait_for_enter(ENHANCED_TIMEOUT_S)
+    except (EOFError, KeyboardInterrupt):
+        log.warning("Erweiterte Supportdaten übersprungen (Abbruch durch Nutzer).")
+        return None
+    if not confirmed:
+        log.warning(
+            "Erweiterte Supportdaten übersprungen (Timeout %d s).",
+            ENHANCED_TIMEOUT_S,
+        )
+        return None
+
+    content = _fetch_one(client, "SupportDataEnhanced")
+    if content is None:
+        log.warning("Erweiterte Supportdaten auch nach Bestätigung nicht erhalten.")
+    return content
+
+
 def extract(
     client: FritzClient, output_dir: Path | None = None
 ) -> tuple[list[dict], dict]:
@@ -137,28 +183,9 @@ def extract(
 
     for field_name, short_name in _VARIANTS:
         if field_name == "SupportDataEnhanced":
-            sys.stderr.write(
-                "\n"
-                "HINWEIS: Erweiterte Supportdaten benötigen eine Bestätigung an der FRITZ!Box.\n"
-                "  1. Drücken Sie einen der Knöpfe an der FRITZ!Box.\n"
-                "  2. Klicken Sie im erscheinenden Bestätigungsdialog auf OK.\n"
-                f"  Sie haben {ENHANCED_TIMEOUT_S} s; danach wird übersprungen.\n"
-            )
-            try:
-                confirmed = _wait_for_enter(ENHANCED_TIMEOUT_S)
-            except (EOFError, KeyboardInterrupt):
-                log.warning("Erweiterte Supportdaten übersprungen (Abbruch durch Nutzer).")
-                missing.append(short_name)
-                continue
-            if not confirmed:
-                log.warning(
-                    "Erweiterte Supportdaten übersprungen (Timeout %d s).",
-                    ENHANCED_TIMEOUT_S,
-                )
-                missing.append(short_name)
-                continue
-
-        content = _fetch_one(client, field_name)
+            content = _fetch_enhanced(client)
+        else:
+            content = _fetch_one(client, field_name)
         if content is None:
             log.info("Supportdaten '%s': nicht verfügbar oder kein Recht.", field_name)
             missing.append(short_name)

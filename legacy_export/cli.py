@@ -35,6 +35,18 @@ def _default_output() -> Path:
     return Path.cwd() / "export"
 
 
+def _normalize_host(host: str) -> str:
+    """Ergänzt fehlendes Schema (Default https) und entfernt Trailing-Slash.
+
+    Ohne Schema greift weder die TLS-Prüfung noch der Benutzer-Auto-Detect,
+    weil requests dann mit MissingSchema abbricht.
+    """
+    host = host.strip().rstrip("/")
+    if "://" not in host:
+        host = "https://" + host
+    return host
+
+
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="legacy_export",
@@ -46,7 +58,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "--output",
         type=Path,
         default=None,
-        help="Ausgabeverzeichnis (Default: ./export bzw. <binary>/export)",
+        help=(
+            "Ausgabeverzeichnis (Default: ./export bzw. <binary>/export); "
+            "je Lauf wird ein Zeitstempel angehängt, z.B. export_20260713T101530Z"
+        ),
     )
     p.add_argument(
         "--password-env",
@@ -80,7 +95,7 @@ _HELP_HINT = (
     "Wichtige Optionen:\n"
     "  --host IP        Ziel-Box (überspringt Auto-Discovery)\n"
     "  --user NAME      FRITZ!Box-Benutzername\n"
-    "  --output DIR     Ausgabeverzeichnis (Default: ./export)\n"
+    "  --output DIR     Ausgabeverzeichnis (Default: ./export, mit Zeitstempel-Suffix je Lauf)\n"
     "  --discover       Nur Discovery-Lauf (JSON auf stdout, für Scripting)\n"
     "  --iface IP       Multicast-Schnittstelle\n"
     "  --insecure       TLS-Zertifikat nicht prüfen\n"
@@ -179,18 +194,83 @@ def _pause_if_double_clicked() -> None:
         pass
 
 
-def _autodetect_user(base_url: str, verify_tls: bool) -> str | None:
-    """Fragt die Box nach ihrer Benutzerliste; gibt den Namen zurück wenn genau einer vorhanden."""
+def _list_users(base_url: str, verify_tls: bool) -> list[str]:
+    """Fragt die Box nach ihrer Benutzerliste (leer bei Fehler/alter Firmware)."""
     session = requests.Session()
     session.verify = verify_tls
     if not verify_tls:
         import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     try:
-        users = fetch_users(base_url, session)
+        return fetch_users(base_url, session)
     finally:
         session.close()
+
+
+def _autodetect_user(base_url: str, verify_tls: bool) -> str | None:
+    """Gibt den Benutzernamen zurück wenn die Box genau einen kennt, sonst None."""
+    users = _list_users(base_url, verify_tls)
     return users[0] if len(users) == 1 else None
+
+
+def _select_user(users: list[str]) -> str | None:
+    """Interaktive Auswahl bei mehreren Benutzern.
+
+    Liefert den gewählten Namen oder None bei Abbruch / kein TTY.
+    """
+    if not (sys.stdin and sys.stdin.isatty()):
+        return None
+    sys.stdout.write("\nMehrere Benutzer auf der Box — bitte auswählen:\n")
+    for i, name in enumerate(users, 1):
+        sys.stdout.write(f"  {i}) {name}\n")
+    sys.stdout.write("\n")
+    while True:
+        try:
+            raw = input(f"Auswahl [1-{len(users)}]: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            sys.stdout.write("\nAbgebrochen.\n")
+            return None
+        if raw.isdigit() and 1 <= int(raw) <= len(users):
+            return users[int(raw) - 1]
+        sys.stdout.write("Ungültige Eingabe.\n")
+
+
+def _resolve_user(base_url: str, args: argparse.Namespace) -> str | None:
+    """Ermittelt den Benutzernamen: --user > Auto (genau einer) > interaktiv.
+
+    Bei mehreren bekannten Benutzern wird eine Auswahl angeboten; ist die
+    Liste nicht abrufbar (alte Firmware), wird nach freiem Text gefragt.
+    Gibt None zurück, wenn nichts aufgelöst werden konnte (Meldung erfolgt hier).
+    """
+    if args.user:
+        return args.user
+
+    users = _list_users(base_url, verify_tls=not args.insecure)
+    if len(users) == 1:
+        log.info("Einzelner Benutzer erkannt: %s — wird automatisch verwendet", users[0])
+        return users[0]
+    if len(users) > 1:
+        chosen = _select_user(users)
+        if chosen is None:
+            log.error(
+                "Mehrere Benutzer (%s), keine Auswahl möglich — --user explizit angeben.",
+                ", ".join(users),
+            )
+        return chosen
+
+    # Keine Liste abrufbar (z.B. alte Firmware ohne Users-Element).
+    if not (sys.stdin and sys.stdin.isatty()):
+        log.error("--user ist erforderlich (Benutzerliste nicht abrufbar).")
+        return None
+    try:
+        name = input("Benutzername: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        sys.stdout.write("\nAbgebrochen.\n")
+        return None
+    if not name:
+        sys.stdout.write("Kein Benutzername eingegeben.\n")
+        return None
+    return name
 
 
 def _resolve_password(env_name: str) -> str:
@@ -267,7 +347,12 @@ def _resolve_target(args: argparse.Namespace) -> tuple[str | None, dict | None, 
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
 
-    output_dir = args.output or _default_output()
+    if args.host:
+        args.host = _normalize_host(args.host)
+
+    run_stamp = output._utc_now_compact()
+    base_dir = args.output or _default_output()
+    output_dir = base_dir.parent / f"{base_dir.name}_{run_stamp}"
 
     log_file: Path | None = None
     if not args.discover:
@@ -279,7 +364,7 @@ def main(argv: list[str] | None = None) -> int:
         if not os.access(output_dir, os.W_OK):
             sys.stderr.write(f"ERROR: Output-Verzeichnis {output_dir} nicht beschreibbar (read-only?).\n")
             return EXIT_NETWORK
-        log_file = output_dir / f"legacy_export_{output._utc_now_compact()}.log"
+        log_file = output_dir / f"legacy_export_{run_stamp}.log"
 
     _configure_logging(verbose=args.verbose, log_file=log_file)
 
@@ -322,19 +407,9 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write(f"Gefundene FRITZ!Box: {box.ip}  —  {label}\n\n")
         args.host = box.url_https()
         _probe_tls(args.host, args)
-        detected = _autodetect_user(args.host, verify_tls=not args.insecure)
-        if detected:
-            log.info("Einzelner Benutzer erkannt: %s — wird automatisch verwendet", detected)
-            args.user = detected
-        else:
-            try:
-                args.user = input("Benutzername: ").strip()
-            except (EOFError, KeyboardInterrupt):
-                sys.stdout.write("\nAbgebrochen.\n")
-                return EXIT_AUTH
-            if not args.user:
-                sys.stdout.write("Kein Benutzername eingegeben.\n")
-                return EXIT_AUTH
+        args.user = _resolve_user(args.host, args)
+        if not args.user:
+            return EXIT_AUTH
 
     target_url, discovery_meta, exit_code = _resolve_target(args)
     if exit_code != EXIT_OK:
@@ -343,14 +418,8 @@ def main(argv: list[str] | None = None) -> int:
 
     _probe_tls(target_url, args)
 
+    args.user = _resolve_user(target_url, args)
     if not args.user:
-        detected = _autodetect_user(target_url, verify_tls=not args.insecure)
-        if detected:
-            log.info("Einzelner Benutzer erkannt: %s — wird automatisch verwendet", detected)
-            args.user = detected
-
-    if not args.user:
-        log.error("--user ist erforderlich (außer bei --discover)")
         return EXIT_AUTH
 
     password = _resolve_password(args.password_env)

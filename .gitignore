@@ -5,7 +5,10 @@ __pycache__/
 .venv/
 venv/
 .env
+# Abzüge NIE einchecken — enthalten echte Forensikdaten.
+# Pro Lauf ein Verzeichnis mit Zeitstempel-Suffix (export_<ts>/).
 export/
+export_*/
 /tmp/
 .pytest_cache/
 .coverage

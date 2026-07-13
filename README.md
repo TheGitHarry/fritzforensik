@@ -73,8 +73,11 @@ um."*). `--insecure` lässt sich bei Bedarf weiterhin explizit setzen.
 (z.B. `--iface 192.168.2.228`).
 
 `--output` ist optional: Default ist `./export/` neben dem Skript bzw.
-neben dem PyInstaller-Binary. Pro Lauf wird eine Logdatei
-`legacy_export_<timestamp>.log` im selben Verzeichnis abgelegt.
+neben dem PyInstaller-Binary. **Jeder Lauf bekommt ein eigenes
+Verzeichnis** mit UTC-Zeitstempel-Suffix — `export_20260713T101530Z/`,
+mit `--output case42` entsprechend `case42_20260713T101530Z/`. So
+überschreibt ein zweiter Lauf nie den Abzug des ersten. Die Logdatei
+`legacy_export_<timestamp>.log` liegt im selben Verzeichnis.
 
 ## Extractoren
 
@@ -107,6 +110,13 @@ Ist TR-064 beim Start nicht erreichbar, erscheint eine Warnung mit der
 Liste der betroffenen Extractoren. Extractoren mit Web-UI-Fallback (`--tam`,
 `--mesh`) laufen in jedem Fall durch.
 
+**Zusätzlich braucht der Box-Benutzer die TR-064-Berechtigung.** Fehlt sie,
+antwortet die Box auf jeden SOAP-Aufruf mit `UPnPError 401 (Invalid Action)`
+— sichtbar als Logzeile *"TR-064 nicht zugänglich"*. Der Lauf bricht dann
+nicht ab, aber `--wan` liefert nur die per Web-UI erreichbaren Felder statt
+der vollständigen WAN-/DSL-Daten. Das Recht wird im Web-UI unter *System →
+FRITZ!Box-Benutzer → \<Benutzer\> → bearbeiten* gesetzt.
+
 ### Anrufbeantworter (`--tam`)
 
 Audio-Aufnahmen werden als WAV in das Subverzeichnis `tam_audio/`
@@ -133,11 +143,20 @@ Drei Varianten werden nacheinander gezogen:
 
 1. `SupportData` — Standard-Diagnosebericht.
 2. `MeshSupportData` — Mesh-Topologie-Diagnose.
-3. `SupportDataEnhanced` — erweiterter Bericht. **Erfordert physische
-   Bestätigung an der Box**: ein beliebiger Knopf an der FRITZ!Box
-   drücken und im Web-UI-Dialog auf OK klicken. Das Tool zeigt einen
-   30-s-Countdown auf der Konsole; läuft die Zeit ab, wird nur diese
-   Variante übersprungen, die anderen beiden bleiben erhalten.
+3. `SupportDataEnhanced` — erweiterter Bericht. Ob dafür eine physische
+   Bestätigung nötig ist, hängt von der Box-Einstellung *erweiterte
+   Sicherheit* ab. Das Tool probiert es deshalb **erst ohne Bestätigung**:
+
+   - Ist die erweiterte Sicherheit deaktiviert, liefert die Box die Daten
+     sofort — kein Prompt, keine Wartezeit (Log: *"Erweiterte Supportdaten
+     ohne Tastendruck erhalten"*).
+   - Verlangt die Box eine Bestätigung, antwortet sie stattdessen mit der
+     Bestätigungsseite; dieser erste Aufruf öffnet zugleich das
+     Zeitfenster für den Tastendruck. Dann erst erscheint der Hinweis:
+     einen beliebigen Knopf an der FRITZ!Box drücken, im Web-UI-Dialog auf
+     OK klicken. Das Tool zeigt einen 30-s-Countdown; läuft die Zeit ab,
+     wird nur diese Variante übersprungen, die anderen beiden bleiben
+     erhalten.
 
 Pro Variante wird die Rohdatei als `supportdata_<typ>_<ts>.txt` plus
 `.sha256`-Sidecar im Output-Verzeichnis abgelegt; das JSON-Record
@@ -187,10 +206,10 @@ Empfohlenes Stick-Layout:
 USB:/
   legacy_export-<version>-linux-x86_64       (chmod +x)
   legacy_export-<version>-windows-x86_64.exe
-  export/                                     (wird automatisch erstellt)
+  export_20260713T101530Z/                    (wird pro Lauf erstellt)
 ```
 
-`export/` landet neben dem Binary, nicht im zufälligen `cwd`. Der
+Das Export-Verzeichnis landet neben dem Binary, nicht im zufälligen `cwd`. Der
 PyInstaller-Bootstrap-Extract wird ebenfalls auf den Stick geschrieben
 (`--runtime-tmpdir .`), damit keine Spuren auf dem Host-System bleiben.
 
