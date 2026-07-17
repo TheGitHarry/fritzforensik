@@ -245,7 +245,18 @@ def _resolve_user(base_url: str, args: argparse.Namespace) -> str | None:
     if args.user:
         return args.user
 
-    users = _list_users(base_url, verify_tls=not args.insecure)
+    try:
+        users = _list_users(base_url, verify_tls=not args.insecure)
+    except requests.exceptions.SSLError as e:
+        # Box-Zertifikat nicht vertrauenswürdig (selbstsigniert). Auf insecure
+        # umschalten und den Read wiederholen, statt den Anwender zu fragen.
+        # args.insecure gilt danach auch für den folgenden Login.
+        log.warning(
+            "TLS-Zertifikat der Box nicht vertrauenswürdig beim Benutzer-Read "
+            "(%s) — schalte auf --insecure um und versuche erneut.", e,
+        )
+        args.insecure = True
+        users = _list_users(base_url, verify_tls=False)
     if len(users) == 1:
         log.info("Einzelner Benutzer erkannt: %s — wird automatisch verwendet", users[0])
         return users[0]
@@ -258,7 +269,13 @@ def _resolve_user(base_url: str, args: argparse.Namespace) -> str | None:
             )
         return chosen
 
-    # Keine Liste abrufbar (z.B. alte Firmware ohne Users-Element).
+    # Liste leer trotz erfolgreicher Abfrage (kein Zertifikatsproblem mehr —
+    # SSL wird oben abgefangen): Box liefert keine Users-Sektion, z.B. alte
+    # Firmware. Erst hier — als letzter Ausweg — den Anwender fragen.
+    log.info(
+        "Box lieferte keine Benutzerliste (auch mit deaktivierter TLS-Prüfung) "
+        "— bitte Benutzer angeben."
+    )
     if not (sys.stdin and sys.stdin.isatty()):
         log.error("--user ist erforderlich (Benutzerliste nicht abrufbar).")
         return None

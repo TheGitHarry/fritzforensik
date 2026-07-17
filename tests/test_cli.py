@@ -94,6 +94,25 @@ def test_resolve_user_mehrere_ohne_tty_ergibt_none(monkeypatch):
     assert cli._resolve_user("https://192.168.2.1", args) is None
 
 
+def test_resolve_user_retry_insecure_bei_sslerror(monkeypatch):
+    """Regression: bei einem Zertifikatsfehler beim Benutzer-Read wird auf
+    insecure umgeschaltet und der Read wiederholt — statt den Anwender zu
+    fragen. args.insecure muss danach True sein (gilt für den Login)."""
+    calls = []
+
+    def fake_list_users(base_url, verify_tls):
+        calls.append(verify_tls)
+        if verify_tls:
+            raise requests.exceptions.SSLError("self-signed certificate")
+        return ["export"]
+
+    monkeypatch.setattr(cli, "_list_users", fake_list_users)
+    args = argparse.Namespace(user=None, insecure=False)
+    assert cli._resolve_user("https://192.168.2.1", args) == "export"
+    assert args.insecure is True
+    assert calls == [True, False]  # erst verify, dann insecure-Retry
+
+
 def test_resolve_user_freitext_wenn_liste_leer(monkeypatch):
     monkeypatch.setattr(cli, "_list_users", lambda b, verify_tls: [])
     monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)

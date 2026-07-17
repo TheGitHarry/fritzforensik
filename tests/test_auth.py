@@ -125,6 +125,15 @@ def test_fetch_users_network_error():
     assert fetch_users("http://fritz.box", session) == []
 
 
+def test_fetch_users_reicht_sslerror_durch():
+    """Zertifikatsfehler darf nicht zu einer stillen leeren Liste werden —
+    der Aufrufer muss auf --insecure umschalten können."""
+    session = MagicMock()
+    session.get.side_effect = requests.exceptions.SSLError("self-signed certificate")
+    with pytest.raises(requests.exceptions.SSLError):
+        fetch_users("https://fritz.box", session)
+
+
 def test_fetch_users_malformed_xml():
     resp = MagicMock()
     resp.text = "not xml at all <<<"

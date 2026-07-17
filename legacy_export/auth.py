@@ -109,11 +109,17 @@ def fetch_users(base_url: str, session: requests.Session) -> list[str]:
 
     Leere Liste bei Netzwerkfehler, Parse-Fehler oder fehlender Users-Sektion
     (ältere Firmware ohne Users-Element).
+
+    Ein TLS-Zertifikatsfehler (`SSLError`) wird *nicht* geschluckt, sondern
+    weitergereicht: der Aufrufer kann dann auf --insecure umschalten und den
+    Read wiederholen, statt fälschlich eine leere Liste zu sehen.
     """
     try:
         resp = session.get(base_url + LOGIN_PATH, timeout=10)
         resp.raise_for_status()
         root = ET.fromstring(resp.text)
+    except requests.exceptions.SSLError:
+        raise
     except (requests.RequestException, ET.ParseError) as e:
         log.warning("Benutzerliste nicht lesbar (%s): %s", type(e).__name__, e)
         return []
