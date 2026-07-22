@@ -534,13 +534,33 @@ def build_timeline(model: Model, proofs: list) -> list:
 
 # ───────────────────────── Gesamt-Report ─────────────────────────────────────
 
+def _pick_device(mesh_nodes: list, host: str = "") -> dict:
+    """Identität der **abgezogenen** Box robust wählen.
+
+    Beste Quelle ist der Mesh-Knoten, dessen Name im `host`-Feld steht (die Box,
+    mit der legacy_export tatsächlich sprach). Ist der Host eine IP (kein
+    Namenstreffer), wird ein Knoten *mit* Modell bevorzugt — der Master-Knoten
+    trägt je nach Firmware kein `device_model`."""
+    if host:
+        hit = next((n for n in mesh_nodes if n.get("name") and n["name"] in host), None)
+        if hit:
+            return hit
+    for pred in (lambda n: n["role"] == "master" and n.get("model"),
+                 lambda n: n["is_ap"] and n.get("model"),
+                 lambda n: n.get("model"),
+                 lambda n: n["role"] == "master"):
+        hit = next((n for n in mesh_nodes if pred(n)), None)
+        if hit:
+            return hit
+    return mesh_nodes[0] if mesh_nodes else {}
+
+
 def build_html(bundle, model: Model, support: dict, header: dict) -> str:
     m = model
     proofs = support.get("proofs", [])
     up = support.get("uptime", {})
 
-    device = m.master or next((n for n in m.mesh_nodes if n["is_ap"]), {}) \
-        or (m.mesh_nodes[0] if m.mesh_nodes else {})
+    device = _pick_device(m.mesh_nodes, m.meta.get("host", ""))
 
     all_iso = [x for x in ([e["f_iso"] for e in m.events] + [c["f_iso"] for c in m.calls]
                            + [p["f_iso"] for p in proofs]) if x]
@@ -637,7 +657,7 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
     s10 = table("tbl-timeline", ["Zeitpunkt", "Quelle", "MAC", "Beschreibung"],
                 render_rows(timeline, c_timeline, 6))
 
-    dhcp_body = ""
+    dhcp_body = '<div class="notice notice-info">Keine DHCP-Konfiguration in diesem Export enthalten.</div>'
     if m.dhcp:
         d = m.dhcp
         dhcp_body = ("<table class='kv'>"
@@ -678,7 +698,10 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
                   note=(f'<strong class="err">{mism} Datei(en) mit Hash-MISMATCH!</strong>' if mism else ""))
         + section("s3", "3", "Hosts / registrierte Geräte", "hosts", len(m.hosts), s3, noun="Geräte")
         + section("s4", "4", "Mesh-Topologie", "mesh", len(m.mesh_nodes), s4, noun="Knoten", note=ap_note)
-        + section("s5", "5", "Clients (wifi.json)", "wifi", len(m.wifi), s5, noun="Clients")
+        + section("s5", "5", "Clients (wifi.json)", "wifi", len(m.wifi), s5, noun="Clients",
+                  note=("" if m.wifi else "Keine WLAN-Clients in <span class='mono'>wifi.json</span> "
+                        "dieses Exports — die Box lieferte zum Sammelzeitpunkt keine Client-Liste "
+                        "(Verbindungsnachweise stehen in Sektion 6)."))
         + section("s6", "6", "Verbindungsnachweise (WLAN, aus Supportdaten)", "wlan", len(proofs), s6,
                   noun="Nachweise", note=wlan_note)
         + section("s7", "7", "Anrufhistorie", "calls", len(m.calls), s7, noun="Anrufe")
