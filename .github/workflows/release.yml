@@ -1,0 +1,35 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            tag: linux-x86_64
+          - runner: ubuntu-22.04-arm
+            tag: linux-aarch64
+          - runner: windows-2022
+            tag: windows-x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build deps
+        run: python -m pip install --upgrade 'pyinstaller>=6' 'pytest>=7'
+      - name: Tests (offline)
+        run: python -m pytest tests/test_core.py -q
+      - name: Build single-file binary
+        run: python scripts/build.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: legacy_report-${{ matrix.tag }}
+          path: dist/*
