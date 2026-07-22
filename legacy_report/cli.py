@@ -1,16 +1,19 @@
-"""CLI — legacy_report <bundle> [--output report.html].
+"""CLI — geführter Feld-Ablauf.
 
-Liest ein legacy_export-Bundle (Verzeichnis), verifiziert die Hashes, wertet die
-Supportdaten aus und schreibt einen self-contained forensischen HTML-Report.
+    legacy_report [bundle] [-o report.html] [--open]
 
-Die Kopf-Felder (Case-ID, Item-ID, SB, Datum) werden hier als CLI-Args
-entgegengenommen — **wie sie im Feldeinsatz erhoben werden (Prompt/Config), ist
-noch offen** und wird später geklärt.
+Ohne ``bundle``-Argument sucht legacy_report legacy_export-Bundles im aktuellen
+Verzeichnis (Auto-Discovery, analog zum Export): genau eines → direkt nehmen,
+mehrere → nummerierte Auswahl. Danach werden die Kopf-Felder (Case-ID, Item-ID,
+SB, Datum) interaktiv abgefragt (per CLI-Flag gesetzte Werte überspringen die
+Abfrage). Der Report bekommt einen sprechenden Namen und wird ins **aktuelle
+Arbeitsverzeichnis** geschrieben — nicht in den Beweismittel-Ordner.
 """
 from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import re
 import sys
 import webbrowser
 from pathlib import Path
@@ -18,7 +21,7 @@ from pathlib import Path
 from . import __version__
 from .bundle import load_bundle
 from .model import build_model
-from .render import build_html
+from .render import _pick_device, build_html
 from .supportdata import analyze
 
 
@@ -30,35 +33,68 @@ def _now_iso() -> str:
     return _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(
-        prog="legacy_report",
-        description="Forensischer HTML-Report aus einem legacy_export-Bundle.")
-    p.add_argument("bundle", type=Path, help="Bundle-Verzeichnis (legacy_export-Export)")
-    p.add_argument("-o", "--output", type=Path, default=None,
-                   help="Ziel-HTML (Default: <bundle>/report.html)")
-    p.add_argument("--open", action="store_true", help="Report danach im Browser öffnen")
-    # Kopf-Felder: standardmäßig interaktiv abgefragt (Prompt). Wer sie hier
-    # angibt, überspringt die Abfrage (Automation/Tests). --no-prompt erzwingt
-    # nicht-interaktiv (leere/CLI-Werte, kein Fragen).
-    p.add_argument("--case-id", default=None, help="Case-ID (sonst Abfrage)")
-    p.add_argument("--item-id", default=None, help="Asservat / Item-ID (sonst Abfrage)")
-    p.add_argument("--sb", default=None, help="Sachbearbeiter (sonst Abfrage)")
-    p.add_argument("--date", default=None, help="Datum (Default: heute)")
-    p.add_argument("--no-prompt", action="store_true",
-                   help="Kopf-Felder nicht abfragen (nimmt CLI-Werte bzw. leer)")
-    p.add_argument("--version", action="version", version=f"legacy_report {__version__}")
-    return p
+# ───────────────────────── Bundle-Discovery ─────────────────────────────────
 
+def is_bundle(d: Path) -> bool:
+    """Ein Verzeichnis ist ein legacy_export-Bundle, wenn es mindestens eine
+    ``legacy_export_<host>_<ts>_<typ>.json`` enthält."""
+    return d.is_dir() and any(d.glob("legacy_export_*_*.json"))
+
+
+def discover_bundles(base: Path) -> list[Path]:
+    """Bundles im Verzeichnis ``base`` finden: ``base`` selbst (falls Bundle)
+    und direkte Unterverzeichnisse. Nach Name sortiert."""
+    found = []
+    if is_bundle(base):
+        found.append(base)
+    found += sorted(p for p in base.iterdir() if is_bundle(p))
+    return found
+
+
+def resolve_bundle(arg: Path | None) -> Path:
+    """Bundle bestimmen: explizites Argument oder Auto-Discovery im cwd."""
+    if arg is not None:
+        if not arg.is_dir():
+            raise SystemExit(f"Fehler: Bundle-Verzeichnis nicht gefunden: {arg}")
+        return arg
+
+    cands = discover_bundles(Path.cwd())
+    if not cands:
+        raise SystemExit(
+            "Fehler: kein legacy_export-Bundle im aktuellen Verzeichnis gefunden.\n"
+            "Bundle-Verzeichnis explizit angeben: legacy_report <verzeichnis>")
+    if len(cands) == 1:
+        print(f"Bundle: {cands[0].name}", file=sys.stderr)
+        return cands[0]
+
+    if not sys.stdin.isatty():
+        names = ", ".join(c.name for c in cands)
+        raise SystemExit(f"Fehler: mehrere Bundles gefunden ({names}). "
+                         f"Bitte eines explizit angeben.")
+    print("Mehrere Bundles gefunden:", file=sys.stderr)
+    for i, c in enumerate(cands, 1):
+        print(f"  {i}) {c.name}", file=sys.stderr)
+    while True:
+        try:
+            ans = input(f"Auswahl [1-{len(cands)}, Enter=1]: ").strip()
+        except EOFError:
+            ans = ""
+        if not ans:
+            return cands[0]
+        if ans.isdigit() and 1 <= int(ans) <= len(cands):
+            return cands[int(ans) - 1]
+        print("  Ungültige Eingabe.", file=sys.stderr)
+
+
+# ───────────────────────── Kopf-Felder ──────────────────────────────────────
 
 def collect_header(args) -> dict:
-    """Kopf-Felder erheben: was per CLI kam, wird übernommen; der Rest wird
-    interaktiv abgefragt (Prompt), sofern ein TTY vorhanden ist und nicht
-    ``--no-prompt`` gesetzt wurde."""
+    """Kopf-Felder erheben: CLI-Werte werden übernommen, der Rest interaktiv
+    abgefragt (sofern TTY und nicht ``--no-prompt``)."""
     interactive = (not args.no_prompt) and sys.stdin.isatty() and sys.stdout.isatty()
 
     def field(cli_val, label, default=""):
-        if cli_val is not None:          # explizit per CLI gesetzt
+        if cli_val is not None:
             return cli_val
         if not interactive:
             return default
@@ -80,11 +116,52 @@ def collect_header(args) -> dict:
     }
 
 
+# ───────────────────────── Ausgabename ──────────────────────────────────────
+
+_SAFE = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def _slug(value: str) -> str:
+    return _SAFE.sub("-", value.strip()).strip("-")
+
+
+def default_output_name(header: dict, box_label: str) -> Path:
+    """Sprechender Report-Name im aktuellen Arbeitsverzeichnis:
+    ``<Case>_<Item>_<Box>_<Datum>.html`` (leere Teile entfallen)."""
+    parts = [header.get("case_id", ""), header.get("item_id", ""),
+             box_label, header.get("date", "")]
+    slug = "_".join(_slug(p) for p in parts if p and _slug(p))
+    return Path.cwd() / (f"{slug}.html" if slug else "legacy_report-report.html")
+
+
+# ───────────────────────── main ─────────────────────────────────────────────
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="legacy_report",
+        description="Forensischer HTML-Report aus einem legacy_export-Bundle. "
+                    "Ohne Bundle-Argument wird im aktuellen Verzeichnis gesucht.")
+    p.add_argument("bundle", type=Path, nargs="?", default=None,
+                   help="Bundle-Verzeichnis (Default: Auto-Discovery im cwd)")
+    p.add_argument("-o", "--output", type=Path, default=None,
+                   help="Ziel-HTML (Default: sprechender Name im cwd)")
+    p.add_argument("--open", action="store_true", help="Report danach im Browser öffnen")
+    p.add_argument("--case-id", default=None, help="Case-ID (sonst Abfrage)")
+    p.add_argument("--item-id", default=None, help="Asservat / Item-ID (sonst Abfrage)")
+    p.add_argument("--sb", default=None, help="Sachbearbeiter (sonst Abfrage)")
+    p.add_argument("--date", default=None, help="Datum (Default: heute)")
+    p.add_argument("--no-prompt", action="store_true",
+                   help="Kopf-Felder nicht abfragen (CLI-Werte bzw. leer)")
+    p.add_argument("--version", action="version", version=f"legacy_report {__version__}")
+    return p
+
+
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
 
+    bundle_dir = resolve_bundle(args.bundle)
     try:
-        bundle = load_bundle(args.bundle)
+        bundle = load_bundle(bundle_dir)
     except (NotADirectoryError, FileNotFoundError) as e:
         print(f"Fehler: {e}", file=sys.stderr)
         return 2
@@ -96,14 +173,17 @@ def main(argv=None) -> int:
     support = analyze(bundle, model.real_aps, master_name)
 
     html = build_html(bundle, model, support, header)
-    out = args.output or (args.bundle / "report.html")
+
+    device = _pick_device(model.mesh_nodes, model.meta.get("host", ""))
+    box_label = device.get("model", "") or bundle_dir.name
+    out = args.output or default_output_name(header, box_label)
     out.write_text(html, encoding="utf-8")
 
-    # --- Zusammenfassung (wie legacy_export)
     proofs = support["proofs"]
     mism = sum(1 for e in bundle.coc if e.status == "mismatch")
     kb = out.stat().st_size / 1024
     print(f"Report: {out}  ({kb:.0f} KB)")
+    print(f"  Gerät: {box_label}")
     print(f"  Integrität: {len(bundle.coc)} Dateien geprüft, "
           + ("alle ✔ verifiziert" if not mism else f"{mism} MISMATCH ✘"))
     print(f"  Hosts {len(model.hosts)} · Clients {len(model.wifi)} · "
