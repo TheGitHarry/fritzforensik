@@ -5,13 +5,27 @@ __pycache__/
 .venv/
 venv/
 .env
-# Abzüge NIE einchecken — enthalten echte Forensikdaten.
-# Pro Lauf ein Verzeichnis mit Zeitstempel-Suffix (export_<ts>/).
-export/
-export_*/
-/tmp/
 .pytest_cache/
 .coverage
+/tmp/
+
+# Abzüge NIE einchecken — enthalten echte Forensikdaten.
+# fritzexport legt pro Lauf ein Verzeichnis mit Zeitstempel-Suffix an.
+export/
+export_*/
+
+# Erzeugte Reports NIE einchecken — enthalten ebenfalls echte Forensikdaten.
+*.report.html
+report.html
+reports/
+
+# Referenzmaterial (PoC, fremder Parser, Testkopien) — NICHT ausliefern
+_material/
+
+# Node (nur für den jsdom-Filtertest lokal installiert)
+node_modules/
+package-lock.json
+package.json
 
 # PyInstaller-Build-Artefakte
 build/

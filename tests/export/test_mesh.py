@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from legacy_export.client import Tr064Disabled
-from legacy_export.extractors import mesh as mesh_mod
+from fritzexport.client import Tr064Disabled
+from fritzexport.extractors import mesh as mesh_mod
 
 
 # Realistisches AVM-Mesh-JSON (gekürzt). Zwei Knoten, ein Link, der in beiden

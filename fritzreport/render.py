@@ -1,7 +1,7 @@
 """HTML-Rendering — self-contained Report, 12 Sektionen.
 
 Übernommen aus dem PoC (``_material/poc/build_report.py``): CSS, JS-Filter/-Druck,
-Sektions-/Tabellen-/Herkunfts-Renderer. Angepasst an legacy_report:
+Sektions-/Tabellen-/Herkunfts-Renderer. Angepasst an fritzreport:
 - **3-Grade-System** (D1/D2/D3, kein D4),
 - **SHA-256-Integritäts-Badge** je Datei in der Chain of Custody,
 - **neue Sektion 10 „Vollständige Timeline"** (quellenübergreifend),
@@ -538,7 +538,7 @@ def _pick_device(mesh_nodes: list, host: str = "") -> dict:
     """Identität der **abgezogenen** Box robust wählen.
 
     Beste Quelle ist der Mesh-Knoten, dessen Name im `host`-Feld steht (die Box,
-    mit der legacy_export tatsächlich sprach). Ist der Host eine IP (kein
+    mit der fritzexport tatsächlich sprach). Ist der Host eine IP (kein
     Namenstreffer), wird ein Knoten *mit* Modell bevorzugt — der Master-Knoten
     trägt je nach Firmware kein `device_model`."""
     if host:
@@ -586,7 +586,7 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
         ("Extraktionswerkzeug", f'{m.meta.get("tool","?")} {m.meta.get("version","?")}'),
         ("Export erstellt am", m.meta.get("extracted_at", "")),
         ("Report erzeugt am", header.get("generated_at", "")),
-        ("Report-Generator", f"legacy_report {__version__}"),
+        ("Report-Generator", f"fritzreport {__version__}"),
         ("Roh-Report-Hash (SHA256)", raw_report_id),
     ]
     s1 = (
@@ -631,7 +631,7 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
     mism = sum(1 for e in bundle.coc if e.status == "mismatch")
     s2 = (
         "<p>Rohquellen dieses Reports. Jede Datei ist per SHA256-Sidecar signiert; "
-        "legacy_report hat jede Datei gegen ihre Sidecar <strong>verifiziert</strong>.</p>"
+        "fritzreport hat jede Datei gegen ihre Sidecar <strong>verifiziert</strong>.</p>"
         "<table><thead><tr><th>Datei</th><th>SHA256</th><th class='num'>Größe (Byte)</th>"
         "<th>Integrität</th></tr></thead><tbody>"
         + "".join(f'<tr><td class="mono">{esc(c.file)}</td>'

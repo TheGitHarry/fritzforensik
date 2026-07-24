@@ -1,29 +1,28 @@
-"""JSON-Output mit SHA256-Sidecar."""
+"""JSON-Output mit SHA256-Sidecar.
+
+Dateinamen, Hüllformat und Sidecar kommen aus :mod:`fritzformat` — dort liegt
+der gemeinsame Formatvertrag mit fritzreport.
+"""
 from __future__ import annotations
 
-import datetime as _dt
-import hashlib
 import json
-import re
 from pathlib import Path
+
+from fritzformat import (
+    TOOL_NAME,
+    build_envelope,
+    dataset_filename,
+    sha256_bytes,
+    utc_now_compact,
+    utc_now_iso,
+    write_sidecar,
+)
 
 from . import __version__
 
-_SAFE = re.compile(r"[^A-Za-z0-9._-]+")
-
-
-def _slug(value: str) -> str:
-    if "://" in value:
-        value = value.split("://", 1)[1]
-    return _SAFE.sub("_", value).strip("_") or "host"
-
-
-def _utc_now_iso() -> str:
-    return _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def _utc_now_compact() -> str:
-    return _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+# Aliase für bestehende Aufrufer (cli.py, Tests) — Implementierung in fritzformat.
+_utc_now_iso = utc_now_iso
+_utc_now_compact = utc_now_compact
 
 
 def write(
@@ -37,26 +36,20 @@ def write(
 ) -> Path:
     """Schreibt Records als JSON + .sha256-Sidecar. Gibt JSON-Pfad zurück."""
     output_dir.mkdir(parents=True, exist_ok=True)
-    ts = timestamp or _utc_now_compact()
-    filename = f"legacy_export_{_slug(host)}_{ts}_{type_name}.json"
-    json_path = output_dir / filename
+    ts = timestamp or utc_now_compact()
+    json_path = output_dir / dataset_filename(host, ts, type_name)
 
-    payload: dict = {
-        "tool": "legacy_export",
-        "version": __version__,
-        "host": host,
-        "extracted_at": _utc_now_iso(),
-        "type": type_name,
-        "records": records,
-    }
-    if discovery_meta:
-        payload["discovery"] = discovery_meta
-    if extra_meta:
-        payload.update(extra_meta)
+    payload = build_envelope(
+        tool=TOOL_NAME,
+        version=__version__,
+        host=host,
+        type_name=type_name,
+        records=records,
+        discovery_meta=discovery_meta,
+        extra_meta=extra_meta,
+    )
     body = json.dumps(payload, indent=2, ensure_ascii=False).encode("utf-8")
     json_path.write_bytes(body)
 
-    digest = hashlib.sha256(body).hexdigest()
-    sidecar = json_path.with_suffix(json_path.suffix + ".sha256")
-    sidecar.write_text(f"{digest}  {filename}\n", encoding="utf-8")
+    write_sidecar(json_path, sha256_bytes(body))
     return json_path

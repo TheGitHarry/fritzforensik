@@ -1,0 +1,50 @@
+"""fritzformat — gemeinsamer Formatvertrag von fritzexport und fritzreport.
+
+Dieses Paket ist die **einzige Wahrheit** darüber, wie ein Bundle aussieht:
+Dateinamen, Hüllformat der JSON-Dateien und die SHA256-Sidecars. Vorher lag
+dasselbe Wissen dreifach vor (Schreibseite im Export, Leseseite im Report und
+ein drittes Mal im Test-Fixture), ohne dass eine Abweichung aufgefallen wäre.
+
+**Bewusst stdlib-only**: fritzreport hat keine Laufzeit-Abhängigkeiten, und da
+es dieses Paket importiert, darf auch hier nichts Fremdes hinzukommen.
+"""
+from __future__ import annotations
+
+from .digest import (
+    SIDECAR_SUFFIX,
+    read_sidecar,
+    sha256_bytes,
+    sha256_file,
+    verify,
+    write_sidecar,
+)
+from .envelope import (
+    ENVELOPE_KEYS,
+    build_envelope,
+    read_envelope_meta,
+    utc_now_compact,
+    utc_now_iso,
+)
+from .names import (
+    BUNDLE_GLOB,
+    JSON_TYPES,
+    SUPPORT_VARIANTS,
+    TOOL_NAME,
+    dataset_filename,
+    dataset_glob,
+    session_log_filename,
+    session_log_glob,
+    slug_host,
+    support_filename,
+    support_glob,
+)
+
+__all__ = [
+    "SIDECAR_SUFFIX", "sha256_bytes", "sha256_file", "read_sidecar", "verify",
+    "write_sidecar",
+    "ENVELOPE_KEYS", "build_envelope", "read_envelope_meta", "utc_now_iso",
+    "utc_now_compact",
+    "TOOL_NAME", "JSON_TYPES", "SUPPORT_VARIANTS", "BUNDLE_GLOB",
+    "dataset_filename", "dataset_glob", "support_filename", "support_glob",
+    "session_log_filename", "session_log_glob", "slug_host",
+]

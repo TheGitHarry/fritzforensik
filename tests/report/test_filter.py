@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from legacy_report.cli import main as cli_main
+from fritzreport.cli import main as cli_main
 
 HERE = Path(__file__).parent
 ROOT = HERE.parent

@@ -4,7 +4,7 @@ from __future__ import annotations
 import socket
 from unittest.mock import patch
 
-from legacy_export.discover import (
+from fritzexport.discover import (
     DiscoveredBox,
     _is_fritzbox,
     discover,
@@ -166,9 +166,9 @@ def _fake_urlopen_factory(url_to_xml):
 
 def test_discover_returns_single_fritzbox():
     fake = _FakeSocket([(AVM_BOX_RESPONSE, ("192.168.178.1", 1900))])
-    with patch("legacy_export.discover.socket.socket", return_value=fake), \
+    with patch("fritzexport.discover.socket.socket", return_value=fake), \
          patch(
-             "legacy_export.discover._fetch_device_xml",
+             "fritzexport.discover._fetch_device_xml",
              return_value=FRITZBOX_IGD_XML,
          ):
         boxes = discover(timeout=0.1)
@@ -193,9 +193,9 @@ def test_discover_filters_out_repeater_via_xml():
         "http://192.168.178.1:49000/igddesc.xml": FRITZBOX_IGD_XML,
         "http://192.168.178.50:49000/igddesc.xml": REPEATER_IGD_XML,
     }
-    with patch("legacy_export.discover.socket.socket", return_value=fake), \
+    with patch("fritzexport.discover.socket.socket", return_value=fake), \
          patch(
-             "legacy_export.discover.urllib.request.urlopen",
+             "fritzexport.discover.urllib.request.urlopen",
              new=_fake_urlopen_factory(xml_for),
          ):
         boxes = discover(timeout=0.1)
@@ -205,7 +205,7 @@ def test_discover_filters_out_repeater_via_xml():
 
 def test_discover_returns_empty_on_timeout():
     fake = _FakeSocket([])
-    with patch("legacy_export.discover.socket.socket", return_value=fake):
+    with patch("fritzexport.discover.socket.socket", return_value=fake):
         boxes = discover(timeout=0.1)
     assert boxes == []
 
@@ -216,8 +216,8 @@ def test_discover_dedups_duplicate_responses():
         (AVM_BOX_RESPONSE, ("192.168.178.1", 1900)),
         (AVM_BOX_RESPONSE, ("192.168.178.1", 1900)),
     ])
-    with patch("legacy_export.discover.socket.socket", return_value=fake), \
-         patch("legacy_export.discover._fetch_device_xml", return_value=FRITZBOX_IGD_XML):
+    with patch("fritzexport.discover.socket.socket", return_value=fake), \
+         patch("fritzexport.discover._fetch_device_xml", return_value=FRITZBOX_IGD_XML):
         boxes = discover(timeout=0.1)
     assert len(boxes) == 1
 
@@ -233,8 +233,8 @@ def test_discover_swallows_oserror_when_no_iface_fallback():
     # Regression: WinError 10065 bei sendto ohne nutzbare Schnittstelle darf
     # keinen Traceback erzeugen — discover() liefert leere Liste.
     fake = _UnreachableSocket([])
-    with patch("legacy_export.discover.socket.socket", return_value=fake), \
-         patch("legacy_export.discover._local_ipv4_interfaces", return_value=[]):
+    with patch("fritzexport.discover.socket.socket", return_value=fake), \
+         patch("fritzexport.discover._local_ipv4_interfaces", return_value=[]):
         boxes = discover(timeout=0.1)
     assert boxes == []
 
@@ -244,12 +244,12 @@ def test_discover_falls_back_to_per_interface_send_on_oserror():
     bad = _UnreachableSocket([])
     good = _FakeSocket([(AVM_BOX_RESPONSE, ("192.168.178.1", 1900))])
     sockets = iter([bad, good])
-    with patch("legacy_export.discover.socket.socket", lambda *a, **k: next(sockets)), \
+    with patch("fritzexport.discover.socket.socket", lambda *a, **k: next(sockets)), \
          patch(
-             "legacy_export.discover._local_ipv4_interfaces",
+             "fritzexport.discover._local_ipv4_interfaces",
              return_value=["192.168.178.20"],
          ), \
-         patch("legacy_export.discover._fetch_device_xml", return_value=FRITZBOX_IGD_XML):
+         patch("fritzexport.discover._fetch_device_xml", return_value=FRITZBOX_IGD_XML):
         boxes = discover(timeout=0.1)
     assert len(boxes) == 1
     assert boxes[0].ip == "192.168.178.1"
@@ -262,6 +262,6 @@ def test_discover_falls_back_to_per_interface_send_on_oserror():
 def test_discover_with_explicit_iface_swallows_oserror():
     # Bei --iface IP soll ein OSError ebenfalls keinen Traceback erzeugen.
     bad = _UnreachableSocket([])
-    with patch("legacy_export.discover.socket.socket", return_value=bad):
+    with patch("fritzexport.discover.socket.socket", return_value=bad):
         boxes = discover(timeout=0.1, iface="192.168.178.20")
     assert boxes == []

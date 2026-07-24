@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from legacy_export.client import Tr064Disabled, Tr064Error
-from legacy_export.extractors import dhcp as dhcp_mod
+from fritzexport.client import Tr064Disabled, Tr064Error
+from fritzexport.extractors import dhcp as dhcp_mod
 
 
 def test_extract_full_record():

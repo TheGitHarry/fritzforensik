@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from legacy_export.client import Tr064Disabled, Tr064Error
-from legacy_export.extractors import wan as wan_mod
+from fritzexport.client import Tr064Disabled, Tr064Error
+from fritzexport.extractors import wan as wan_mod
 
 
 def _make_client(call_map: dict[str, dict | Exception]):

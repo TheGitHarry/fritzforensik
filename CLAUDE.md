@@ -1,90 +1,114 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance für Claude Code in diesem Repository.
 
-## Was das Projekt macht
+## Was das Repo enthält
 
-`legacy_export` ist eine Python-CLI zum **Live-Abzug forensisch relevanter
-Daten aus einer laufenden FRITZ!Box** (im Gegensatz zum Offline-Parser
-`fritz_processor.py` aus `it-forensic-automat`, der nur exportierte
-Support-ZIPs verarbeitet).
+Zwei zusammengehörige Feldwerkzeuge für FRITZ!Box-Forensik plus ihr gemeinsames
+Formatmodul:
 
-Abgedeckt sind: Anrufliste, Telefonbücher, WLAN-Geräte, Ereignislog,
-Anrufbeantworter (inkl. Audio), Mesh-Topologie, Hosts, WAN/DSL, DHCP,
-Port-Forwards, USB-Storage, erweiterte Supportdaten, TR-069-Konfig.
-
-## Wie es das macht
-
-- **Auth**: AVM Web-UI-SID-Verfahren (PBKDF2-Challenge-Response,
-  MD5-Fallback für ältere Firmware) — siehe [auth.py](legacy_export/auth.py).
-- **Discovery**: SSDP-Multicast im LAN; bei genau einer Box automatischer
-  Login, sonst muss `--host` gesetzt werden — siehe [discover.py](legacy_export/discover.py).
-- **Protokolle**: Primär TR-064 (SOAP über UPnP), mit Web-UI-Fallback wo
-  möglich. Reine Web-UI-Pfade für Daten ohne TR-064-Pendant
-  (Anrufliste, Telefonbuch, Events, Supportdaten).
-- **Extractoren**: Ein Modul pro Datenart in [legacy_export/extractors/](legacy_export/extractors/),
-  CLI-Glue in [cli.py](legacy_export/cli.py).
-- **Output**: Pro Extractor eine JSON-Datei mit Hüllformat
-  (`tool`/`version`/`host`/`extracted_at`/`type`/`records`) plus
-  SHA256-Sidecar — siehe [output.py](legacy_export/output.py).
-- **Distribution**: Single-file PyInstaller-Binaries für Linux x86_64,
-  Linux aarch64, Linux armv7, Windows x86_64 — gedacht für USB-Stick-
-  Feldeinsatz ohne installiertes Python.
-
-## GitHub-Workflow
-
-**Eine Workflow-Datei**: [.github/workflows/release.yml](.github/workflows/release.yml).
-Trigger:
-- Push eines Tags `v*` (= Release-Build)
-- `workflow_dispatch` (manueller Trigger)
-
-**Kein** CI-Lauf auf normalen Pushes oder Pull-Requests — Tests laufen nur
-als Teil des Release-Builds (`python -m pytest` vor jedem PyInstaller-Run).
-Schlägt der Test-Step fehl, gibt es kein Artefakt.
-
-**Build-Matrix**:
-
-| Job | Runner | Artefakt |
+| Paket | Rolle | Abhängigkeiten |
 |---|---|---|
-| `build` (x86_64) | `ubuntu-22.04` | `legacy_export-<v>-linux-x86_64` |
-| `build` (aarch64) | `ubuntu-22.04-arm` | `legacy_export-<v>-linux-aarch64` |
-| `build` (windows) | `windows-2022` | `legacy_export-<v>-windows-x86_64.exe` |
-| `build-arm32` | `ubuntu-22.04` + QEMU (`uraimo/run-on-arch-action`) | `legacy_export-<v>-linux-armv7l` |
+| `fritzexport/` | **Live-Abzug** aus einer laufenden Box → Bundle-Verzeichnis | `requests` |
+| `fritzreport/` | Bundle → **self-contained HTML-Report** (kein Box-Zugriff) | **stdlib-only** |
+| `fritzformat/` | gemeinsamer **Formatvertrag** beider Seiten | **stdlib-only** |
 
-`fail-fast: false` — schlägt eine Plattform fehl, laufen die anderen
-trotzdem durch. Artefakte landen pro Job als `actions/upload-artifact@v4`,
-nicht als GitHub-Release; Release-Anlage erfolgt manuell.
+Hervorgegangen aus den vormals getrennten Repos `legacy_export` (→ fritzexport) und
+`legacy_report` (→ fritzreport); beide Historien stecken in diesem Repo.
 
-### Release auslösen
+## fritzformat — bitte hier zuerst schauen
 
-1. **Erst Version hochzählen** in [legacy_export/__init__.py](legacy_export/__init__.py)
-   *und* [pyproject.toml](pyproject.toml). Beide Stellen müssen synchron
-   bleiben — `scripts/build.py` zieht die Version aus `__init__.py`, der
-   Paketname kommt aus `pyproject.toml`.
-2. Commit der Version-Bumps.
-3. Tag setzen und pushen: `git tag v0.2.x && git push --tags`.
-4. Matrix-Build läuft automatisch; Artefakte werden im Actions-Run abgelegt.
+`fritzformat` ist die **einzige Wahrheit** über das Bundle-Format: Dateinamen
+(`names.py`), Hüllformat (`envelope.py`), SHA256-Sidecars (`digest.py`).
+
+Vorher lag dieses Wissen **vierfach** vor — Schreibseite in `output.py`, nochmal im
+Supportdaten-Extractor, Leseseite in `bundle.py`, und ein viertes Mal im Test-Fixture.
+Eine Abweichung wäre erst im Feld aufgefallen. **Formatänderungen deshalb ausschließlich
+in `fritzformat` vornehmen**, nie in den Werkzeugen nachbauen.
+
+`fritzformat` **muss stdlib-only bleiben** — es wird von `fritzreport` importiert, das
+seine Abhängigkeitsfreiheit behalten soll (schlankes, netzwerkfreies Report-Binary).
+`tests/format/test_stdlib_only.py` wacht statisch darüber.
+
+## Wie fritzexport arbeitet
+
+- **Auth**: AVM Web-UI-SID-Verfahren (PBKDF2-Challenge-Response, MD5-Fallback für ältere
+  Firmware) — [auth.py](fritzexport/auth.py).
+- **Discovery**: SSDP-Multicast im LAN; bei genau einer Box automatischer Login, sonst
+  Auswahlmenü oder `--host` — [discover.py](fritzexport/discover.py).
+- **Protokolle**: primär TR-064 (SOAP über UPnP), Web-UI-Fallback wo möglich; reine
+  Web-UI-Pfade für Daten ohne TR-064-Pendant (Anrufliste, Telefonbuch, Events, Supportdaten).
+- **Extractoren**: ein Modul je Datenart in [fritzexport/extractors/](fritzexport/extractors/),
+  CLI-Glue in [cli.py](fritzexport/cli.py). Die Registry `EXTRACTORS` muss deckungsgleich
+  mit `fritzformat.JSON_TYPES` bleiben — ein Test prüft das.
+
+## Wie fritzreport arbeitet
+
+`{bundle,model,supportdata,render}.py`. `bundle.py` lädt und **verifiziert** jede Datei
+gegen ihre Sidecar und stellt je Datensatz die Fundstelle bereit (Zeilennummer + wörtlicher
+Auszug). `supportdata.py` parst die Roh-Supportdaten (Sektionen, 802.11-Logs) — der Export
+*holt* diese Dateien nur, er parst sie nicht; hier gibt es keine doppelte Logik.
+
+**Belegtheits-Grade** (kombinierbar): **D1** plausibel innerhalb der Rohdaten · **D2** durch
+eigene forensische Tests verifiziert ([ressourcen/methode.md](ressourcen/methode.md)) ·
+**D3** abgeleitet/Interpretation. Zeile ohne Badge = reine Rohdaten-Wiedergabe.
+Verbindungsnachweise: methode.md-Parser → D1+D2, 802.11-Log-Parser → D1+D3.
+
+## Tests
+
+```bash
+python -m pytest              # volle Suite, offline
+python -m pytest -m golden    # zusätzlich gegen echte Bundles unter ~/testdata/_work
+```
+
+`tests/{format,export,report}/`. Standardmäßig deselektiert: `network` (echtes LAN) und
+`golden` (echte Forensikdaten, liegen bewusst nicht im Repo).
+
+Die Vertragstests in `tests/format/` sind der Kern der Absicherung: Listen-Synchronität,
+Rundlauf *schreiben → lesen* über beide Werkzeuge, stdlib-Wächter.
+
+## Release / CI
+
+**Eine** Workflow-Datei: [.github/workflows/release.yml](.github/workflows/release.yml).
+Beide Werkzeuge werden **unabhängig versioniert**, das Tag-Präfix entscheidet:
+
+| Tag | baut |
+|---|---|
+| `export-v0.3.2` | nur fritzexport |
+| `report-v0.1.1` | nur fritzreport |
+
+`workflow_dispatch` erlaubt zusätzlich einen manuellen Lauf mit Auswahl (`all`/`export`/`report`).
+
+Release auslösen:
+1. Version im jeweiligen Paket hochzählen — `fritzexport/__init__.py` **oder**
+   `fritzreport/__init__.py`. `scripts/build.py` zieht die Version von dort; sie steht im
+   Binary-Namen. Die Version in `pyproject.toml` ist die **Repo**-Version und wird bewusst
+   nicht mitgezogen.
+2. Commit, dann `git tag export-v0.3.2 && git push --tags`.
+
+Kein CI-Lauf auf normalen Pushes/PRs — Tests laufen als Teil des Release-Builds; schlägt
+der Test-Step fehl, gibt es kein Artefakt.
 
 ### Stolperfallen im Build
 
-- **`--runtime-tmpdir .`** wird in [scripts/build.py](scripts/build.py)
-  nur auf Nicht-Windows-Plattformen gesetzt: auf Windows knallt der
-  Bootstrap-Extract im Drive-Root (`F:\`) wegen fehlender Permissions.
-- **certifi** wird via `--collect-data certifi` ins Binary gebündelt
-  (TLS gegen FRITZ!Box mit selbstsigniertem Cert sonst kaputt).
-- Tests sind **offline** (`@pytest.mark.network` ist per default
-  deselectet via `pyproject.toml`), CI braucht keinen Box-Zugriff.
-
-## Lokale Tests
-
-```bash
-python -m pytest
-```
+- **`--runtime-tmpdir .`** wird in [scripts/build.py](scripts/build.py) nur auf
+  Nicht-Windows gesetzt: auf Windows knallt der Bootstrap-Extract im Drive-Root (`F:\`)
+  wegen fehlender Permissions.
+- **certifi** wird nur für fritzexport gebündelt (`--collect-data certifi`); ohne das ist
+  TLS gegen Boxen mit selbstsigniertem Zertifikat kaputt. fritzreport braucht es nicht.
+- Im Report-Build wird `requests` zwar installiert (die gemeinsame Testsuite braucht es),
+  landet aber **nicht** im Binary — fritzreport importiert es nicht.
 
 ## Konventionen
 
-- Sprache der Doku, Logmeldungen, Fehlermeldungen: **Deutsch**.
-- Code-Identifier, JSON-Feldnamen: Englisch.
-- Forensik-Prinzip: **nichts auf der Box verändern**. Wo das Lesen
-  Status verändert (z.B. TAM-Read-Flag), wird der Originalstatus per
-  Restore-Aufruf wiederhergestellt und im Record dokumentiert.
+- Sprache von Doku, Logmeldungen, Fehlermeldungen: **Deutsch**.
+- Code-Identifier, JSON-Feldnamen: **Englisch**.
+- Forensik-Prinzip: **nichts auf der Box verändern**. Wo Lesen den Status ändert (z.B.
+  TAM-Read-Flag), wird der Originalzustand per Restore-Aufruf wiederhergestellt und im
+  Record dokumentiert.
+- Abzüge und erzeugte Reports enthalten echte Forensikdaten und werden **nie** eingecheckt
+  (siehe `.gitignore`).
+
+## Library-Recherche
+
+Erst **deepwiki** (nur public GitHub), Fallback **exa**.

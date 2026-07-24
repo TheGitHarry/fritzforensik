@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import pytest
 
-from legacy_export.client import (
+from fritzexport.client import (
     Tr064Disabled,
     Tr064Error,
     _parse_soap_fault,
     _parse_soap_response,
 )
-from legacy_export.extractors.tam import (
+from fritzexport.extractors.tam import (
     _parse_message_xml,
     _parse_webui_rows,
 )

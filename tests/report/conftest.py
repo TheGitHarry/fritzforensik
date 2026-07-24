@@ -1,40 +1,50 @@
-"""Test-Fixtures: ein selbst-enthaltenes synthetisches legacy_export-Bundle.
+"""Test-Fixtures: ein selbst-enthaltenes synthetisches fritzexport-Bundle.
 
 Erzeugt ein kleines, aber vollständiges Bundle (JSON-Datenarten + korrekte
 ``.sha256``-Sidecars + eine Roh-``supportdata_standard``-Datei mit dhcpd,
 STATION_MODULE, WLAN_EVENTS (ID 30005), einer 802.11-``wl0``-Zeile und uptime).
 So laufen die Tests ohne die echten Forensikdaten unter ``~/testdata``.
+
+Das Bundle wird über :mod:`fritzformat` gebaut — also über exakt denselben
+Formatvertrag, den fritzexport beim Schreiben benutzt. Früher baute dieses
+Fixture das Format von Hand nach; eine Abweichung wäre unbemerkt geblieben.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 from pathlib import Path
 
 import pytest
 
+from fritzformat import (
+    TOOL_NAME,
+    build_envelope,
+    dataset_filename,
+    sha256_bytes,
+    support_filename,
+    write_sidecar,
+)
+
 MAC = "AA:BB:CC:DD:EE:01"
 maclow = MAC.lower()
 EXTRACTED = "2026-01-06T10:00:00Z"
 
 
+HOST = "https://fritz.box"
+
+
 def _meta(type_, records):
-    return {"tool": "legacy_export", "version": "0.3.1",
-            "host": "https://fritz.box", "extracted_at": EXTRACTED,
-            "type": type_, "records": records}
+    return build_envelope(tool=TOOL_NAME, version="0.3.1", host=HOST,
+                          type_name=type_, records=records, extracted_at=EXTRACTED)
 
 
 def _write_json(d: Path, ts, type_, records):
-    p = d / f"legacy_export_fritz.box_{ts}_{type_}.json"
-    p.write_text(json.dumps(_meta(type_, records), indent=2, ensure_ascii=False), encoding="utf-8")
-    _sidecar(p)
+    p = d / dataset_filename(HOST, ts, type_)
+    body = json.dumps(_meta(type_, records), indent=2, ensure_ascii=False).encode("utf-8")
+    p.write_bytes(body)
+    write_sidecar(p, sha256_bytes(body))
     return p
-
-
-def _sidecar(p: Path):
-    digest = hashlib.sha256(p.read_bytes()).hexdigest()
-    p.with_suffix(p.suffix + ".sha256").write_text(f"{digest}  {p.name}\n", encoding="utf-8")
 
 
 SUPPORT = """\
@@ -89,9 +99,10 @@ def build_bundle(d: Path) -> Path:
          "min_address": "192.168.1.20", "max_address": "192.168.1.200",
          "subnet_mask": "255.255.255.0", "domain_name": "fritz.box",
          "ip_routers": "192.168.1.1", "dns_servers": "192.168.1.1"}])
-    sup = d / f"supportdata_standard_{ts}.txt"
-    sup.write_text(SUPPORT, encoding="utf-8")
-    _sidecar(sup)
+    sup = d / support_filename("standard", ts)
+    body = SUPPORT.encode("utf-8")
+    sup.write_bytes(body)
+    write_sidecar(sup, sha256_bytes(body))
     return d
 
 

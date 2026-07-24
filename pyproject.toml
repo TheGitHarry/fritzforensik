@@ -3,25 +3,34 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "legacy_export"
-version = "0.3.1"
-description = "Forensic live-data extractor for AVM FRITZ!Box"
+name = "fritzforensik"
+# Repo-/Distributionsversion. Die beiden Werkzeuge tragen ihre EIGENEN Versionen
+# in fritzexport/__init__.py bzw. fritzreport/__init__.py — die stehen in den
+# Binary-Namen und in den Release-Tags (export-v* / report-v*). Diese Zeile hier
+# betrifft nur `pip install .` und wird bewusst nicht mitgezogen.
+version = "0.1.0"
+description = "Forensik-Werkzeuge für AVM FRITZ!Box: Live-Datenabzug (fritzexport) und HTML-Report (fritzreport)"
 readme = "README.md"
 requires-python = ">=3.10"
+# requests wird ausschließlich von fritzexport benötigt. fritzreport und
+# fritzformat sind stdlib-only; ein Test wacht darüber (tests/format/test_stdlib_only.py).
 dependencies = ["requests>=2.31"]
 
 [project.scripts]
-legacy_export = "legacy_export.__main__:main"
+fritzexport = "fritzexport.__main__:main"
+fritzreport = "fritzreport.__main__:main"
 
 [project.optional-dependencies]
 dev = ["pyinstaller>=6", "pytest>=7", "certifi"]
 
 [tool.setuptools]
-packages = ["legacy_export", "legacy_export.extractors"]
+packages = ["fritzformat", "fritzexport", "fritzexport.extractors", "fritzreport"]
 py-modules = []
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
 markers = [
     "network: Tests, die echte LAN-Verbindung benötigen (default deselected)",
+    "golden: Tests gegen die echten Bundles unter ~/testdata (default deselected)",
 ]
-addopts = "-m 'not network'"
+addopts = "-q -m 'not network and not golden'"

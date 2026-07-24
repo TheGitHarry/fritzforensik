@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from legacy_export.client import Tr064Disabled, Tr064Error
-from legacy_export.extractors import tr069 as tr069_mod
+from fritzexport.client import Tr064Disabled, Tr064Error
+from fritzexport.extractors import tr069 as tr069_mod
 
 
 def _make_client(call_map: dict[str, dict | Exception]):

@@ -1,53 +1,82 @@
 name: Release
 
+# Ein Workflow für beide Werkzeuge. Welches gebaut wird, ergibt sich aus dem
+# Tag-Präfix — die Werkzeuge werden dadurch unabhängig voneinander versioniert:
+#   export-v0.3.2  → baut nur fritzexport
+#   report-v0.1.1  → baut nur fritzreport
 on:
   push:
     tags:
-      - "v*"
+      - "export-v*"
+      - "report-v*"
   workflow_dispatch:
+    inputs:
+      tool:
+        description: "Welches Werkzeug bauen"
+        type: choice
+        options: [all, export, report]
+        default: all
 
 jobs:
-  build:
+  setup:
+    runs-on: ubuntu-22.04
+    outputs:
+      tool: ${{ steps.pick.outputs.tool }}
+    steps:
+      - id: pick
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TOOL="${{ inputs.tool }}"
+          else
+            case "$GITHUB_REF_NAME" in
+              export-v*) TOOL=export ;;
+              report-v*) TOOL=report ;;
+              *) echo "::error::Unerwarteter Tag '$GITHUB_REF_NAME' — erwartet export-v* oder report-v*"; exit 1 ;;
+            esac
+          fi
+          echo "Baue: $TOOL"
+          echo "tool=$TOOL" >> "$GITHUB_OUTPUT"
+
+  build-export:
+    needs: setup
+    if: contains(fromJSON('["export","all"]'), needs.setup.outputs.tool)
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-22.04
-            artifact_glob: "dist/legacy_export-*-linux-x86_64"
+            tag: linux-x86_64
           - os: ubuntu-22.04-arm
-            artifact_glob: "dist/legacy_export-*-linux-aarch64"
+            tag: linux-aarch64
           - os: windows-2022
-            artifact_glob: "dist/legacy_export-*-windows-x86_64.exe"
+            tag: windows-x86_64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Install build deps
         run: |
           python -m pip install --upgrade pip
           python -m pip install "pyinstaller>=6" "certifi" "requests>=2.31" pytest
-
       - name: Run unit tests
         run: python -m pytest
-
       - name: Build binary
-        run: python scripts/build.py
-
+        run: python scripts/build.py --tool export
       - uses: actions/upload-artifact@v4
         with:
-          name: legacy_export-${{ matrix.os }}
-          path: ${{ matrix.artifact_glob }}
+          name: fritzexport-${{ matrix.tag }}
+          path: dist/fritzexport-*
           if-no-files-found: error
 
-  build-arm32:
+  build-export-arm32:
+    needs: setup
+    if: contains(fromJSON('["export","all"]'), needs.setup.outputs.tool)
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-
       - uses: uraimo/run-on-arch-action@v2
         name: Build on armv7 (QEMU)
         with:
@@ -60,10 +89,45 @@ jobs:
             pip3 install "pyinstaller>=6" certifi "requests>=2.31" pytest
           run: |
             python3 -m pytest
-            python3 scripts/build.py
-
+            python3 scripts/build.py --tool export
       - uses: actions/upload-artifact@v4
         with:
-          name: legacy_export-linux-arm32
-          path: dist/legacy_export-*-linux-armv7l
+          name: fritzexport-linux-armv7l
+          path: dist/fritzexport-*-linux-armv7l
+          if-no-files-found: error
+
+  build-report:
+    needs: setup
+    if: contains(fromJSON('["report","all"]'), needs.setup.outputs.tool)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            tag: linux-x86_64
+          - os: ubuntu-22.04-arm
+            tag: linux-aarch64
+          - os: windows-2022
+            tag: windows-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # requests wird nur für die Export-Tests der gemeinsamen Suite gebraucht,
+      # nicht für das Report-Binary — fritzreport importiert es nicht, PyInstaller
+      # bündelt deshalb auch nichts davon ein.
+      - name: Install build deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "pyinstaller>=6" "requests>=2.31" pytest
+      - name: Run unit tests
+        run: python -m pytest
+      - name: Build binary
+        run: python scripts/build.py --tool report
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fritzreport-${{ matrix.tag }}
+          path: dist/fritzreport-*
           if-no-files-found: error

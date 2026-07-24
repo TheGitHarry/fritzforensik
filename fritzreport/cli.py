@@ -1,9 +1,9 @@
 """CLI — geführter Feld-Ablauf.
 
-    legacy_report [bundle] [-o report.html] [--open]
+    fritzreport [bundle] [-o report.html] [--open]
 
-Ohne ``bundle``-Argument sucht legacy_report legacy_export-Bundles im aktuellen
-Verzeichnis (Auto-Discovery, analog zum Export): genau eines → direkt nehmen,
+Ohne ``bundle``-Argument sucht fritzreport fritzexport-Bundles im aktuellen
+Verzeichnis (Auto-Discovery, analog zu fritzexport): genau eines → direkt nehmen,
 mehrere → nummerierte Auswahl. Danach werden die Kopf-Felder (Case-ID, Item-ID,
 SB, Datum) interaktiv abgefragt (per CLI-Flag gesetzte Werte überspringen die
 Abfrage). Der Report bekommt einen sprechenden Namen und wird ins **aktuelle
@@ -18,6 +18,8 @@ import sys
 import webbrowser
 from pathlib import Path
 
+from fritzformat import BUNDLE_GLOB, utc_now_iso
+
 from . import __version__
 from .bundle import load_bundle
 from .model import build_model
@@ -29,16 +31,17 @@ def _today() -> str:
     return _dt.date.today().isoformat()
 
 
-def _now_iso() -> str:
-    return _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+#: Zeitstempel der Report-Erzeugung — Format aus fritzformat, damit Report und
+#: Bundle dieselbe Schreibweise verwenden.
+_now_iso = utc_now_iso
 
 
 # ───────────────────────── Bundle-Discovery ─────────────────────────────────
 
 def is_bundle(d: Path) -> bool:
-    """Ein Verzeichnis ist ein legacy_export-Bundle, wenn es mindestens eine
-    ``legacy_export_<host>_<ts>_<typ>.json`` enthält."""
-    return d.is_dir() and any(d.glob("legacy_export_*_*.json"))
+    """Ein Verzeichnis ist ein fritzexport-Bundle, wenn es mindestens eine
+    ``fritzexport_<host>_<ts>_<typ>.json`` enthält."""
+    return d.is_dir() and any(d.glob(BUNDLE_GLOB))
 
 
 def discover_bundles(base: Path) -> list[Path]:
@@ -61,8 +64,8 @@ def resolve_bundle(arg: Path | None) -> Path:
     cands = discover_bundles(Path.cwd())
     if not cands:
         raise SystemExit(
-            "Fehler: kein legacy_export-Bundle im aktuellen Verzeichnis gefunden.\n"
-            "Bundle-Verzeichnis explizit angeben: legacy_report <verzeichnis>")
+            "Fehler: kein fritzexport-Bundle im aktuellen Verzeichnis gefunden.\n"
+            "Bundle-Verzeichnis explizit angeben: fritzreport <verzeichnis>")
     if len(cands) == 1:
         print(f"Bundle: {cands[0].name}", file=sys.stderr)
         return cands[0]
@@ -131,15 +134,15 @@ def default_output_name(header: dict, box_label: str) -> Path:
     parts = [header.get("case_id", ""), header.get("item_id", ""),
              box_label, header.get("date", "")]
     slug = "_".join(_slug(p) for p in parts if p and _slug(p))
-    return Path.cwd() / (f"{slug}.html" if slug else "legacy_report-report.html")
+    return Path.cwd() / (f"{slug}.html" if slug else "fritzreport.html")
 
 
 # ───────────────────────── main ─────────────────────────────────────────────
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="legacy_report",
-        description="Forensischer HTML-Report aus einem legacy_export-Bundle. "
+        prog="fritzreport",
+        description="Forensischer HTML-Report aus einem fritzexport-Bundle. "
                     "Ohne Bundle-Argument wird im aktuellen Verzeichnis gesucht.")
     p.add_argument("bundle", type=Path, nargs="?", default=None,
                    help="Bundle-Verzeichnis (Default: Auto-Discovery im cwd)")
@@ -152,7 +155,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--date", default=None, help="Datum (Default: heute)")
     p.add_argument("--no-prompt", action="store_true",
                    help="Kopf-Felder nicht abfragen (CLI-Werte bzw. leer)")
-    p.add_argument("--version", action="version", version=f"legacy_report {__version__}")
+    p.add_argument("--version", action="version", version=f"fritzreport {__version__}")
     return p
 
 

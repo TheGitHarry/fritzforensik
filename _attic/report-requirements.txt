@@ -1,2 +1,0 @@
-# legacy_report ist bewusst stdlib-only — keine Laufzeit-Abhängigkeiten.
-# (Build-/Test-Tools stehen in pyproject.toml unter [project.optional-dependencies].)

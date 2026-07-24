@@ -1,4 +1,4 @@
-"""legacy_export — CLI für Live-Datenabzug aus FRITZ!Box."""
+"""fritzexport — CLI für Live-Datenabzug aus FRITZ!Box."""
 from __future__ import annotations
 
 import argparse
@@ -25,7 +25,7 @@ EXIT_NO_DISCOVERY = 5
 
 PASSWORD_ENV = "FRITZ_PW"
 
-log = logging.getLogger("legacy_export")
+log = logging.getLogger("fritzexport")
 
 
 def _default_output() -> Path:
@@ -49,7 +49,7 @@ def _normalize_host(host: str) -> str:
 
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="legacy_export",
+        prog="fritzexport",
         description="Live-Abzug forensisch relevanter Daten aus einer FRITZ!Box.",
     )
     p.add_argument("--host", help="Hostname oder IP (Default: SSDP-Auto-Discovery)")
@@ -86,7 +86,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     for name in EXTRACTORS:
         p.add_argument(f"--{name}", action="store_true", help=f"Extractor '{name}' ausführen")
-    p.add_argument("--version", action="version", version=f"legacy_export {__version__}")
+    p.add_argument("--version", action="version", version=f"fritzexport {__version__}")
     p.add_argument("-v", "--verbose", action="store_true", help="Mehr Logausgabe")
     return p
 
@@ -381,7 +381,7 @@ def main(argv: list[str] | None = None) -> int:
         if not os.access(output_dir, os.W_OK):
             sys.stderr.write(f"ERROR: Output-Verzeichnis {output_dir} nicht beschreibbar (read-only?).\n")
             return EXIT_NETWORK
-        log_file = output_dir / f"legacy_export_{run_stamp}.log"
+        log_file = output_dir / f"fritzexport_{run_stamp}.log"
 
     _configure_logging(verbose=args.verbose, log_file=log_file)
 

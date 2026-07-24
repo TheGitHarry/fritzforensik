@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from legacy_export.extractors import supportdata as sd
+from fritzexport.extractors import supportdata as sd
 
 
 def _client() -> MagicMock:

@@ -1,7 +1,7 @@
 """Bundle-Erkennung, SHA-256-Verifikation und Herkunfts-Slices.
 
-Ein legacy_export-Bundle ist ein Verzeichnis mit — pro Datenart — einer
-``legacy_export_<host>_<UTC>Z_<typ>.json`` und einer ``.sha256``-Sidecar, dazu
+Ein fritzexport-Bundle ist ein Verzeichnis mit — pro Datenart — einer
+``fritzexport_<host>_<UTC>Z_<typ>.json`` und einer ``.sha256``-Sidecar, dazu
 den Roh-Supportdateien ``supportdata_<variante>_<UTC>Z.txt`` (+ Sidecar), einem
 Sitzungs-Log und optional ``tam_audio/``.
 
@@ -12,57 +12,29 @@ Fundstelle in der Quelldatei bereit (Zeilennummer + wörtlicher Auszug).
 from __future__ import annotations
 
 import bisect
-import hashlib
 import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# Datenarten, die als JSON im Bundle liegen (legacy_export-Extraktoren).
-JSON_TYPES = [
-    "calls", "phonebook", "wifi", "events", "tam", "mesh", "hosts",
-    "dhcp", "portforward", "storage", "wan", "supportdata", "tr069",
+# Formatvertrag mit fritzexport — Dateinamen, Datenarten, Sidecar-Prüfung.
+from fritzformat import (
+    JSON_TYPES,
+    SIDECAR_SUFFIX,
+    SUPPORT_VARIANTS,
+    dataset_glob,
+    read_envelope_meta,
+    read_sidecar,
+    session_log_glob,
+    sha256_file,
+    support_glob,
+    verify,
+)
+
+__all__ = [
+    "JSON_TYPES", "SUPPORT_VARIANTS", "sha256_file", "read_sidecar", "verify",
+    "record_slices", "Dataset", "SupportFile", "CoCEntry", "Bundle", "load_bundle",
 ]
-
-# Roh-Supportdaten-Varianten (Textdateien mit Sektionen / Logs).
-SUPPORT_VARIANTS = ["standard", "mesh", "enhanced"]
-
-
-# --------------------------------------------------------------- Hashing
-
-def sha256_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as fh:
-        for chunk in iter(lambda: fh.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
-def read_sidecar(path: Path) -> tuple[str, str]:
-    """→ (erwarteter Hex-Digest, im Sidecar genannter Dateiname). Leer wenn keine Sidecar."""
-    sc = path.with_suffix(path.suffix + ".sha256")
-    if not sc.exists():
-        return "", ""
-    raw = sc.read_text(encoding="utf-8", errors="replace").strip()
-    if not raw:
-        return "", ""
-    parts = raw.split()
-    digest = parts[0]
-    fname = " ".join(parts[1:]) if len(parts) > 1 else ""
-    return digest.lower(), fname
-
-
-def verify(path: Path) -> tuple[str, str]:
-    """Verifiziert ``path`` gegen seine ``.sha256``-Sidecar.
-
-    → (status, digest) mit status ∈ {"ok", "mismatch", "no_sidecar"}.
-    ``digest`` ist der tatsächlich berechnete Hash der Datei (immer gesetzt).
-    """
-    actual = sha256_file(path)
-    expected, _ = read_sidecar(path)
-    if not expected:
-        return "no_sidecar", actual
-    return ("ok" if expected == actual else "mismatch"), actual
 
 
 # ----------------------------------------------------- Herkunfts-Slices
@@ -195,7 +167,7 @@ def load_bundle(dir_: Path) -> Bundle:
 
     # --- JSON-Datenarten
     for t in JSON_TYPES:
-        p = _first(dir_, f"*_{t}.json")
+        p = _first(dir_, dataset_glob(t))
         if not p:
             b.datasets[t] = Dataset(type=t, path=None)  # type: ignore[arg-type]
             continue
@@ -212,7 +184,7 @@ def load_bundle(dir_: Path) -> Bundle:
 
     # --- Roh-Supportdaten
     for v in SUPPORT_VARIANTS:
-        p = _first(dir_, f"supportdata_{v}_*.txt")
+        p = _first(dir_, support_glob(v))
         if not p:
             b.support[v] = SupportFile(variant=v, path=None)  # type: ignore[arg-type]
             continue
@@ -227,17 +199,12 @@ def load_bundle(dir_: Path) -> Bundle:
     for t in ("hosts", *JSON_TYPES):
         d = b.datasets.get(t)
         if d and d.present and d.data:
-            b.meta = {
-                "tool": d.data.get("tool", ""),
-                "version": d.data.get("version", ""),
-                "host": d.data.get("host", ""),
-                "extracted_at": d.data.get("extracted_at", ""),
-            }
+            b.meta = read_envelope_meta(d.data)
             break
 
     # --- Chain of Custody: jede Datei mit Sidecar, verifiziert
-    for sc in sorted(dir_.glob("*.sha256")):
-        target = sc.with_suffix("")  # entfernt ".sha256"
+    for sc in sorted(dir_.glob(f"*{SIDECAR_SUFFIX}")):
+        target = sc.with_suffix("")  # entfernt die Sidecar-Endung
         expected, _ = read_sidecar(target)
         if target.exists():
             status, actual = verify(target)
@@ -248,7 +215,7 @@ def load_bundle(dir_: Path) -> Bundle:
         b.coc.append(CoCEntry(file=target.name, sha256=shown, status=status, size=size))
 
     # --- Sitzungs-Log + TAM-Audio
-    log = _first(dir_, "legacy_export_*.log")
+    log = _first(dir_, session_log_glob())
     if log:
         b.session_log = log.read_text(encoding="utf-8", errors="replace")
     tam = dir_ / "tam_audio"

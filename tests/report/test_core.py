@@ -6,17 +6,17 @@ from pathlib import Path
 
 import pytest
 
-from legacy_report.bundle import load_bundle
-from legacy_report.model import build_model
-from legacy_report.render import build_html, build_timeline
-from legacy_report.supportdata import analyze
+from fritzreport.bundle import load_bundle
+from fritzreport.model import build_model
+from fritzreport.render import build_html, build_timeline
+from fritzreport.supportdata import analyze
 
 
 # ───────────────────────── Bundle / Verifikation ─────────────────────────────
 
 def test_bundle_loads_and_verifies(synth_bundle):
     b = load_bundle(synth_bundle)
-    assert b.meta["tool"] == "legacy_export"
+    assert b.meta["tool"] == "fritzexport"
     assert b.ds("hosts").present
     assert all(e.status == "ok" for e in b.coc), "alle Sidecars müssen verifizieren"
     assert b.integrity_ok

@@ -1,1 +1,6 @@
+# Laufzeit-Abhängigkeiten des Repos.
+#
+# requests wird NUR von fritzexport benötigt (HTTP gegen die Box).
+# fritzreport und fritzformat sind bewusst stdlib-only — abgesichert durch
+# tests/format/test_stdlib_only.py.
 requests>=2.31

@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 
 import requests
 
-from legacy_export.auth import (
+from fritzexport.auth import (
     AuthError,
     _parse_session_xml,
     calculate_response,
@@ -76,7 +76,7 @@ def test_parse_session_xml_handles_missing_blocktime():
 
 
 def test_authenticate_invalid_sid_constant():
-    from legacy_export.auth import INVALID_SID
+    from fritzexport.auth import INVALID_SID
     assert INVALID_SID == "0000000000000000"
 
 

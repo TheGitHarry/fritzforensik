@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 import requests
 
-log = logging.getLogger("legacy_export")
+log = logging.getLogger("fritzexport")
 
 LOGIN_PATH = "/login_sid.lua?version=2"
 LOGIN_POST_PATH = "/login_sid.lua"

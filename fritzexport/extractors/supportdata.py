@@ -14,11 +14,12 @@ Das JSON-Record enthält nur Metadaten (Typ, Pfad, Größe, Hash).
 from __future__ import annotations
 
 import datetime as _dt
-import hashlib
 import logging
 import sys
 import time
 from pathlib import Path
+
+from fritzformat import sha256_bytes, support_filename, write_sidecar
 
 from ..client import FritzClient
 
@@ -191,15 +192,14 @@ def extract(
             missing.append(short_name)
             continue
 
-        sha256 = hashlib.sha256(content).hexdigest()
-        filename = f"supportdata_{short_name}_{ts}.txt"
+        sha256 = sha256_bytes(content)
+        filename = support_filename(short_name, ts)
 
         if output_dir is not None:
             output_dir.mkdir(parents=True, exist_ok=True)
             raw_path = output_dir / filename
             raw_path.write_bytes(content)
-            sidecar = raw_path.with_suffix(".txt.sha256")
-            sidecar.write_text(f"{sha256}  {filename}\n", encoding="utf-8")
+            write_sidecar(raw_path, sha256)
             log.info(
                 "Supportdaten '%s' gespeichert: %s (%d Bytes)",
                 short_name, raw_path, len(content),

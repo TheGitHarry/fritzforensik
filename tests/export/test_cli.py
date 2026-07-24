@@ -3,7 +3,7 @@ import argparse
 import pytest
 import requests
 
-from legacy_export import cli
+from fritzexport import cli
 
 
 @pytest.mark.parametrize(
@@ -130,4 +130,4 @@ def test_output_dir_bekommt_zeitstempel_suffix(monkeypatch, tmp_path):
     assert rc == cli.EXIT_NO_DISCOVERY
     run_dir = tmp_path / "case42_20260713T101530Z"
     assert run_dir.is_dir()
-    assert (run_dir / "legacy_export_20260713T101530Z.log").exists()
+    assert (run_dir / "fritzexport_20260713T101530Z.log").exists()

@@ -1,11 +1,11 @@
-# legacy_report — Konzept & Architektur (Stand 2026-07-22, v0.1.0)
+# fritzreport — Konzept & Architektur (Stand 2026-07-22, v0.1.0)
 
-> Schwestertool zu **legacy_export**. Der Export *saugt* die Daten live aus der
+> Schwestertool zu **fritzexport**. Der Export *saugt* die Daten live aus der
 > FRITZ!Box (JSON-Bundle je Datenart + `.sha256`, plus Roh-`supportdata_*.txt`).
-> **legacy_report** *spuckt* daraus einen **self-contained forensischen HTML-Report**.
+> **fritzreport** *spuckt* daraus einen **self-contained forensischen HTML-Report**.
 
 ## Zweck / Abgrenzung
-- **Kein** erneuter Datenabzug — liest ein bereits gezogenes legacy_export-Bundle.
+- **Kein** erneuter Datenabzug — liest ein bereits gezogenes fritzexport-Bundle.
 - Eigenständiges Feldwerkzeug: **stdlib-only**, PyInstaller-Single-File-Binary,
   **vollständig vom `it-forensic-automat` abgekoppelt** (keine DB-/ESB-/Job-Importe).
 - Übernommen wurden genau zwei Dinge: die **Supportdaten-Methode** aus dem `fritz`-Worker
@@ -22,10 +22,10 @@ Bundle-Verzeichnis
    ▼
    render.py        12 Sektionen, Inline-CSS/JS, Filter/Druck/DarkMode → ein .html
    ▲
-   cli.py           legacy_report <bundle> -o report.html  (Kopf-Felder per Prompt)
+   cli.py           fritzreport <bundle> -o report.html  (Kopf-Felder per Prompt)
 ```
 
-## Module (`legacy_report/`)
+## Module (`fritzreport/`)
 | Datei | Aufgabe |
 |-------|---------|
 | `bundle.py` | Bundle laden; **jede Datei gegen ihre `.sha256` verifizieren** (ok/mismatch/no_sidecar); Metadaten (`tool/version/host/extracted_at`); `record_slices` = Fundstelle jedes JSON-Records (Zeilennummer + wörtlicher Auszug). |

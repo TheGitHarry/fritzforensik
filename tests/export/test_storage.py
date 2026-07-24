@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from legacy_export.client import Tr064Disabled, Tr064Error
-from legacy_export.extractors import storage as storage_mod
+from fritzexport.client import Tr064Disabled, Tr064Error
+from fritzexport.extractors import storage as storage_mod
 
 
 def test_extract_with_active_storage_and_users():
