@@ -51,6 +51,9 @@ jobs:
             tag: linux-aarch64
           - os: windows-2022
             tag: windows-x86_64
+          # macOS-Runner kosten das 10-fache an Actions-Minuten (nur Apple Silicon).
+          - os: macos-14
+            tag: macos-arm64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -109,6 +112,9 @@ jobs:
             tag: linux-aarch64
           - os: windows-2022
             tag: windows-x86_64
+          # macOS-Runner kosten das 10-fache an Actions-Minuten (nur Apple Silicon).
+          - os: macos-14
+            tag: macos-arm64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
