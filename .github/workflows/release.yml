@@ -131,3 +131,39 @@ jobs:
           name: fritzreport-${{ matrix.tag }}
           path: dist/fritzreport-*
           if-no-files-found: error
+
+  # Bei einem Tag-Push die gebauten Binaries als GitHub-Release veröffentlichen
+  # (inkl. SHA256SUMS). Läuft NICHT bei workflow_dispatch — dort gibt es keinen
+  # Tag, dann bleiben die Artefakte wie gehabt nur am Actions-Run hängen.
+  release:
+    needs: [build-export, build-export-arm32, build-report]
+    if: >-
+      always()
+      && startsWith(github.ref, 'refs/tags/')
+      && !contains(needs.*.result, 'failure')
+      && !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      # Ohne name: werden ALLE Artefakte des Runs gezogen. Da bei einem
+      # export-v* / report-v* Tag nur die Jobs des jeweiligen Werkzeugs laufen,
+      # enthält das automatisch nur dessen Binaries.
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Binaries sammeln und SHA256SUMS bilden
+        run: |
+          mkdir -p release
+          find artifacts -type f -exec cp {} release/ \;
+          ( cd release && sha256sum fritz* > SHA256SUMS && cat SHA256SUMS )
+          echo "--- Release-Inhalt ---"; ls -l release/
+      - name: GitHub-Release anlegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            release/*
