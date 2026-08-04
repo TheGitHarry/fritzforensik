@@ -40,6 +40,31 @@ def slug_host(value: str) -> str:
     return _UNSAFE.sub("_", value).strip("_") or "host"
 
 
+#: Verzeichnisname eines Abzugs ohne Fallkopf — auch Namensstamm des Reports.
+RUN_FALLBACK = "export"
+
+
+def run_slug(case_id: str = "", item_id: str = "", timestamp: str = "") -> str:
+    """Gemeinsamer Namensstamm von Bundle-Verzeichnis und Report.
+
+    ``<Case>_<Item>_<UTC>Z`` — leere Teile entfallen, ohne Fallkopf bleibt
+    ``export_<UTC>Z``. Beide Werkzeuge bilden den Stamm hier und nicht jedes für
+    sich, damit Abzug und Report am Namen zusammenfinden:
+
+        C-2026-0815_A-01_20260804T184059Z/       (Bundle)
+        C-2026-0815_A-01_20260804T184059Z.html   (Report)
+
+    Der Zeitstempel stammt aus dem Abzug (Hüllfeld ``extracted_at`` bzw. der
+    Laufzeitstempel) — er macht den Reportnamen zugleich kollisionsfrei, sodass
+    ein zweiter Abzug desselben Asservats den ersten Report nicht überschreibt.
+    """
+    parts = [_UNSAFE.sub("-", p.strip()).strip("-")
+             for p in (case_id, item_id) if p and p.strip()]
+    stem = "_".join(p for p in parts if p) or RUN_FALLBACK
+    ts = _UNSAFE.sub("-", timestamp.strip()).strip("-") if timestamp else ""
+    return f"{stem}_{ts}" if ts else stem
+
+
 def dataset_filename(host: str, timestamp: str, type_name: str) -> str:
     """``fritzexport_<host>_<UTC>Z_<typ>.json``"""
     return f"{TOOL_NAME}_{slug_host(host)}_{timestamp}_{type_name}.json"

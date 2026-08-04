@@ -31,6 +31,7 @@ from .digest import (
 from .envelope import (
     ENVELOPE_KEYS,
     build_envelope,
+    compact_from_iso,
     read_envelope_meta,
     utc_now_compact,
     utc_now_iso,
@@ -38,10 +39,12 @@ from .envelope import (
 from .names import (
     BUNDLE_GLOB,
     JSON_TYPES,
+    RUN_FALLBACK,
     SUPPORT_VARIANTS,
     TOOL_NAME,
     dataset_filename,
     dataset_glob,
+    run_slug,
     session_log_filename,
     session_log_glob,
     slug_host,
@@ -55,8 +58,8 @@ __all__ = [
     "SIDECAR_SUFFIX", "sha256_bytes", "sha256_file", "read_sidecar", "verify",
     "write_sidecar",
     "ENVELOPE_KEYS", "build_envelope", "read_envelope_meta", "utc_now_iso",
-    "utc_now_compact",
-    "TOOL_NAME", "JSON_TYPES", "SUPPORT_VARIANTS", "BUNDLE_GLOB",
+    "utc_now_compact", "compact_from_iso",
+    "TOOL_NAME", "JSON_TYPES", "SUPPORT_VARIANTS", "BUNDLE_GLOB", "RUN_FALLBACK",
     "dataset_filename", "dataset_glob", "support_filename", "support_glob",
-    "session_log_filename", "session_log_glob", "slug_host",
+    "session_log_filename", "session_log_glob", "slug_host", "run_slug",
 ]

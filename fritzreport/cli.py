@@ -6,8 +6,10 @@ Ohne ``bundle``-Argument sucht fritzreport fritzexport-Bundles im aktuellen
 Verzeichnis (Auto-Discovery, analog zu fritzexport): genau eines → direkt nehmen,
 mehrere → nummerierte Auswahl. Danach werden die Kopf-Felder (Case-ID, Item-ID,
 SB, Datum) interaktiv abgefragt (per CLI-Flag gesetzte Werte überspringen die
-Abfrage). Der Report bekommt einen sprechenden Namen und wird ins **aktuelle
-Arbeitsverzeichnis** geschrieben — nicht in den Beweismittel-Ordner.
+Abfrage; eine ``case.json`` im Bundle belegt sie vor). Der Report wird ins
+**aktuelle Arbeitsverzeichnis** geschrieben — nicht in den Beweismittel-Ordner —
+und trägt denselben Namensstamm wie das Bundle-Verzeichnis
+(``<Case>_<Item>_<Abzugszeitpunkt>.html``), sodass beide am Namen zusammenfinden.
 
 Neben dem Report entsteht eine ``<report>.html.sha256``-Sidecar im selben Format
 wie im Bundle (``sha256sum -c``-kompatibel), damit auch das Berichtsdokument
@@ -16,12 +18,19 @@ selbst einen Integritätsnachweis hat.
 from __future__ import annotations
 
 import argparse
-import re
 import sys
 import webbrowser
 from pathlib import Path
 
-from fritzformat import BUNDLE_GLOB, CASE_LABELS, collect_case, read_case, utc_now_iso
+from fritzformat import (
+    BUNDLE_GLOB,
+    CASE_LABELS,
+    collect_case,
+    compact_from_iso,
+    read_case,
+    run_slug,
+    utc_now_iso,
+)
 from fritzformat.digest import sha256_bytes, write_sidecar
 
 from . import __version__
@@ -111,20 +120,22 @@ def collect_header(args, bundle_dir: Path | None = None) -> dict:
 
 # ───────────────────────── Ausgabename ──────────────────────────────────────
 
-_SAFE = re.compile(r"[^A-Za-z0-9._-]+")
+def default_output_name(header: dict, extracted_at: str = "") -> Path:
+    """Sprechender Report-Name im aktuellen Arbeitsverzeichnis.
 
+    ``<Case>_<Item>_<Abzugszeitpunkt>.html`` — **derselbe Namensstamm wie das
+    Bundle-Verzeichnis**, damit am Namen erkennbar ist, welcher Report zu welchem
+    Abzug gehört.
 
-def _slug(value: str) -> str:
-    return _SAFE.sub("-", value.strip()).strip("-")
-
-
-def default_output_name(header: dict, box_label: str) -> Path:
-    """Sprechender Report-Name im aktuellen Arbeitsverzeichnis:
-    ``<Case>_<Item>_<Box>_<Datum>.html`` (leere Teile entfallen)."""
-    parts = [header.get("case_id", ""), header.get("item_id", ""),
-             box_label, header.get("date", "")]
-    slug = "_".join(_slug(p) for p in parts if p and _slug(p))
-    return Path.cwd() / (f"{slug}.html" if slug else "fritzreport.html")
+    Der Zeitstempel kommt aus der Hülle des Bundles (``extracted_at``), nicht aus
+    dem Verzeichnisnamen: So stimmt der Stamm auch bei umbenannten oder alten
+    Bundles. Er macht den Namen zugleich eindeutig — zwei Abzüge desselben
+    Asservats am selben Tag ergaben früher denselben Reportnamen, der zweite
+    überschrieb den ersten kommentarlos.
+    """
+    slug = run_slug(header.get("case_id", ""), header.get("item_id", ""),
+                    compact_from_iso(extracted_at))
+    return Path.cwd() / f"{slug}.html"
 
 
 # ───────────────────────── main ─────────────────────────────────────────────
@@ -169,7 +180,7 @@ def main(argv=None) -> int:
 
     device = _pick_device(model.mesh_nodes, model.meta.get("host", ""))
     box_label = device.get("model", "") or bundle_dir.name
-    out = args.output or default_output_name(header, box_label)
+    out = args.output or default_output_name(header, bundle.meta.get("extracted_at", ""))
     # Über die kodierten Bytes gehen, damit die Sidecar exakt das beschreibt,
     # was auf der Platte liegt (write_text würde sonst zweimal kodieren).
     payload = html.encode("utf-8")

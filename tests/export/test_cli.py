@@ -131,3 +131,94 @@ def test_output_dir_bekommt_zeitstempel_suffix(monkeypatch, tmp_path):
     run_dir = tmp_path / "case42_20260713T101530Z"
     assert run_dir.is_dir()
     assert (run_dir / "fritzexport_20260713T101530Z.log").exists()
+
+
+# ───────────────────────── Verzeichnis-Benennung ─────────────────────────────
+
+def _lauf(monkeypatch, tmp_path, case_args, records=None):
+    """Vollständigen main()-Lauf mit gemocktem Client/Extractor fahren."""
+    import logging
+
+    from fritzexport.extractors import EXTRACTORS
+
+    monkeypatch.setattr(cli.output, "_utc_now_compact", lambda: "20260713T101530Z")
+    monkeypatch.setattr(cli, "_resolve_target",
+                        lambda args: ("https://192.168.2.1", None, cli.EXIT_OK))
+    monkeypatch.setattr(cli, "_probe_tls", lambda url, args: None)
+    monkeypatch.setattr(cli, "_resolve_user", lambda url, args: "admin")
+    monkeypatch.setattr(cli, "_resolve_password", lambda env: "geheim")
+
+    class _Client:
+        def tr064_available(self): return True
+        def close(self): pass
+
+    monkeypatch.setattr(cli.FritzClient, "login",
+                        classmethod(lambda cls, *a, **kw: _Client()))
+    monkeypatch.setitem(EXTRACTORS, "hosts", lambda c: records or [{"mac": "aa:bb"}])
+
+    rc = cli.main(["--host", "192.168.2.1", "--user", "admin", "--hosts",
+                   "--no-prompt", "--output", str(tmp_path / "export"), *case_args])
+    logging.shutdown()
+    return rc
+
+
+def test_verzeichnis_bekommt_fallkopf_namen(monkeypatch, tmp_path):
+    """Der Abzug landet unter <Case>_<Item>_<ts> — demselben Stamm wie der Report."""
+    rc = _lauf(monkeypatch, tmp_path,
+               ["--case-id", "C-2026-0815", "--item-id", "A-01", "--sb", "X"])
+    assert rc == cli.EXIT_OK
+    assert (tmp_path / "C-2026-0815_A-01_20260713T101530Z").is_dir()
+    assert not (tmp_path / "export_20260713T101530Z").exists()
+
+
+def test_ohne_fallkopf_bleibt_zeitstempelname(monkeypatch, tmp_path):
+    """Ein Abzug ohne Fallkopf ist der Normalfall — kein Umbenennen, kein Fehler."""
+    rc = _lauf(monkeypatch, tmp_path, [])
+    assert rc == cli.EXIT_OK
+    assert (tmp_path / "export_20260713T101530Z").is_dir()
+
+
+def test_logdatei_wandert_mit_und_ist_gefuellt(monkeypatch, tmp_path):
+    """Das Log muss im umbenannten Verzeichnis liegen UND Inhalt haben — es wird
+    ab der ersten Zeile geschrieben, damit es bei einem Absturz nicht fehlt."""
+    _lauf(monkeypatch, tmp_path, ["--case-id", "C-1"])
+    log = tmp_path / "C-1_20260713T101530Z" / "fritzexport_20260713T101530Z.log"
+    assert log.exists(), "Logdatei ist beim Umbenennen verlorengegangen"
+    assert log.stat().st_size > 0, "Logdatei ist leer — wurde sie gepuffert?"
+
+
+def test_kein_offener_log_handler_nach_dem_lauf(monkeypatch, tmp_path):
+    """Wirksamkeitsprobe für Windows: ein offener FileHandler sperrt das
+    Verzeichnis und ließe rename() mit WinError 32 scheitern. Auf Linux fällt das
+    nie auf — deshalb dieser Test."""
+    import logging
+
+    _lauf(monkeypatch, tmp_path, ["--case-id", "C-1"])
+    offen = [h for h in logging.getLogger().handlers
+             if isinstance(h, logging.FileHandler)]
+    assert not offen, f"FileHandler nach dem Umbenennen noch offen: {offen}"
+
+
+def test_bundle_bleibt_nach_umbenennen_ladbar(monkeypatch, tmp_path):
+    """Gegenprobe: Nach dem Umbenennen muss der Report das Bundle noch lesen und
+    alle Sidecars verifizieren können — hier fielen absolute Pfade auf."""
+    from fritzreport.bundle import load_bundle
+    from fritzreport.cli import is_bundle
+
+    _lauf(monkeypatch, tmp_path, ["--case-id", "C-1", "--item-id", "A-01"])
+    neu = tmp_path / "C-1_A-01_20260713T101530Z"
+
+    assert is_bundle(neu), "umbenanntes Verzeichnis wird nicht mehr als Bundle erkannt"
+    b = load_bundle(neu)
+    assert b.ds("hosts").present
+    assert b.integrity_ok, "Sidecars verifizieren nach dem Umbenennen nicht mehr"
+
+
+def test_umbenennen_scheitert_lautlos_nicht(monkeypatch, tmp_path):
+    """Existiert der Zielname schon, bleibt der Abzug unter seinem alten Namen —
+    ein fertiger Abzug darf nicht an der Benennung scheitern."""
+    (tmp_path / "C-1_20260713T101530Z").mkdir(parents=True)
+    rc = _lauf(monkeypatch, tmp_path, ["--case-id", "C-1"])
+
+    assert rc == cli.EXIT_OK, "Exit-Code darf sich durch das Benennungsproblem nicht ändern"
+    assert (tmp_path / "export_20260713T101530Z").is_dir()

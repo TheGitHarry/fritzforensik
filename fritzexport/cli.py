@@ -11,7 +11,7 @@ from pathlib import Path
 
 import requests
 
-from fritzformat import build_case, collect_case, utc_now_iso, write_case
+from fritzformat import build_case, collect_case, run_slug, utc_now_iso, write_case
 
 from . import __version__, discover, output
 from .auth import AuthError, fetch_users
@@ -320,6 +320,49 @@ def _configure_logging(verbose: bool, log_file: Path | None) -> None:
     logging.basicConfig(level=level, format=fmt, handlers=handlers, force=True)
 
 
+def _close_log_file() -> None:
+    """Logdatei schließen und abhängen — Voraussetzung fürs Umbenennen.
+
+    Windows sperrt ein Verzeichnis, solange darin eine Datei offen ist, und der
+    FileHandler bleibt sonst bis Prozessende offen (``rename`` scheiterte dort mit
+    WinError 32). Der StreamHandler bleibt bestehen, damit die Abschlussmeldung
+    weiterhin auf stderr geht.
+    """
+    root = logging.getLogger()
+    for h in list(root.handlers):
+        if isinstance(h, logging.FileHandler):
+            h.flush()
+            h.close()
+            root.removeHandler(h)
+
+
+def _finalize_output_dir(output_dir: Path, case: dict, run_stamp: str) -> Path:
+    """Abzugsverzeichnis auf den sprechenden Namen bringen; gibt den Pfad zurück.
+
+    Läuft als **letzter** Schritt, wenn nichts mehr in die Logdatei geschrieben
+    wird. Ohne Fallkopf bleibt der Zeitstempelname bestehen. Scheitert das
+    Umbenennen, behält der Abzug seinen bisherigen Namen — er ist vollständig, und
+    ein fertiger Abzug darf nicht an der Benennung scheitern.
+    """
+    slug = run_slug(case.get("case_id", ""), case.get("item_id", ""), run_stamp)
+    ziel = output_dir.parent / slug
+    if ziel == output_dir:
+        return output_dir
+    if ziel.exists():
+        sys.stderr.write(f"WARN: {ziel.name} existiert bereits — Abzug bleibt unter "
+                         f"{output_dir.name}.\n")
+        return output_dir
+
+    _close_log_file()
+    try:
+        output_dir.rename(ziel)
+    except OSError as e:
+        sys.stderr.write(f"WARN: Umbenennen nach {ziel.name} fehlgeschlagen ({e}) — "
+                         f"Abzug liegt unter {output_dir.name}.\n")
+        return output_dir
+    return ziel
+
+
 def _resolve_target(args: argparse.Namespace) -> tuple[str | None, dict | None, int]:
     """Liefert (target_url, discovery_meta, exit_code).
 
@@ -511,10 +554,15 @@ def main(argv: list[str] | None = None) -> int:
     case_file = write_case(output_dir, build_case(**case, written_at=utc_now_iso()))
     log.info("Fallkopf → %s", case_file)
 
+    # Ab hier darf nichts mehr in die Logdatei — sie wird gleich geschlossen,
+    # damit das Verzeichnis umbenannt werden kann.
     if failures:
         log.warning("Fehlgeschlagene Extractoren: %s", ", ".join(failures))
-        return EXIT_PARTIAL
-    return EXIT_OK
+    exit_code = EXIT_PARTIAL if failures else EXIT_OK
+
+    final_dir = _finalize_output_dir(output_dir, case, run_stamp)
+    sys.stderr.write(f"\nAbzug abgelegt in: {final_dir}\n")
+    return exit_code
 
 
 if __name__ == "__main__":

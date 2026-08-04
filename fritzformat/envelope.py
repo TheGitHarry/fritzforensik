@@ -26,6 +26,25 @@ def utc_now_compact() -> str:
     return _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
+def compact_from_iso(value: str) -> str:
+    """``2026-07-24T10:15:30Z`` → ``20260724T101530Z``.
+
+    Der Report kennt den Abzugszeitpunkt nur als ISO-Wert aus der Hülle
+    (``extracted_at``), braucht ihn für den Dateinamen aber kompakt — sonst bilden
+    Abzug und Report nicht denselben Namensstamm. Unbrauchbare Werte ergeben einen
+    leeren String; der Aufrufer entscheidet dann über den Rückfall.
+    """
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            return _dt.datetime.strptime(raw, fmt).strftime("%Y%m%dT%H%M%SZ")
+        except ValueError:
+            continue
+    return ""
+
+
 def build_envelope(
     tool: str,
     version: str,

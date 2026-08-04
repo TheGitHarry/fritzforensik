@@ -14,8 +14,10 @@ from fritzformat import (
     SUPPORT_VARIANTS,
     TOOL_NAME,
     build_case,
+    compact_from_iso,
     dataset_filename,
     read_case,
+    run_slug,
     read_envelope_meta,
     sha256_bytes,
     support_filename,
@@ -136,3 +138,49 @@ def test_fallkopf_traegt_keine_sidecar(tmp_path) -> None:
     Box und muss korrigierbar bleiben, ohne die Bundle-Integrität zu verletzen."""
     write_case(tmp_path, build_case(case_id="C-1"))
     assert not (tmp_path / f"{CASE_FILENAME}.sha256").exists()
+
+
+# ───────────────────────── Gemeinsamer Namensstamm ───────────────────────────
+
+def test_run_slug_verbindet_abzug_und_report() -> None:
+    """Beide Werkzeuge bilden denselben Stamm — sonst finden sie nicht zusammen."""
+    stamm = run_slug("C-2026-0815", "A-01", "20260804T184059Z")
+    assert stamm == "C-2026-0815_A-01_20260804T184059Z"
+
+
+def test_run_slug_ohne_fallkopf_faellt_zurueck() -> None:
+    """Ohne Case/Item bleibt der Zeitstempelname — ein Abzug ohne Fallkopf ist
+    der Normalfall im Feld, kein Fehler."""
+    assert run_slug("", "", "20260804T184059Z") == "export_20260804T184059Z"
+    assert run_slug("", "", "").startswith("export")
+
+
+def test_run_slug_laesst_leere_teile_weg() -> None:
+    assert run_slug("C-1", "", "20260804T184059Z") == "C-1_20260804T184059Z"
+    assert run_slug("", "A-01", "20260804T184059Z") == "A-01_20260804T184059Z"
+
+
+def test_run_slug_entschaerft_sonderzeichen() -> None:
+    """Case-IDs aus der Praxis enthalten Schrägstriche und Leerzeichen — die
+    dürfen nicht im Dateinamen landen."""
+    stamm = run_slug("ST/0815-26", "Asservat 1", "20260804T184059Z")
+    assert "/" not in stamm and " " not in stamm
+    assert stamm == "ST-0815-26_Asservat-1_20260804T184059Z"
+
+
+def test_compact_from_iso() -> None:
+    """Der Report kennt den Abzugszeitpunkt nur als ISO-Wert, braucht ihn für den
+    Dateinamen aber kompakt — sonst weicht sein Stamm vom Verzeichnis ab."""
+    assert compact_from_iso("2026-08-04T18:40:59Z") == "20260804T184059Z"
+    assert compact_from_iso("") == ""
+    assert compact_from_iso("kein zeitstempel") == ""
+
+
+def test_stamm_von_abzug_und_report_ist_identisch() -> None:
+    """Der eigentliche Vertrag: Verzeichnisname und Reportname teilen den Stamm."""
+    case = {"case_id": "C-2026-0815", "item_id": "A-01"}
+    verzeichnis = run_slug(case["case_id"], case["item_id"], "20260804T184059Z")
+    # der Report geht vom ISO-Wert der Hülle aus
+    report = run_slug(case["case_id"], case["item_id"],
+                      compact_from_iso("2026-08-04T18:40:59Z"))
+    assert verzeichnis == report

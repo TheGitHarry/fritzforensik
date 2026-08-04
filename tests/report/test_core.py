@@ -207,6 +207,60 @@ def test_cli_schlaegt_fallkopf_aus_dem_bundle(synth_bundle, tmp_path, monkeypatc
     assert "ALT" in html
 
 
+# ───────────────────────── Report-Name ──────────────────────────────────────
+
+def test_reportname_traegt_den_abzugszeitpunkt(synth_bundle, tmp_path, monkeypatch):
+    """Der Reportname teilt seinen Stamm mit dem Bundle-Verzeichnis — der
+    Zeitstempel kommt aus der Hülle, nicht aus dem Verzeichnisnamen."""
+    from fritzformat import build_case, write_case
+    from fritzreport.cli import main
+
+    write_case(synth_bundle, build_case(case_id="C-2026-0815", item_id="A-01"))
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sys.argv", ["fritzreport", str(synth_bundle), "--no-prompt"])
+    assert main() == 0
+
+    erzeugt = list(tmp_path.glob("*.html"))
+    assert len(erzeugt) == 1
+    # Fixture-Bundle trägt extracted_at = 2026-01-06T10:00:00Z
+    assert erzeugt[0].name == "C-2026-0815_A-01_20260106T100000Z.html"
+
+
+def test_zwei_reports_kollidieren_nicht(synth_bundle, tmp_path, monkeypatch):
+    """Früher nutzte der Name nur das Datum: Zwei Abzüge desselben Asservats am
+    selben Tag ergaben denselben Reportnamen, der zweite überschrieb den ersten
+    kommentarlos. Der Abzugszeitpunkt im Namen verhindert das."""
+    import json
+
+    from fritzreport.cli import main
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sys.argv", ["fritzreport", str(synth_bundle), "--no-prompt",
+                                     "--case-id", "C-1", "--item-id", "A-01"])
+    assert main() == 0
+
+    # zweiter Abzug desselben Asservats, eine Stunde später
+    zweit = tmp_path / "zweiter_abzug"
+    zweit.mkdir()
+    for p in synth_bundle.iterdir():
+        if p.is_file():
+            (zweit / p.name).write_bytes(p.read_bytes())
+    for p in zweit.glob("*.json"):
+        if p.name.endswith(".sha256"):
+            continue
+        data = json.loads(p.read_text(encoding="utf-8"))
+        if "extracted_at" in data:
+            data["extracted_at"] = "2026-01-06T11:00:00Z"
+            p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    monkeypatch.setattr("sys.argv", ["fritzreport", str(zweit), "--no-prompt",
+                                     "--case-id", "C-1", "--item-id", "A-01"])
+    assert main() == 0
+
+    namen = sorted(p.name for p in tmp_path.glob("*.html"))
+    assert len(namen) == 2, f"zweiter Report hat den ersten überschrieben: {namen}"
+
+
 # ───────────────────────── Optional: echte Boxen ────────────────────────────
 
 def test_real_boxes_end_to_end(real_boxes):

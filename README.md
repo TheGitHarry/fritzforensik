@@ -84,8 +84,23 @@ werden erkannt; das Tool schaltet dann selbstständig auf TLS ohne Verifikation 
 SSDP-Multicast bei Multi-Interface-Hosts.
 
 `--output` ist optional (Default `./export/` neben dem Binary). **Jeder Lauf bekommt ein
-eigenes Verzeichnis** mit UTC-Zeitstempel — `export_20260713T101530Z/`. Ein zweiter Lauf
-überschreibt nie den ersten. Die Logdatei `fritzexport_<ts>.log` liegt im selben Verzeichnis.
+eigenes Verzeichnis** mit UTC-Zeitstempel; ein zweiter Lauf überschreibt nie den ersten.
+Die Logdatei `fritzexport_<ts>.log` liegt im selben Verzeichnis.
+
+Nach dem Abzug wird das Verzeichnis auf den **Fallkopf** umbenannt, sodass Abzug und
+Report am Namen zusammenfinden:
+
+```
+C-2026-0815_A-01_20260713T101530Z/            ← Bundle
+C-2026-0815_A-01_20260713T101530Z.html        ← Report (fritzreport)
+C-2026-0815_A-01_20260713T101530Z.html.sha256
+```
+
+Ohne Fallkopf bleibt es beim Zeitstempelnamen (`export_20260713T101530Z/`) — der
+gemeinsame Stamm trägt auch dann. Schlägt das Umbenennen fehl (Rechte, Zielname
+existiert), behält der Abzug seinen bisherigen Namen; er ist vollständig, es wird nur
+gewarnt. Bricht der Lauf vorher ab, bleibt ebenfalls der Zeitstempelname stehen —
+mitsamt vollständiger Logdatei, die ab der ersten Zeile geschrieben wird.
 
 ## Extractoren
 
@@ -199,8 +214,13 @@ fritzreport
 - **Auto-Discovery:** sucht fritzexport-Bundles im aktuellen Verzeichnis. Genau eines →
   direkt genommen. Mehrere → nummerierte Auswahl.
 - **Kopf-Felder:** Case-ID · Asservat/Item-ID · Sachbearbeiter · Datum (Enter = leer).
-- **Ausgabe:** sprechender Name `<Case>_<Item>_<Box>_<Datum>.html` im **aktuellen
-  Arbeitsverzeichnis** — bewusst *nicht* im Beweismittel-Ordner.
+  Liegt eine `case.json` im Bundle (von fritzexport geschrieben), belegt sie die
+  Abfrage vor; CLI-Argumente überschreiben sie weiterhin.
+- **Ausgabe:** `<Case>_<Item>_<Abzugszeitpunkt>.html` im **aktuellen
+  Arbeitsverzeichnis** — bewusst *nicht* im Beweismittel-Ordner. Der Name trägt
+  denselben Stamm wie das Bundle-Verzeichnis; der Abzugszeitpunkt stammt aus der
+  Hülle des Bundles und macht den Namen eindeutig, sodass zwei Abzüge desselben
+  Asservats zwei Reports ergeben statt einen überschriebenen.
 
 **Nicht-interaktiv:**
 
@@ -301,7 +321,8 @@ USB:/
   fritzexport-<version>-linux-x86_64        (chmod +x)
   fritzexport-<version>-windows-x86_64.exe
   fritzreport-<version>-linux-x86_64
-  export_20260713T101530Z/                  (wird pro Lauf erstellt)
+  C-2026-0815_A-01_20260713T101530Z/        (Bundle, pro Lauf erstellt)
+  C-2026-0815_A-01_20260713T101530Z.html    (Report, gleicher Namensstamm)
 ```
 
 Das Export-Verzeichnis landet neben dem Binary, nicht im zufälligen `cwd`. Der
