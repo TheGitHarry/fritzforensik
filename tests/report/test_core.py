@@ -170,6 +170,43 @@ def test_report_sidecar_detects_tampering(synth_bundle, tmp_path, monkeypatch):
     assert status != STATUS_OK, "Manipulation am Report muss auffallen"
 
 
+# ───────────────────────── Fallkopf aus dem Bundle ──────────────────────────
+
+def test_fallkopf_belegt_report_kopf_vor(synth_bundle, tmp_path, monkeypatch):
+    """Liegt eine case.json im Bundle, landen ihre Werte ohne Rückfrage im Report."""
+    from fritzformat import build_case, write_case
+    from fritzreport.cli import main
+
+    write_case(synth_bundle, build_case(case_id="C-2026-0815", item_id="A-01",
+                                        sb="Killefiz", date="2026-08-04"))
+    out = tmp_path / "report.html"
+    monkeypatch.setattr("sys.argv", ["fritzreport", str(synth_bundle), "-o", str(out),
+                                     "--no-prompt"])
+    assert main() == 0
+
+    html = out.read_text(encoding="utf-8")
+    assert "C-2026-0815" in html
+    assert "A-01" in html
+    assert "Killefiz" in html
+
+
+def test_cli_schlaegt_fallkopf_aus_dem_bundle(synth_bundle, tmp_path, monkeypatch):
+    """CLI-Argumente gewinnen gegen die case.json — sonst ließe sich nichts korrigieren."""
+    from fritzformat import build_case, write_case
+    from fritzreport.cli import main
+
+    write_case(synth_bundle, build_case(case_id="ALT", item_id="ALT", sb="ALT"))
+    out = tmp_path / "report.html"
+    monkeypatch.setattr("sys.argv", ["fritzreport", str(synth_bundle), "-o", str(out),
+                                     "--no-prompt", "--case-id", "NEU"])
+    assert main() == 0
+
+    html = out.read_text(encoding="utf-8")
+    assert "NEU" in html
+    # die nicht überschriebenen Felder kommen weiter aus dem Bundle
+    assert "ALT" in html
+
+
 # ───────────────────────── Optional: echte Boxen ────────────────────────────
 
 def test_real_boxes_end_to_end(real_boxes):

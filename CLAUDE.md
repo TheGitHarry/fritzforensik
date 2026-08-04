@@ -19,7 +19,8 @@ Hervorgegangen aus den vormals getrennten Repos `legacy_export` (→ fritzexport
 ## fritzformat — bitte hier zuerst schauen
 
 `fritzformat` ist die **einzige Wahrheit** über das Bundle-Format: Dateinamen
-(`names.py`), Hüllformat (`envelope.py`), SHA256-Sidecars (`digest.py`).
+(`names.py`), Hüllformat (`envelope.py`), SHA256-Sidecars (`digest.py`), Fallkopf
+(`casefile.py` — `case.json` plus die von beiden Werkzeugen genutzte Abfrage).
 
 Vorher lag dieses Wissen **vierfach** vor — Schreibseite in `output.py`, nochmal im
 Supportdaten-Extractor, Leseseite in `bundle.py`, und ein viertes Mal im Test-Fixture.

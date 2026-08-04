@@ -16,13 +16,12 @@ selbst einen Integritätsnachweis hat.
 from __future__ import annotations
 
 import argparse
-import datetime as _dt
 import re
 import sys
 import webbrowser
 from pathlib import Path
 
-from fritzformat import BUNDLE_GLOB, utc_now_iso
+from fritzformat import BUNDLE_GLOB, CASE_LABELS, collect_case, read_case, utc_now_iso
 from fritzformat.digest import sha256_bytes, write_sidecar
 
 from . import __version__
@@ -30,10 +29,6 @@ from .bundle import load_bundle
 from .model import build_model
 from .render import _pick_device, build_html
 from .supportdata import analyze
-
-
-def _today() -> str:
-    return _dt.date.today().isoformat()
 
 
 #: Zeitstempel der Report-Erzeugung — Format aus fritzformat, damit Report und
@@ -96,32 +91,22 @@ def resolve_bundle(arg: Path | None) -> Path:
 
 # ───────────────────────── Kopf-Felder ──────────────────────────────────────
 
-def collect_header(args) -> dict:
-    """Kopf-Felder erheben: CLI-Werte werden übernommen, der Rest interaktiv
-    abgefragt (sofern TTY und nicht ``--no-prompt``)."""
-    interactive = (not args.no_prompt) and sys.stdin.isatty() and sys.stdout.isatty()
+def collect_header(args, bundle_dir: Path | None = None) -> dict:
+    """Kopf-Felder erheben; eine ``case.json`` im Bundle belegt die Abfrage vor.
 
-    def field(cli_val, label, default=""):
-        if cli_val is not None:
-            return cli_val
-        if not interactive:
-            return default
-        suffix = f" [{default}]" if default else ""
-        try:
-            ans = input(f"  {label}{suffix}: ").strip()
-        except EOFError:
-            ans = ""
-        return ans or default
-
-    if interactive and all(getattr(args, a) is None for a in ("case_id", "item_id", "sb")):
-        print("Kopf-Felder für den Report (Enter = leer):", file=sys.stderr)
-    return {
-        "case_id": field(args.case_id, "Case-ID"),
-        "item_id": field(args.item_id, "Asservat / Item-ID"),
-        "sb": field(args.sb, "Sachbearbeiter (SB)"),
-        "date": args.date or field(None, "Datum", _today()),
-        "generated_at": _now_iso(),
-    }
+    Hat fritzexport den Fallkopf bereits erfasst, werden die Werte als Vorgabe
+    angeboten (mit Enter zu übernehmen, weiterhin überschreibbar). Fehlt die Datei
+    oder ist sie unbrauchbar, wird wie bisher gefragt — ein Bundle ohne Fallkopf
+    ist gültig.
+    """
+    defaults = read_case(bundle_dir) if bundle_dir else {}
+    if defaults and any(defaults.values()):
+        gefunden = ", ".join(f"{CASE_LABELS[k]}: {v}" for k, v in defaults.items() if v)
+        print(f"Fallkopf aus dem Bundle übernommen ({gefunden}).", file=sys.stderr)
+    header = collect_case(args, defaults=defaults,
+                          intro="Kopf-Felder für den Report (Enter = leer):")
+    header["generated_at"] = _now_iso()
+    return header
 
 
 # ───────────────────────── Ausgabename ──────────────────────────────────────
@@ -174,7 +159,7 @@ def main(argv=None) -> int:
         print(f"Fehler: {e}", file=sys.stderr)
         return 2
 
-    header = collect_header(args)
+    header = collect_header(args, bundle_dir)
 
     model = build_model(bundle)
     master_name = model.master.get("name", "") or (model.real_aps[0] if model.real_aps else "")

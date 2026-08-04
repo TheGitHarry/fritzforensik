@@ -9,14 +9,18 @@ from __future__ import annotations
 import json
 
 from fritzformat import (
+    CASE_FILENAME,
     JSON_TYPES,
     SUPPORT_VARIANTS,
     TOOL_NAME,
+    build_case,
     dataset_filename,
+    read_case,
     read_envelope_meta,
     sha256_bytes,
     support_filename,
     verify,
+    write_case,
     write_sidecar,
 )
 from fritzexport import output
@@ -96,3 +100,39 @@ def test_mismatch_wird_erkannt(tmp_path) -> None:
     path.write_bytes(path.read_bytes() + b" ")
     status, _digest = verify(path)
     assert status == "mismatch"
+
+
+# ───────────────────────── Fallkopf (case.json) ──────────────────────────────
+
+def test_fallkopf_rundlauf(tmp_path) -> None:
+    """Was fritzexport schreibt, liest fritzreport unverändert zurück."""
+    geschrieben = build_case(case_id="C-2026-0815", item_id="A-01",
+                             sb="Killefiz", date="2026-08-04",
+                             written_at="2026-08-04T12:00:00Z")
+    write_case(tmp_path, geschrieben)
+
+    gelesen = read_case(tmp_path)
+    assert gelesen == {"case_id": "C-2026-0815", "item_id": "A-01",
+                       "sb": "Killefiz", "date": "2026-08-04"}
+
+
+def test_fallkopf_fehlt_ist_kein_fehler(tmp_path) -> None:
+    """Ein Bundle ohne Fallkopf ist gültig — der Report darf nicht scheitern."""
+    assert read_case(tmp_path) == {}
+
+
+def test_fallkopf_kaputt_wird_ignoriert(tmp_path) -> None:
+    """Beschädigte case.json blockiert den Report nicht (sie ist Bequemlichkeit,
+    keine Voraussetzung) — Gegenprobe zum Rundlauf oben."""
+    (tmp_path / CASE_FILENAME).write_text("{kein json", encoding="utf-8")
+    assert read_case(tmp_path) == {}
+
+    (tmp_path / CASE_FILENAME).write_text('["liste statt objekt"]', encoding="utf-8")
+    assert read_case(tmp_path) == {}
+
+
+def test_fallkopf_traegt_keine_sidecar(tmp_path) -> None:
+    """Bewusst ohne Sidecar: eine Bearbeiterangabe ist kein Beweismittel aus der
+    Box und muss korrigierbar bleiben, ohne die Bundle-Integrität zu verletzen."""
+    write_case(tmp_path, build_case(case_id="C-1"))
+    assert not (tmp_path / f"{CASE_FILENAME}.sha256").exists()

@@ -10,6 +10,16 @@ es dieses Paket importiert, darf auch hier nichts Fremdes hinzukommen.
 """
 from __future__ import annotations
 
+from .casefile import (
+    CASE_FIELDS,
+    CASE_FILENAME,
+    CASE_LABELS,
+    build_case,
+    case_path,
+    collect_case,
+    read_case,
+    write_case,
+)
 from .digest import (
     SIDECAR_SUFFIX,
     read_sidecar,
@@ -40,6 +50,8 @@ from .names import (
 )
 
 __all__ = [
+    "CASE_FILENAME", "CASE_FIELDS", "CASE_LABELS", "build_case", "case_path",
+    "collect_case", "read_case", "write_case",
     "SIDECAR_SUFFIX", "sha256_bytes", "sha256_file", "read_sidecar", "verify",
     "write_sidecar",
     "ENVELOPE_KEYS", "build_envelope", "read_envelope_meta", "utc_now_iso",

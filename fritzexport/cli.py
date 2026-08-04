@@ -11,6 +11,8 @@ from pathlib import Path
 
 import requests
 
+from fritzformat import build_case, collect_case, utc_now_iso, write_case
+
 from . import __version__, discover, output
 from .auth import AuthError, fetch_users
 from .client import FritzClient
@@ -83,6 +85,15 @@ def _build_parser() -> argparse.ArgumentParser:
         "--insecure",
         action="store_true",
         help="TLS-Zertifikat der Box NICHT prüfen (für selbstsignierte Box-Zertifikate)",
+    )
+    p.add_argument("--case-id", default=None, help="Case-ID für den Fallkopf (sonst Abfrage)")
+    p.add_argument("--item-id", default=None, help="Asservat / Item-ID (sonst Abfrage)")
+    p.add_argument("--sb", default=None, help="Sachbearbeiter (sonst Abfrage)")
+    p.add_argument("--date", default=None, help="Datum des Fallkopfs (Default: heute)")
+    p.add_argument(
+        "--no-prompt",
+        action="store_true",
+        help="Keine interaktive Fallkopf-Abfrage (für Automation)",
     )
     for name in EXTRACTORS:
         p.add_argument(f"--{name}", action="store_true", help=f"Extractor '{name}' ausführen")
@@ -457,6 +468,10 @@ def main(argv: list[str] | None = None) -> int:
         log.error("Box nicht erreichbar: %s", e)
         return EXIT_NETWORK
 
+    # Fallkopf vor dem Abzug erheben — hier weiß der Anwender noch, welches
+    # Asservat vor ihm liegt; nach dem Lauf ist der Moment vorbei.
+    case = collect_case(args, intro="\nFallkopf für dieses Asservat (Enter = leer):")
+
     if not client.tr064_available():
         log.warning(
             "TR-064-Port 49000 nicht erreichbar. "
@@ -492,6 +507,9 @@ def main(argv: list[str] | None = None) -> int:
             log.info("Extractor '%s': %d Records → %s", name, len(records), path)
     finally:
         client.close()
+
+    case_file = write_case(output_dir, build_case(**case, written_at=utc_now_iso()))
+    log.info("Fallkopf → %s", case_file)
 
     if failures:
         log.warning("Fehlgeschlagene Extractoren: %s", ", ".join(failures))

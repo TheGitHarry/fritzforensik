@@ -138,7 +138,7 @@ Anforderungen, die erst durch den eigenständigen Feldeinsatz entstanden sind.
 |---|---|---|---|
 | H1 | Bundle-Auto-Discovery: genau eines → direkt nehmen, mehrere → Auswahl | erfüllt | — |
 | H2 | Sprechender Ausgabename aus Fallkopf und Gerät | erfüllt | — |
-| H3 | Fallkopf einmal erfassen, mit dem Bundle transportieren, im Report vorbelegen | offen | #2, #4 |
+| H3 | Fallkopf einmal erfassen, mit dem Bundle transportieren, im Report vorbelegen | erfüllt | `test_fallkopf_rundlauf`, `test_fallkopf_belegt_report_kopf_vor` |
 | H4 | Mehrere Objekte am Stück abarbeiten, ohne Neustart je Objekt | offen | #1, #3 |
 | H5 | Nichts auf der Box verändern; wo Lesen den Status ändert, Originalzustand wiederherstellen und dokumentieren | erfüllt | — |
 
