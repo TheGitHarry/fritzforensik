@@ -128,6 +128,48 @@ def test_render_structure(synth_bundle):
     assert 'data-grade="D4"' not in html
 
 
+# ───────────────────────── Report-Sidecar ───────────────────────────────────
+
+def test_report_sidecar_written_and_verifies(synth_bundle, tmp_path, monkeypatch):
+    """Der Report bekommt eine eigene .sha256-Sidecar, die zur Datei passt."""
+    from fritzformat.digest import STATUS_OK, verify
+    from fritzreport.cli import main
+
+    out = tmp_path / "report.html"
+    monkeypatch.setattr("sys.argv", [
+        "fritzreport", str(synth_bundle), "-o", str(out),
+        "--case-id", "C-1", "--item-id", "A-1", "--sb", "Test", "--date", "2026-01-01",
+    ])
+    assert main() == 0
+
+    sidecar = out.with_suffix(out.suffix + ".sha256")
+    assert sidecar.exists(), "Sidecar zum Report fehlt"
+
+    status, digest = verify(out)
+    assert status == STATUS_OK, f"Report verifiziert nicht gegen seine Sidecar: {status}"
+
+    # sha256sum-kompatibles Format: "<digest>  <dateiname>"
+    raw = sidecar.read_text(encoding="utf-8").strip()
+    assert raw == f"{digest}  {out.name}"
+
+
+def test_report_sidecar_detects_tampering(synth_bundle, tmp_path, monkeypatch):
+    """Nachträgliche Änderung am Report wird über die Sidecar erkannt."""
+    from fritzformat.digest import STATUS_OK, verify
+    from fritzreport.cli import main
+
+    out = tmp_path / "report.html"
+    monkeypatch.setattr("sys.argv", [
+        "fritzreport", str(synth_bundle), "-o", str(out),
+        "--case-id", "C-1", "--item-id", "A-1", "--sb", "Test", "--date", "2026-01-01",
+    ])
+    assert main() == 0
+
+    out.write_text(out.read_text(encoding="utf-8") + "<!-- tampered -->", encoding="utf-8")
+    status, _ = verify(out)
+    assert status != STATUS_OK, "Manipulation am Report muss auffallen"
+
+
 # ───────────────────────── Optional: echte Boxen ────────────────────────────
 
 def test_real_boxes_end_to_end(real_boxes):

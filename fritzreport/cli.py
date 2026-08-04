@@ -8,6 +8,10 @@ mehrere → nummerierte Auswahl. Danach werden die Kopf-Felder (Case-ID, Item-ID
 SB, Datum) interaktiv abgefragt (per CLI-Flag gesetzte Werte überspringen die
 Abfrage). Der Report bekommt einen sprechenden Namen und wird ins **aktuelle
 Arbeitsverzeichnis** geschrieben — nicht in den Beweismittel-Ordner.
+
+Neben dem Report entsteht eine ``<report>.html.sha256``-Sidecar im selben Format
+wie im Bundle (``sha256sum -c``-kompatibel), damit auch das Berichtsdokument
+selbst einen Integritätsnachweis hat.
 """
 from __future__ import annotations
 
@@ -19,6 +23,7 @@ import webbrowser
 from pathlib import Path
 
 from fritzformat import BUNDLE_GLOB, utc_now_iso
+from fritzformat.digest import sha256_bytes, write_sidecar
 
 from . import __version__
 from .bundle import load_bundle
@@ -180,12 +185,19 @@ def main(argv=None) -> int:
     device = _pick_device(model.mesh_nodes, model.meta.get("host", ""))
     box_label = device.get("model", "") or bundle_dir.name
     out = args.output or default_output_name(header, box_label)
-    out.write_text(html, encoding="utf-8")
+    # Über die kodierten Bytes gehen, damit die Sidecar exakt das beschreibt,
+    # was auf der Platte liegt (write_text würde sonst zweimal kodieren).
+    payload = html.encode("utf-8")
+    out.write_bytes(payload)
+    report_digest = sha256_bytes(payload)
+    sidecar = write_sidecar(out, report_digest)
 
     proofs = support["proofs"]
     mism = sum(1 for e in bundle.coc if e.status == "mismatch")
     kb = out.stat().st_size / 1024
     print(f"Report: {out}  ({kb:.0f} KB)")
+    print(f"  SHA256: {report_digest}")
+    print(f"  Sidecar: {sidecar.name}")
     print(f"  Gerät: {box_label}")
     print(f"  Integrität: {len(bundle.coc)} Dateien geprüft, "
           + ("alle ✔ verifiziert" if not mism else f"{mism} MISMATCH ✘"))
