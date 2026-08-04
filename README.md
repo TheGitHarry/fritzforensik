@@ -22,6 +22,9 @@ ohne installiertes Python.
 Das gemeinsame Bundle-Format liegt in **`fritzformat/`** — Dateinamen, Hüllformat und
 SHA256-Sidecars stehen dort *einmal* und werden von beiden Seiten benutzt.
 
+Was die Werkzeuge fachlich leisten müssen, steht in [ANFORDERUNGEN.md](ANFORDERUNGEN.md);
+offene Punkte ausschließlich in den [GitHub-Issues](https://github.com/TheGitHarry/fritzforensik/issues).
+
 ---
 
 ## Installation
@@ -228,11 +231,17 @@ Eine einzige HTML-Datei, per Doppelklick zu öffnen, funktioniert offline ohne S
 Zeilen ohne Badge sind reine Rohdaten-Wiedergabe (impliziter Normalfall). Badges markieren
 die besonderen Fälle, kombinierbar:
 
+Schema **v2** (3 Grade). Ältere Unterlagen können ein 4-Grade-Schema nennen, in dem `D3`
+„durch eigene forensische Versuche belegt" bedeutete — das entspricht hier `D2`. Die
+Umrechnung steht in [ANFORDERUNGEN.md](ANFORDERUNGEN.md), Abschnitt D.
+
 | Grad | Bedeutung |
 |------|-----------|
-| **D1** | Plausibel innerhalb der Rohdaten |
-| **D2** | Durch eigene forensische **Tests verifiziert** (`ressourcen/methode.md`) |
+| **D1** | Plausibel innerhalb Rohdaten |
+| **D2** | Durch eigene forensische Tests verifiziert |
 | **D3** | Abgeleitet / Interpretation |
+
+Grundlage für **D2** ist die Methodik in [ressourcen/methode.md](ressourcen/methode.md).
 
 **Verbindungsnachweise** (Sektion 6): Treffer des Methoden-Parsers tragen **D1+D2**, die aus
 den 802.11-Logs **D1+D3**. Beide Parser laufen auf jeder Box, Ergebnisse werden vereint

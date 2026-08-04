@@ -54,14 +54,17 @@ Permission-Regel.
 Issues anlegen, kommentieren oder schließen sind nach außen sichtbare Handlungen.
 Vorher beim Nutzer rückversichern, sofern er sie nicht ausdrücklich beauftragt hat.
 
-## Zusammenspiel mit dem Backlog
+## Backlog
 
-Der offene Stand steht an zwei Orten, die auseinanderlaufen können:
+Der offene Stand steht **ausschließlich** in den GitHub-Issues — es gibt bewusst keine
+zweite Quelle. Wer nach „was steht noch an" gefragt wird, liest die Issues, sonst nichts.
 
-- **GitHub-Issues** — über diesen Skill
-- **[CONCEPT.md](../../../CONCEPT.md)**, Abschnitt „Offen / später" — ZIP-Eingabe,
-  Owner-Korrelation, D2-Ausweitung, weitere Zeitquellen für 7490/7590
+Früher führte `CONCEPT.md` einen zweiten Backlog („Offen / später"); die beiden liefen
+auseinander, die Datei ist deshalb aufgelöst. Taucht in einem alten Stand oder einer
+alten Unterhaltung noch ein Verweis darauf auf: nicht wiederbeleben, sondern als Issue
+anlegen.
 
-Wer nach „was steht noch an" gefragt wird, muss **beide** Quellen lesen und Dubletten
-benennen. CONCEPT.md hat den Stand v0.1.0 (Juli 2026) und kennt `fritzformat` noch
-nicht; Angaben dort gegen den Code prüfen, statt sie zu übernehmen.
+Der fachliche Vertrag — was die Werkzeuge leisten müssen — steht in
+**[ANFORDERUNGEN.md](../../../ANFORDERUNGEN.md)**. Dort nennt jede Zeile mit Status
+`offen` ihre Issue-Nummer; die Verknüpfung läuft nur in diese Richtung (Issues
+verweisen nicht zurück, sonst wären bei jedem Statuswechsel zwei Orte zu pflegen).

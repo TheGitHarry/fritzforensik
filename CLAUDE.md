@@ -103,6 +103,32 @@ der Test-Step fehl, gibt es kein Artefakt.
 - Im Report-Build wird `requests` zwar installiert (die gemeinsame Testsuite braucht es),
   landet aber **nicht** im Binary — fritzreport importiert es nicht.
 
+## Doku-Eigentum
+
+Jede Aussage hat **genau einen** Ort — dasselbe Prinzip wie bei `fritzformat`:
+
+| Datei | besitzt |
+|---|---|
+| [ANFORDERUNGEN.md](ANFORDERUNGEN.md) | Was die Werkzeuge leisten müssen, inkl. entfallener Anforderungen |
+| [README.md](README.md) | Bedienung, Flags, Bundle-Format, Distribution |
+| CLAUDE.md | Orientierung, Fallen, Konventionen (diese Datei) |
+| [ressourcen/methode.md](ressourcen/methode.md) | Forensische Methodik + empirische Parser-Begründung |
+| GitHub-Issues | Backlog — **ausschließlich** |
+
+Drei Regeln, die verhindern, dass es wieder auseinanderläuft:
+
+- **Backlog nur in Issues.** Keine „Offen / später"-Liste in einer Markdown-Datei; die
+  hat keinen Zustand und wird nie geschlossen. Genau daran ist das frühere `CONCEPT.md`
+  gescheitert.
+- **Anforderungen nur in ANFORDERUNGEN.md**, mit stabilen IDs (A1, B7, E2 …). IDs werden
+  nie wiederverwendet; Weggefallenes bleibt mit Status `entfällt` und Begründung stehen.
+- **Kein Status in Prosa.** Testanzahlen, Versionen, „alles grün" veralten ab dem
+  nächsten Commit. Was nirgends steht, kann nicht falsch werden.
+
+`tests/format/test_docs.py` erzwingt die gefährlichsten Punkte mechanisch: Die
+Grade-Tabellen in README und ANFORDERUNGEN müssen `fritzreport.model.GRADE_LABEL`
+wörtlich wiedergeben, Nachweise müssen auf existierende Tests zeigen.
+
 ## Konventionen
 
 - Sprache von Doku, Logmeldungen, Fehlermeldungen: **Deutsch**.

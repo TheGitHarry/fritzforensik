@@ -185,6 +185,26 @@ Bei RX = 0 und TX = 0 → **ignorieren**
 
 ---
 
+## Warum zwei Parser laufen (empirischer Befund)
+
+`fritzreport` wertet die Supportdaten auf **zwei** Wegen aus: nach dieser Methodik
+(→ D1+D2) und zusätzlich über die 802.11-Logs (→ D1+D3). Der Grund ist eine
+Marker-Zählung über vier Testboxen — **kein Weg allein genügt**:
+
+| Box | Treffer nach dieser Methodik (D1+D2) | 802.11-Treffer (D1+D3) | Interface |
+|-----|---:|---:|---|
+| 7530ax | 1958 | 238 | `wl0/wl1` (Broadcom) |
+| 7690 | 1401 | 21 | `ath0/1` (Atheros) |
+| 7590 | 1937 | 0 | nur Zähler, keine Einzel-Events |
+| 7490 | 1840 | 0 | nur Kernel-Tick-Logs (keine Wall-Clock) |
+
+Beide Parser laufen auf jeder Box, die Ergebnisse werden vereint und dedupliziert
+(Schlüssel: Sekunde, MAC, Ereignis); der Belegtheits-Grad richtet sich nach der
+Herkunft. Auf 7590 und 7490 liefert der 802.11-Weg **nichts** — dort tragen die
+Nachweise ausschließlich diese Methodik.
+
+---
+
 ## Forensische Einschränkungen (für Gutachten relevant)
 
 | Einschränkung | Quelle |
