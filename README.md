@@ -243,6 +243,10 @@ Eine einzige HTML-Datei, per Doppelklick zu öffnen, funktioniert offline ohne S
   „X von Y ausgeblendet" zeigt die Wirkung, **Zurücksetzen** stellt alles wieder her.
 - **Herkunft** je Zeile über das „▸"-Symbol: Quelldatei, SHA-256, Zeilennummer und
   wörtlicher Original-Auszug, per Knopf kopierbar.
+- **Sicherungszeitraum** in den Metadaten (Sektion 1): *Gesichert von / bis / Dauer* —
+  der erste bis letzte Datenabruf, nicht ein einzelner Zeitpunkt. Neuere Abzüge
+  protokollieren ihn im Sitzungslog; bei älteren Bundles leitet fritzreport ihn aus den
+  Zeitstempeln der Datensätze ab und kennzeichnet ihn dann mit **D3**.
 - **Drucken:** „Gefilterte Sicht drucken" druckt nur die sichtbaren Zeilen, mit Banner
   (aktive Filter + Roh-Report-Hash).
 

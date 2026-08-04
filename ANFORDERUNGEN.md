@@ -143,6 +143,7 @@ Anforderungen, die erst durch den eigenständigen Feldeinsatz entstanden sind.
 | H3 | Fallkopf einmal erfassen, mit dem Bundle transportieren, im Report vorbelegen | erfüllt | `test_fallkopf_rundlauf`, `test_fallkopf_belegt_report_kopf_vor` |
 | H4 | Mehrere Objekte am Stück abarbeiten, ohne Neustart je Objekt | offen | #1, #3 |
 | H5 | Nichts auf der Box verändern; wo Lesen den Status ändert, Originalzustand wiederherstellen und dokumentieren | erfüllt | — |
+| H8 | Der Report weist den **Sicherungszeitraum** aus (erster bis letzter Datenabruf), nicht einen einzelnen Zeitpunkt; ist er abgeleitet statt protokolliert, ist das erkennbar | erfüllt | `test_report_zeigt_gerechneten_zeitraum_mit_d3`, `test_report_zeigt_protokollierten_zeitraum_ohne_badge` |
 
 ---
 

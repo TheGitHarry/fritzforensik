@@ -273,3 +273,59 @@ def test_real_boxes_end_to_end(real_boxes):
         assert html.count('class="section"') == 12
         assert ">None<" not in html
         assert res["proofs"], f"{d.name}: keine Verbindungsnachweise"
+
+
+# ───────────────────────── Sicherungszeitraum im Report ─────────────────────
+
+def test_report_zeigt_gerechneten_zeitraum_mit_d3(synth_bundle):
+    """Ohne Marker-Log wird der Zeitraum abgeleitet — und muss als solcher
+    gekennzeichnet sein, sonst sieht Gerechnetes aus wie Protokolliertes."""
+    b = load_bundle(synth_bundle)
+    assert b.secured_source == "berechnet"
+
+    m = build_model(b)
+    res = analyze(b, m.real_aps, m.master.get("name", ""))
+    html = build_html(b, m, res, {"case_id": "", "item_id": "", "sb": "",
+                                  "date": "2026-01-06", "generated_at": "x"})
+    assert "Gesichert von" in html
+    assert "Export erstellt am" not in html
+    # die Zeitraum-Zeilen tragen das D3-Badge
+    zeile = html.split("Gesichert von", 1)[1].split("</tr>", 1)[0]
+    assert 'class="grade gD3"' in zeile, "gerechneter Zeitraum ohne D3-Kennzeichnung"
+
+
+def test_report_zeigt_protokollierten_zeitraum_ohne_badge(synth_bundle):
+    """Mit Marker-Log stammt der Zeitraum aus dem Protokoll — ohne Badge, und
+    die Werte weichen bewusst von min/max ab, damit der Test beides unterscheidet."""
+    (synth_bundle / "fritzexport_20260106T095500Z.log").write_text(
+        "2026-01-06 10:55:00,001 INFO SICHERUNG BEGINN 2026-01-06T09:55:00Z\n"
+        "2026-01-06 11:07:42,880 INFO SICHERUNG ENDE 2026-01-06T10:07:42Z\n",
+        encoding="utf-8")
+
+    b = load_bundle(synth_bundle)
+    assert b.secured_source == "log"
+    # Fixture-Datensätze tragen 10:00:00 — der Log-Wert ist ein anderer
+    assert b.secured_from == "2026-01-06T09:55:00Z"
+
+    m = build_model(b)
+    res = analyze(b, m.real_aps, m.master.get("name", ""))
+    html = build_html(b, m, res, {"case_id": "", "item_id": "", "sb": "",
+                                  "date": "2026-01-06", "generated_at": "x"})
+    zeile = html.split("Gesichert von", 1)[1].split("</tr>", 1)[0]
+    assert "2026-01-06 09:55:00 UTC" in zeile
+    assert 'class="grade gD3"' not in zeile, "protokollierter Zeitraum fälschlich als abgeleitet markiert"
+    assert "12 min 42 s" in html, "Dauer fehlt oder falsch berechnet"
+
+
+def test_report_weist_fehlendes_ende_aus(synth_bundle):
+    """Abgebrochener Lauf: Beginn ohne Ende darf nicht als leeres Feld erscheinen."""
+    (synth_bundle / "fritzexport_20260106T095500Z.log").write_text(
+        "2026-01-06 10:55:00,001 INFO SICHERUNG BEGINN 2026-01-06T09:55:00Z\n",
+        encoding="utf-8")
+
+    b = load_bundle(synth_bundle)
+    m = build_model(b)
+    res = analyze(b, m.real_aps, m.master.get("name", ""))
+    html = build_html(b, m, res, {"case_id": "", "item_id": "", "sb": "",
+                                  "date": "2026-01-06", "generated_at": "x"})
+    assert "nicht protokolliert" in html

@@ -23,6 +23,7 @@ from fritzformat import (
     SIDECAR_SUFFIX,
     SUPPORT_VARIANTS,
     dataset_glob,
+    parse_span,
     read_envelope_meta,
     read_sidecar,
     session_log_glob,
@@ -143,6 +144,13 @@ class Bundle:
     session_log: str = ""
     tam_audio_dir: Path | None = None
 
+    #: Sicherungszeitraum (erster bis letzter Datenabruf) als ISO-UTC.
+    #: ``secured_source``: "log" = aus den Markern protokolliert · "berechnet" =
+    #: aus den ``extracted_at`` der Datensätze abgeleitet · "" = nicht ermittelbar.
+    secured_from: str = ""
+    secured_to: str = ""
+    secured_source: str = ""
+
     def ds(self, type_: str) -> Dataset:
         return self.datasets.get(type_) or Dataset(type=type_, path=None)  # type: ignore[arg-type]
 
@@ -222,4 +230,28 @@ def load_bundle(dir_: Path) -> Bundle:
     if tam.is_dir():
         b.tam_audio_dir = tam
 
+    _resolve_secured_span(b)
     return b
+
+
+def _resolve_secured_span(b: Bundle) -> None:
+    """Sicherungszeitraum bestimmen — protokolliert, sonst gerechnet.
+
+    Neuere Abzüge protokollieren Beginn und Ende als Marker im Sitzungslog. Fehlen
+    sie (Altbestand), wird der Zeitraum aus den ``extracted_at`` **aller** Datensätze
+    abgeleitet: Jede Datei trägt den Zeitpunkt, zu dem ihr Extractor fertig war.
+    Der gerechnete Wert beginnt damit etwas später als der tatsächliche Abruf — der
+    Report muss ihn deshalb als abgeleitet kennzeichnen.
+    """
+    von, bis = parse_span(b.session_log)
+    if von or bis:
+        b.secured_from, b.secured_to, b.secured_source = von, bis, "log"
+        return
+
+    stamps = sorted(
+        s for d in b.datasets.values()
+        if d.present and isinstance(d.data, dict)
+        and (s := str(d.data.get("extracted_at", "") or ""))
+    )
+    if stamps:
+        b.secured_from, b.secured_to, b.secured_source = stamps[0], stamps[-1], "berechnet"

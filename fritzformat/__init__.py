@@ -51,6 +51,13 @@ from .names import (
     support_filename,
     support_glob,
 )
+from .sessionlog import (
+    MARKER_BEGIN,
+    MARKER_END,
+    begin_line,
+    end_line,
+    parse_span,
+)
 
 __all__ = [
     "CASE_FILENAME", "CASE_FIELDS", "CASE_LABELS", "build_case", "case_path",
@@ -62,4 +69,5 @@ __all__ = [
     "TOOL_NAME", "JSON_TYPES", "SUPPORT_VARIANTS", "BUNDLE_GLOB", "RUN_FALLBACK",
     "dataset_filename", "dataset_glob", "support_filename", "support_glob",
     "session_log_filename", "session_log_glob", "slug_host", "run_slug",
+    "MARKER_BEGIN", "MARKER_END", "begin_line", "end_line", "parse_span",
 ]

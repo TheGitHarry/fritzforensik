@@ -10,6 +10,7 @@ Sektions-/Tabellen-/Herkunfts-Renderer. Angepasst an fritzreport:
 """
 from __future__ import annotations
 
+import datetime as _dt
 import hashlib
 import html
 
@@ -368,6 +369,47 @@ def badges(grades) -> str:
     )
 
 
+def _duration(von: str, bis: str) -> str:
+    """ISO-Spanne → „6 min 27 s"; leer, wenn nicht berechenbar."""
+    try:
+        a = _dt.datetime.strptime(von, "%Y-%m-%dT%H:%M:%SZ")
+        b = _dt.datetime.strptime(bis, "%Y-%m-%dT%H:%M:%SZ")
+    except (ValueError, TypeError):
+        return ""
+    sek = int((b - a).total_seconds())
+    if sek < 0:
+        return ""
+    if sek < 60:
+        return f"{sek} s"
+    if sek < 3600:
+        return f"{sek // 60} min {sek % 60} s"
+    return f"{sek // 3600} h {(sek % 3600) // 60} min"
+
+
+def _secured_rows(bundle, m) -> list[tuple]:
+    """Metadaten-Zeilen zum Sicherungszeitraum (erster bis letzter Datenabruf).
+
+    Aus den Log-Markern protokolliert oder aus den ``extracted_at`` der Datensätze
+    abgeleitet. Der abgeleitete Fall trägt ein **D3**-Badge, damit ein gerechneter
+    Zeitraum im Gutachten nicht wie ein protokollierter aussieht.
+    """
+    if not bundle.secured_from and not bundle.secured_to:
+        # Nichts ermittelbar (leeres oder beschädigtes Bundle) — bisherige
+        # Einzelangabe behalten, damit nichts schlechter dasteht als vorher.
+        return [("Export erstellt am", m.meta.get("extracted_at", ""))]
+
+    badge = "" if bundle.secured_source == "log" else " " + badges(["D3"])
+    von = bundle.secured_from.replace("T", " ").replace("Z", " UTC")
+    bis = (bundle.secured_to.replace("T", " ").replace("Z", " UTC")
+           if bundle.secured_to else "nicht protokolliert (Lauf abgebrochen)")
+
+    rows = [("Gesichert von", von, badge), ("Gesichert bis", bis, badge)]
+    dauer = _duration(bundle.secured_from, bundle.secured_to)
+    if dauer:
+        rows.append(("Dauer", dauer, badge))
+    return rows
+
+
 def data_attrs(rec) -> str:
     return (
         f' data-mac="{esc((rec.get("mac") or "").upper())}"'
@@ -584,7 +626,7 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
         ("Geräte-MAC", device.get("mac", "")),
         ("Host-URL", m.meta.get("host", "")),
         ("Extraktionswerkzeug", f'{m.meta.get("tool","?")} {m.meta.get("version","?")}'),
-        ("Export erstellt am", m.meta.get("extracted_at", "")),
+        *_secured_rows(bundle, m),
         ("Report erzeugt am", header.get("generated_at", "")),
         ("Report-Generator", f"fritzreport {__version__}"),
         ("Belegtheits-Schema", f"{GRADE_SCHEMA} ({len(GRADE_LABEL)} Grade)"),
@@ -592,7 +634,9 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
     ]
     s1 = (
         "<h3>Metadaten des Beweismittels</h3><table class='kv'>"
-        + "".join(f'<tr><th>{esc(k)}</th><td class="mono">{esc(v)}</td></tr>' for k, v in meta_rows)
+        # Zeilen sind (Schlüssel, Wert) oder (Schlüssel, Wert, Badge-HTML)
+        + "".join(f'<tr><th>{esc(r[0])}</th><td class="mono">{esc(r[1])}'
+                  f'{r[2] if len(r) > 2 else ""}</td></tr>' for r in meta_rows)
         + "</table>"
         + f'<h3>Kennzahlen <span class="grade gD3">D3</span></h3><table class="kv">'
         + f'<tr><th>Hosts insgesamt</th><td>{len(m.hosts)}</td></tr>'

@@ -11,7 +11,15 @@ from pathlib import Path
 
 import requests
 
-from fritzformat import build_case, collect_case, run_slug, utc_now_iso, write_case
+from fritzformat import (
+    begin_line,
+    build_case,
+    collect_case,
+    end_line,
+    run_slug,
+    utc_now_iso,
+    write_case,
+)
 
 from . import __version__, discover, output
 from .auth import AuthError, fetch_users
@@ -523,6 +531,10 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     failures: list[str] = []
+    # Sicherungsvorgang = erster bis letzter Datenabruf. Der Report weist diesen
+    # Zeitraum aus; ohne die Marker müsste er ihn aus den Einzel-Zeitstempeln der
+    # Dateien schätzen.
+    log.info(begin_line(utc_now_iso()))
     try:
         for name in _selected_extractors(args):
             log.info("Starte Extractor: %s", name)
@@ -550,6 +562,9 @@ def main(argv: list[str] | None = None) -> int:
             log.info("Extractor '%s': %d Records → %s", name, len(records), path)
     finally:
         client.close()
+        # Ende vor dem Fallkopf: Der ist eine Bearbeiterangabe, kein Datenabruf.
+        # Im finally, damit auch ein abgebrochener Lauf ein Ende protokolliert.
+        log.info(end_line(utc_now_iso()))
 
     case_file = write_case(output_dir, build_case(**case, written_at=utc_now_iso()))
     log.info("Fallkopf → %s", case_file)

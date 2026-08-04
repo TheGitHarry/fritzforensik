@@ -10,12 +10,17 @@ import json
 
 from fritzformat import (
     CASE_FILENAME,
+    MARKER_BEGIN,
+    MARKER_END,
+    begin_line,
     JSON_TYPES,
     SUPPORT_VARIANTS,
     TOOL_NAME,
     build_case,
     compact_from_iso,
     dataset_filename,
+    end_line,
+    parse_span,
     read_case,
     run_slug,
     read_envelope_meta,
@@ -184,3 +189,69 @@ def test_stamm_von_abzug_und_report_ist_identisch() -> None:
     report = run_slug(case["case_id"], case["item_id"],
                       compact_from_iso("2026-08-04T18:40:59Z"))
     assert verzeichnis == report
+
+
+# ───────────────────────── Sicherungszeitraum im Log ─────────────────────────
+
+def test_parse_span_liest_beide_marker() -> None:
+    text = (f"2026-07-13 11:34:58,004 INFO {MARKER_BEGIN} 2026-07-13T09:34:58Z\n"
+            "2026-07-13 11:34:58,120 INFO Starte Extractor: calls\n"
+            f"2026-07-13 11:41:25,880 INFO {MARKER_END} 2026-07-13T09:41:25Z\n")
+    assert parse_span(text) == ("2026-07-13T09:34:58Z", "2026-07-13T09:41:25Z")
+
+
+def test_parse_span_ohne_marker_ist_leer() -> None:
+    """Altbestand: Logs von vor der Einführung dürfen nicht zu Fehlern führen."""
+    assert parse_span("2026-07-13 11:34:58 INFO Starte Extractor: calls\n") == ("", "")
+    assert parse_span("") == ("", "")
+
+
+def test_parse_span_nur_beginn_bei_abbruch() -> None:
+    """Abgebrochener Lauf: Beginn steht, Ende fehlt — der Report muss das zeigen
+    können, statt einen erfundenen Endzeitpunkt anzugeben."""
+    von, bis = parse_span(f"INFO {MARKER_BEGIN} 2026-07-13T09:34:58Z\nINFO Abbruch\n")
+    assert von == "2026-07-13T09:34:58Z"
+    assert bis == ""
+
+
+def test_parse_span_mehrere_laeufe_umspannen_alles() -> None:
+    """Mehrere Läufe in einem Log → erster Beginn, letztes Ende."""
+    text = (f"{MARKER_BEGIN} 2026-07-13T09:00:00Z\n{MARKER_END} 2026-07-13T09:10:00Z\n"
+            f"{MARKER_BEGIN} 2026-07-13T10:00:00Z\n{MARKER_END} 2026-07-13T10:30:00Z\n")
+    assert parse_span(text) == ("2026-07-13T09:00:00Z", "2026-07-13T10:30:00Z")
+
+
+def test_marker_rundlauf_export_zu_report(tmp_path) -> None:
+    """Was fritzexport ins Log schreibt, liest fritzreport unverändert zurück."""
+    log = tmp_path / "fritzexport_20260713T093458Z.log"
+    log.write_text(
+        f"2026-07-13 11:34:58,004 INFO {begin_line('2026-07-13T09:34:58Z')}\n"
+        f"2026-07-13 11:41:25,880 INFO {end_line('2026-07-13T09:41:25Z')}\n",
+        encoding="utf-8")
+
+    output.write(tmp_path, "https://fritz.box", "hosts", [{"a": 1}])
+    b = load_bundle(tmp_path)
+
+    assert b.secured_source == "log"
+    assert b.secured_from == "2026-07-13T09:34:58Z"
+    assert b.secured_to == "2026-07-13T09:41:25Z"
+
+
+def test_zeitraum_ohne_log_wird_gerechnet(tmp_path) -> None:
+    """Ohne Marker: Minimum und Maximum über die extracted_at der Datensätze."""
+    import json
+
+    for type_name, stamp in (("hosts", "2026-07-13T09:35:00Z"),
+                             ("calls", "2026-07-13T09:41:22Z"),
+                             ("wifi", "2026-07-13T09:37:10Z")):
+        p = output.write(tmp_path, "https://fritz.box", type_name, [{"a": 1}])
+        d = json.loads(p.read_text(encoding="utf-8"))
+        d["extracted_at"] = stamp
+        body = json.dumps(d, indent=2, ensure_ascii=False).encode("utf-8")
+        p.write_bytes(body)
+        write_sidecar(p, sha256_bytes(body))
+
+    b = load_bundle(tmp_path)
+    assert b.secured_source == "berechnet"
+    assert b.secured_from == "2026-07-13T09:35:00Z"
+    assert b.secured_to == "2026-07-13T09:41:22Z"
