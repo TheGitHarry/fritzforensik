@@ -65,11 +65,7 @@ Passwort, dann vollständiger Abzug:
 ./fritzexport
 ```
 
-Bei mehreren Boxen erscheint eine nummerierte Auswahl. Nach jedem Abzug werden die
-**verbliebenen Boxen erneut angeboten** — mehrere Objekte laufen so am Stück, ohne das
-Werkzeug je Asservat neu zu starten. Jede Box bekommt ihr eigenes Verzeichnis mit
-eigenem Zeitstempel, eigener Logdatei und eigenem Fallkopf; *fertig* beendet.
-
+Bei mehreren Boxen erscheint eine nummerierte Auswahl mit Option *"keine"* (= Abbruch).
 Alternativ explizit:
 
 ```bash
@@ -216,9 +212,7 @@ fritzreport
 ```
 
 - **Auto-Discovery:** sucht fritzexport-Bundles im aktuellen Verzeichnis. Genau eines →
-  direkt genommen. Mehrere → nummerierte Auswahl, und nach jedem Report werden die
-  **verbliebenen Bundles erneut angeboten**; *fertig* beendet. So lassen sich mehrere
-  Asservate am Stück berichten.
+  direkt genommen. Mehrere → nummerierte Auswahl.
 - **Kopf-Felder:** Case-ID · Asservat/Item-ID · Sachbearbeiter · Datum (Enter = leer).
   Liegt eine `case.json` im Bundle (von fritzexport geschrieben), belegt sie die
   Abfrage vor; CLI-Argumente überschreiben sie weiterhin.

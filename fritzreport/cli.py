@@ -4,8 +4,7 @@
 
 Ohne ``bundle``-Argument sucht fritzreport fritzexport-Bundles im aktuellen
 Verzeichnis (Auto-Discovery, analog zu fritzexport): genau eines → direkt nehmen,
-mehrere → nummerierte Auswahl, die nach jedem Report erneut erscheint, bis der
-Anwender abbricht (mehrere Asservate am Stück). Danach werden die Kopf-Felder (Case-ID, Item-ID,
+mehrere → nummerierte Auswahl. Danach werden die Kopf-Felder (Case-ID, Item-ID,
 SB, Datum) interaktiv abgefragt (per CLI-Flag gesetzte Werte überspringen die
 Abfrage; eine ``case.json`` im Bundle belegt sie vor). Der Report wird ins
 **aktuelle Arbeitsverzeichnis** geschrieben — nicht in den Beweismittel-Ordner —
@@ -62,36 +61,6 @@ def discover_bundles(base: Path) -> list[Path]:
         found.append(base)
     found += sorted(p for p in base.iterdir() if is_bundle(p))
     return found
-
-
-def _select_bundle(rest: list[Path], fertig: int) -> Path | None:
-    """Nächstes Bundle wählen; ``None`` = Abbruch.
-
-    Wird nach jedem Report erneut aufgerufen, damit im Feld mehrere Asservate am
-    Stück laufen. Ohne TTY wird nicht gefragt: dort das erste in der Runde und
-    danach Schluss, sonst liefe eine Automation endlos.
-    """
-    if not sys.stdin.isatty():
-        return rest[0] if fertig == 0 else None
-
-    kopf = "Mehrere Bundles gefunden:" if fertig == 0 else \
-           f"\nNoch {len(rest)} Bundle(s) offen ({fertig} ausgewertet):"
-    print(kopf, file=sys.stderr)
-    for i, c in enumerate(rest, 1):
-        print(f"  {i}) {c.name}", file=sys.stderr)
-    ende = len(rest) + 1
-    print(f"  {ende}) fertig — beenden", file=sys.stderr)
-
-    while True:
-        try:
-            ans = input(f"Auswahl [1-{ende}, Enter=1]: ").strip()
-        except EOFError:
-            return None
-        if not ans:
-            return rest[0]
-        if ans.isdigit() and 1 <= int(ans) <= ende:
-            return None if int(ans) == ende else rest[int(ans) - 1]
-        print("  Ungültige Eingabe.", file=sys.stderr)
 
 
 def resolve_bundle(arg: Path | None) -> Path:
@@ -191,8 +160,10 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def _build_report(args, bundle_dir: Path) -> int:
-    """Einen Report aus ``bundle_dir`` erzeugen. Rückgabe: Exit-Code."""
+def main(argv=None) -> int:
+    args = build_parser().parse_args(argv)
+
+    bundle_dir = resolve_bundle(args.bundle)
     try:
         bundle = load_bundle(bundle_dir)
     except (NotADirectoryError, FileNotFoundError) as e:
@@ -237,47 +208,6 @@ def _build_report(args, bundle_dir: Path) -> int:
     if args.open:
         webbrowser.open(out.resolve().as_uri())
     return 0
-
-
-def main(argv=None) -> int:
-    args = build_parser().parse_args(argv)
-
-    # Explizit angegebenes Bundle: genau eines, keine Schleife.
-    if args.bundle is not None:
-        return _build_report(args, resolve_bundle(args.bundle))
-
-    offen = discover_bundles(Path.cwd())
-    if not offen:
-        raise SystemExit(
-            "Fehler: kein fritzexport-Bundle im aktuellen Verzeichnis gefunden.\n"
-            "Bundle-Verzeichnis explizit angeben: fritzreport <verzeichnis>")
-
-    # Genau eines: direkt nehmen, wie bisher.
-    if len(offen) == 1:
-        print(f"Bundle: {offen[0].name}", file=sys.stderr)
-        return _build_report(args, offen[0])
-
-    # Mehrere: nacheinander abarbeiten, bis der Anwender abbricht — im Feld
-    # liegen mehrere Asservate nebeneinander, und ein Neustart je Objekt hält auf.
-    rc = 0
-    erledigt: list[Path] = []
-    while True:
-        rest = [b for b in offen if b not in erledigt]
-        if not rest:
-            print(f"\nAlle {len(erledigt)} Bundles ausgewertet.", file=sys.stderr)
-            break
-
-        gewaehlt = _select_bundle(rest, len(erledigt))
-        if gewaehlt is None:
-            break
-        rc = _build_report(args, gewaehlt) or rc
-        erledigt.append(gewaehlt)
-
-        # Kopf-Argumente gelten nur für das erste Bundle — sonst trüge jedes
-        # weitere Asservat denselben Fallkopf.
-        args.case_id = args.item_id = None
-
-    return rc
 
 
 if __name__ == "__main__":
