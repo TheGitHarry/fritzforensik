@@ -129,19 +129,26 @@ def _selected_extractors(args: argparse.Namespace) -> list[str]:
     return selected
 
 
-def _select_box(boxes: list[discover.DiscoveredBox]) -> discover.DiscoveredBox | None:
+def _select_box(boxes: list[discover.DiscoveredBox],
+                fertig: int = 0) -> discover.DiscoveredBox | None:
     """Interaktive Auswahl bei mehreren Boxen.
 
     Liefert die gewählte Box oder None falls 'keine' / Abbruch / kein TTY.
+    Wird nach jedem Abzug erneut aufgerufen (``fertig`` = Zahl der bereits
+    abgezogenen Boxen), damit im Feld mehrere Objekte am Stück laufen.
     """
     if not (sys.stdin and sys.stdin.isatty()):
         return None
-    sys.stdout.write("\nMehrere FRITZ!Boxen gefunden — bitte auswählen:\n")
+    if fertig:
+        sys.stdout.write(f"\nNoch {len(boxes)} Box(en) offen "
+                         f"({fertig} abgezogen) — bitte auswählen:\n")
+    else:
+        sys.stdout.write("\nMehrere FRITZ!Boxen gefunden — bitte auswählen:\n")
     for i, b in enumerate(boxes, 1):
         label = b.friendly_name or b.model_name or "FRITZ!Box"
         sys.stdout.write(f"  {i}) {b.ip}  —  {label}\n")
     none_idx = len(boxes) + 1
-    sys.stdout.write(f"  {none_idx}) keine\n\n")
+    sys.stdout.write(f"  {none_idx}) {'fertig — beenden' if fertig else 'keine'}\n\n")
     while True:
         try:
             raw = input(f"Auswahl [1-{none_idx}]: ").strip()
@@ -463,17 +470,11 @@ def main(argv: list[str] | None = None) -> int:
             return EXIT_NO_DISCOVERY
 
         if len(boxes) > 1:
-            chosen = _select_box(boxes)
-            if chosen is None:
-                sys.stdout.write(
-                    "\nKeine Box gewählt — Abbruch. "
-                    "Alternativ --host explizit angeben:\n\n"
-                )
-                sys.stdout.write(_HELP_HINT)
-                return EXIT_AMBIGUOUS
-            box = chosen
-        else:
-            box = boxes[0]
+            # Mehrere Boxen: nacheinander abarbeiten, bis der Anwender abbricht.
+            # Jede bekommt ihr eigenes Verzeichnis samt eigener Logdatei — das
+            # erste ist bereits angelegt, weitere entstehen in der Schleife.
+            return _export_mehrere(args, boxes, output_dir, run_stamp)
+        box = boxes[0]
         label = box.friendly_name or box.model_name or "FRITZ!Box"
         sys.stdout.write(f"Gefundene FRITZ!Box: {box.ip}  —  {label}\n\n")
         args.host = box.url_https()
@@ -498,6 +499,91 @@ def main(argv: list[str] | None = None) -> int:
         log.error("Kein Passwort übergeben")
         return EXIT_AUTH
 
+    return _run_export(args, target_url, password, discovery_meta,
+                       output_dir, run_stamp)
+
+
+def _export_mehrere(args, boxes: list[discover.DiscoveredBox],
+                    erstes_dir: Path, erster_stamp: str) -> int:
+    """Mehrere gefundene Boxen nacheinander abziehen, bis abgebrochen wird.
+
+    Im Feld liegen mehrere Objekte nebeneinander; ein Neustart je Box hält auf.
+    Jede Box bekommt ihr **eigenes** Verzeichnis mit eigenem Zeitstempel und
+    eigener Logdatei. Das erste Verzeichnis ist bereits angelegt (dort liegt die
+    laufende Logdatei) und wird für die erste Box wiederverwendet.
+    """
+    rc = EXIT_OK
+    erledigt: list[discover.DiscoveredBox] = []
+    zuerst = True
+    cli_user = args.user  # explizit gesetzter Benutzer gilt für alle Boxen
+
+    while True:
+        rest = [b for b in boxes if b not in erledigt]
+        if not rest:
+            sys.stdout.write(f"\nAlle {len(erledigt)} Boxen abgezogen.\n")
+            break
+
+        box = _select_box(rest, fertig=len(erledigt))
+        if box is None:
+            if zuerst:
+                sys.stdout.write("\nKeine Box gewählt — Abbruch. "
+                                 "Alternativ --host explizit angeben:\n\n")
+                sys.stdout.write(_HELP_HINT)
+                return EXIT_AMBIGUOUS
+            break
+
+        label = box.friendly_name or box.model_name or "FRITZ!Box"
+        sys.stdout.write(f"\nFRITZ!Box: {box.ip}  —  {label}\n\n")
+        args.host = box.url_https()
+        _probe_tls(args.host, args)
+        if not zuerst:
+            # Jede Box hat ihre eigenen Benutzer — die Wahl der vorigen darf
+            # nicht durchschlagen. Ein per --user gesetzter Wert bleibt gültig.
+            args.user = cli_user
+        args.user = _resolve_user(args.host, args)
+        if not args.user:
+            return EXIT_AUTH if zuerst else rc
+
+        target_url, discovery_meta, exit_code = _resolve_target(args)
+        if exit_code != EXIT_OK:
+            return exit_code
+        _probe_tls(target_url, args)
+
+        password = _resolve_password(args.password_env)
+        if not password:
+            log.error("Kein Passwort übergeben")
+            return EXIT_AUTH if zuerst else rc
+
+        if zuerst:
+            ziel, stamp = erstes_dir, erster_stamp
+        else:
+            # Neues Verzeichnis samt eigener Logdatei für diese Box.
+            stamp = output._utc_now_compact()
+            basis = args.output or _default_output()
+            ziel = basis.parent / f"{basis.name}_{stamp}"
+            try:
+                ziel.mkdir(parents=True, exist_ok=True)
+            except OSError as e:
+                sys.stderr.write(f"ERROR: Verzeichnis {ziel} nicht erstellbar: {e}\n")
+                return rc or EXIT_NETWORK
+            _configure_logging(verbose=args.verbose,
+                               log_file=ziel / f"fritzexport_{stamp}.log")
+
+        ergebnis = _run_export(args, target_url, password, discovery_meta, ziel, stamp)
+        rc = ergebnis or rc
+        erledigt.append(box)
+        zuerst = False
+
+        # Fallkopf-Argumente gelten nur für die erste Box — sonst trüge jedes
+        # weitere Asservat denselben Fallkopf.
+        args.case_id = args.item_id = None
+
+    return rc
+
+
+def _run_export(args, target_url: str, password: str, discovery_meta,
+                output_dir: Path, run_stamp: str) -> int:
+    """Eine Box abziehen: Login, Extractoren, Fallkopf, Verzeichnis benennen."""
     try:
         client = FritzClient.login(
             target_url, args.user, password, verify_tls=not args.insecure

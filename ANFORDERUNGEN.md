@@ -141,7 +141,7 @@ Anforderungen, die erst durch den eigenständigen Feldeinsatz entstanden sind.
 | H6 | Export-Verzeichnis und Report-Name teilen einen Namensstamm, sodass die Zusammengehörigkeit ohne Nachschlagen erkennbar ist | erfüllt | `test_stamm_von_abzug_und_report_ist_identisch`, `test_verzeichnis_bekommt_fallkopf_namen` |
 | H7 | Ein zweiter Abzug desselben Asservats überschreibt den Report des ersten nicht | erfüllt | `test_zwei_reports_kollidieren_nicht` |
 | H3 | Fallkopf einmal erfassen, mit dem Bundle transportieren, im Report vorbelegen | erfüllt | `test_fallkopf_rundlauf`, `test_fallkopf_belegt_report_kopf_vor` |
-| H4 | Mehrere Objekte am Stück abarbeiten, ohne Neustart je Objekt | offen | #1, #3 |
+| H4 | Mehrere Objekte am Stück abarbeiten, ohne Neustart je Objekt | erfüllt | `test_zweite_box_wird_angeboten`, `test_mehrere_bundles_werden_nacheinander_ausgewertet` |
 | H5 | Nichts auf der Box verändern; wo Lesen den Status ändert, Originalzustand wiederherstellen und dokumentieren | erfüllt | — |
 
 ---
