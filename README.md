@@ -245,8 +245,10 @@ Eine einzige HTML-Datei, per Doppelklick zu öffnen, funktioniert offline ohne S
   wörtlicher Original-Auszug, per Knopf kopierbar.
 - **Sicherungszeitraum** in den Metadaten (Sektion 1): *Gesichert von / bis / Dauer* —
   der erste bis letzte Datenabruf, nicht ein einzelner Zeitpunkt. Neuere Abzüge
-  protokollieren ihn im Sitzungslog; bei älteren Bundles leitet fritzreport ihn aus den
-  Zeitstempeln der Datensätze ab und kennzeichnet ihn dann mit **D3**.
+  protokollieren ihn im Sitzungslog (Rohdaten-Wiedergabe, kein Badge); bei älteren
+  Bundles leitet fritzreport ihn aus den Zeitstempeln der Datensätze ab — die Werte
+  selbst stehen so in den signierten Hüllen, abgeleitet ist nur der Schluss auf den
+  Zeitraum, daher **D1**. Die *Dauer* ist errechnet und trägt **D3**.
 - **Drucken:** „Gefilterte Sicht drucken" druckt nur die sichtbaren Zeilen, mit Banner
   (aktive Filter + Roh-Report-Hash).
 

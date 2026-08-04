@@ -389,16 +389,23 @@ def _duration(von: str, bis: str) -> str:
 def _secured_rows(bundle, m) -> list[tuple]:
     """Metadaten-Zeilen zum Sicherungszeitraum (erster bis letzter Datenabruf).
 
-    Aus den Log-Markern protokolliert oder aus den ``extracted_at`` der Datensätze
-    abgeleitet. Der abgeleitete Fall trägt ein **D3**-Badge, damit ein gerechneter
-    Zeitraum im Gutachten nicht wie ein protokollierter aussieht.
+    Belegtheit nach derselben Regel wie beim Uptime-Block weiter unten (roh = ohne
+    Badge, berechnet = D3):
+
+    - **protokolliert** — das Log nennt Beginn und Ende wörtlich → reine
+      Rohdaten-Wiedergabe, kein Badge
+    - **abgeleitet** — Minimum und Maximum der ``extracted_at``. Die beiden Werte
+      stehen so in den signierten Hüllen; abgeleitet ist allein der Schluss, dass
+      sie den Sicherungszeitraum begrenzen → **D1** („plausibel innerhalb Rohdaten")
+    - **Dauer** — eine Subtraktion, in den Rohdaten steht sie nirgends → immer
+      **D3**, genau wie „hochgefahren am, berechnet"
     """
     if not bundle.secured_from and not bundle.secured_to:
         # Nichts ermittelbar (leeres oder beschädigtes Bundle) — bisherige
         # Einzelangabe behalten, damit nichts schlechter dasteht als vorher.
         return [("Export erstellt am", m.meta.get("extracted_at", ""))]
 
-    badge = "" if bundle.secured_source == "log" else " " + badges(["D3"])
+    badge = "" if bundle.secured_source == "log" else " " + badges(["D1"])
     von = bundle.secured_from.replace("T", " ").replace("Z", " UTC")
     bis = (bundle.secured_to.replace("T", " ").replace("Z", " UTC")
            if bundle.secured_to else "nicht protokolliert (Lauf abgebrochen)")
@@ -406,7 +413,7 @@ def _secured_rows(bundle, m) -> list[tuple]:
     rows = [("Gesichert von", von, badge), ("Gesichert bis", bis, badge)]
     dauer = _duration(bundle.secured_from, bundle.secured_to)
     if dauer:
-        rows.append(("Dauer", dauer, badge))
+        rows.append(("Dauer", dauer, " " + badges(["D3"])))
     return rows
 
 

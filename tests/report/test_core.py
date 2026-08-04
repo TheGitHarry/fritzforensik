@@ -277,9 +277,14 @@ def test_real_boxes_end_to_end(real_boxes):
 
 # ───────────────────────── Sicherungszeitraum im Report ─────────────────────
 
-def test_report_zeigt_gerechneten_zeitraum_mit_d3(synth_bundle):
+def test_report_zeigt_gerechneten_zeitraum_mit_d1(synth_bundle):
     """Ohne Marker-Log wird der Zeitraum abgeleitet — und muss als solcher
-    gekennzeichnet sein, sonst sieht Gerechnetes aus wie Protokolliertes."""
+    gekennzeichnet sein, sonst sieht Gerechnetes aus wie Protokolliertes.
+
+    D1, nicht D3: Die beiden Werte stehen wörtlich in den signierten Hüllen
+    (min/max der extracted_at). Abgeleitet ist allein der Schluss, dass sie den
+    Sicherungszeitraum begrenzen — das ist „plausibel innerhalb Rohdaten".
+    Nur die Dauer ist ein errechneter Wert und trägt deshalb D3."""
     b = load_bundle(synth_bundle)
     assert b.secured_source == "berechnet"
 
@@ -291,7 +296,12 @@ def test_report_zeigt_gerechneten_zeitraum_mit_d3(synth_bundle):
     assert "Export erstellt am" not in html
     # die Zeitraum-Zeilen tragen das D3-Badge
     zeile = html.split("Gesichert von", 1)[1].split("</tr>", 1)[0]
-    assert 'class="grade gD3"' in zeile, "gerechneter Zeitraum ohne D3-Kennzeichnung"
+    assert 'class="grade gD1"' in zeile, "gerechneter Zeitraum ohne D1-Kennzeichnung"
+    assert 'class="grade gD3"' not in zeile, "Rohwerte dürfen nicht als Interpretation gelten"
+
+    # die Dauer dagegen steht nirgends in den Rohdaten → D3
+    dauer_zeile = html.split("<th>Dauer", 1)[1].split("</tr>", 1)[0]
+    assert 'class="grade gD3"' in dauer_zeile, "errechnete Dauer ohne D3"
 
 
 def test_report_zeigt_protokollierten_zeitraum_ohne_badge(synth_bundle):
@@ -313,7 +323,7 @@ def test_report_zeigt_protokollierten_zeitraum_ohne_badge(synth_bundle):
                                   "date": "2026-01-06", "generated_at": "x"})
     zeile = html.split("Gesichert von", 1)[1].split("</tr>", 1)[0]
     assert "2026-01-06 09:55:00 UTC" in zeile
-    assert 'class="grade gD3"' not in zeile, "protokollierter Zeitraum fälschlich als abgeleitet markiert"
+    assert "grade g" not in zeile, "protokollierter Zeitraum ist Rohdaten-Wiedergabe — kein Badge"
     assert "12 min 42 s" in html, "Dauer fehlt oder falsch berechnet"
 
 
