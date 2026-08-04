@@ -1,6 +1,9 @@
 # fritz-supportdatas-processor — Entwicklungszusammenfassung
 
 Quellen: `Methode-1.txt` (v1, 18.12.2025), `Methode-2.txt` (formal, Jan 2026)  
+Maßgeblich: **„Methodenpapier zur forensischen Auswertung von Router-Supportdaten
+(Fritz FRITZ!Box)", v1.0, Januar 2026** — nicht öffentlicher Herausgeber;
+Verfasser hier nicht genannt. Bei Abweichungen gilt das Methodenpapier.  
 Ziel: FRITZ!Box Supportdaten forensisch auswerten → gerätebezogene Verbindungsnachweise mit Zeitstempeln
 
 ---
@@ -8,9 +11,11 @@ Ziel: FRITZ!Box Supportdaten forensisch auswerten → gerätebezogene Verbindung
 ## Kontext
 
 **Zielformat:** AVM FRITZ!Box Supportdatei (Textdatei)  
-**Validiert für:** FRITZ!OS 8.20, Hardware-Plattform 285 (FRITZ!Box 7690)  
-**Ausstehend:** Hardware-Plattform 259 (FRITZ!Box 7590) — Testdaten vorhanden (`testdata/support_Fritz.Box_7590_259.08.20.zip`), Validierung noch nicht durchgeführt  
-**Portabilität:** Andere Versionen erfordern gesonderte Prüfung  
+**Validiert für:** FRITZ!OS 8.20, Hardware-Plattform 259 (FRITZ!Box 7590)  
+**Portabilität:** Die Übertragbarkeit auf andere FRITZ!OS-Versionen oder Hardware-Plattformen
+wird **nicht vorausgesetzt** und ist im Einzelfall gesondert zu prüfen. Insbesondere die
+Plattform 285 (FRITZ!Box 7690) ist **nicht** validiert, auch wenn dafür umfangreiche
+Testdaten vorliegen.  
 **Rechtsrahmen:** Ergebnis sind technische Hinweise — kein Beweis für kontinuierliche Nutzung oder Personenbezug
 
 ---
@@ -189,4 +194,4 @@ Bei RX = 0 und TX = 0 → **ignorieren**
 | Status ≠ 1 → Zeitpunkt nicht bestimmbar (Verbindungsabbruch) | STATION_MODULE |
 | Events Events: nur Erstanmeldungen | Events Events |
 | Kein Personenbezug aus MAC allein ableitbar | alle |
-| Methodik validiert nur für FRITZ!OS 8.20 / HW 259 | alle |
+| Methodik validiert nur für FRITZ!OS 8.20 / HW 259 (FRITZ!Box 7590); Übertragbarkeit auf andere Versionen/Plattformen im Einzelfall zu prüfen | alle |

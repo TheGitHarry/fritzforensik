@@ -57,12 +57,16 @@ Verbindungsnachweise: methode.md-Parser → D1+D2, 802.11-Log-Parser → D1+D3.
 ## Tests
 
 ```bash
-python -m pytest              # volle Suite, offline
-python -m pytest -m golden    # zusätzlich gegen echte Bundles unter ~/testdata/_work
+python3 -m pytest             # volle Suite, offline
+python3 -m pytest -m golden   # NUR die Golden-Tests gegen ~/testdata/_work
 ```
 
 `tests/{format,export,report}/`. Standardmäßig deselektiert: `network` (echtes LAN) und
 `golden` (echte Forensikdaten, liegen bewusst nicht im Repo).
+
+`tests/report/test_filter.py` treibt das Filter-JS über `node` + `jsdom` und **skippt
+stillschweigend**, wenn beides fehlt — ein grüner Lauf heißt also nicht zwingend, dass
+die Client-seitige Filterlogik geprüft wurde.
 
 Die Vertragstests in `tests/format/` sind der Kern der Absicherung: Listen-Synchronität,
 Rundlauf *schreiben → lesen* über beide Werkzeuge, stdlib-Wächter.
