@@ -128,7 +128,7 @@ Verbindungsnachweise: methode.md-Parser → **D1+D2**, 802.11-Log-Parser → **D
 | G1 | Jede Datenzeile aufklappbar, zeigt Quelldatei, deren SHA256, Fundstelle und den Roh-Datensatz | erfüllt | `test_provenance_exact` |
 | G2 | Quelldatei-Name und SHA256 per Klick kopierbar | erfüllt | — |
 | G3 | Im zugeklappten Zustand bleibt die Zeile schmal — die Referenz drängt sich nicht auf | erfüllt | — |
-| G4 | ZIP-Auslieferung der Rohdaten neben dem Report | offen | #11 |
+| G4 | ZIP-Auslieferung der Rohdaten neben dem Report | entfällt | Bedarf durch A2 (Rohdaten 1:1 im Report), G1/G2 (zeichengenaue Herkunft je Datensatz) und die Chain-of-Custody-Tabelle gedeckt; das Bundle-Verzeichnis ist selbst die Rohdatenauslieferung. Siehe #11 |
 
 ## H. Feldeinsatz (neu, nicht aus dem Ursprungskatalog)
 
