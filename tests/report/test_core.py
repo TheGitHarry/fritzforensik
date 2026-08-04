@@ -339,3 +339,26 @@ def test_report_weist_fehlendes_ende_aus(synth_bundle):
     html = build_html(b, m, res, {"case_id": "", "item_id": "", "sb": "",
                                   "date": "2026-01-06", "generated_at": "x"})
     assert "nicht protokolliert" in html
+
+
+def test_kein_irrefuehrender_report_hash_im_dokument(synth_bundle):
+    """Der Report darf keinen Wert als „Report-Hash" ausweisen, der keiner ist.
+
+    Früher stand in Metadaten und Druckbanner ein SHA256 über
+    extracted_at + host, beschriftet als „Roh-Report-Hash". Wer ihn mit
+    `sha256sum report.html` prüfte, bekam einen anderen Wert — genau die Art
+    Abweichung, die in einer Hauptverhandlung erklärungsbedürftig wird.
+    Der echte Hash steht seit #6 in der Sidecar; im Report kann er nicht stehen,
+    er würde sich selbst verändern.
+    """
+    b = load_bundle(synth_bundle)
+    m = build_model(b)
+    res = analyze(b, m.real_aps, m.master.get("name", ""))
+    html = build_html(b, m, res, {"case_id": "C-1", "item_id": "A-1", "sb": "X",
+                                  "date": "2026-01-06", "generated_at": "x"})
+
+    assert "Roh-Report-Hash" not in html
+    # der Druckbanner verweist stattdessen auf die Sidecar
+    banner = html.split('id="pbanner"', 1)[1].split("</div>", 1)[0]
+    assert ".sha256" in banner, "Ausdruck nennt nicht, wo der echte Hash zu finden ist"
+    assert "Gesichert" in banner, "Ausdruck ohne Zuordnung zum Sicherungszeitraum"

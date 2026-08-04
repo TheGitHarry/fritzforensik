@@ -11,7 +11,6 @@ Sektions-/Tabellen-/Herkunfts-Renderer. Angepasst an fritzreport:
 from __future__ import annotations
 
 import datetime as _dt
-import hashlib
 import html
 
 from . import __version__
@@ -621,8 +620,18 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
                | {n["mac"] for n in m.mesh_nodes if n["mac"]}
                | {p["mac"] for p in proofs if p["mac"]})
     active_hosts = sum(1 for h in m.hosts if h["active"])
-    raw_report_id = hashlib.sha256(
-        (m.meta.get("extracted_at", "") + m.meta.get("host", "")).encode()).hexdigest()
+
+    # Einzeiler für den Druck-Banner: ordnet einen Ausdruck seinem Abzug zu.
+    # Früher stand hier ein SHA256 über extracted_at+host, ausgewiesen als
+    # "Roh-Report-Hash" — er war weder ein Hash des Reports noch trug er etwas bei,
+    # das Host-URL, Zeitraum und Chain of Custody nicht schon zeigen.
+    if bundle.secured_from:
+        _von = bundle.secured_from.replace("T", " ").replace("Z", "")
+        _bis = (bundle.secured_to.replace("T", " ").replace("Z", "")
+                if bundle.secured_to else "?")
+        secured_line = f"Gesichert {_von} – {_bis} UTC"
+    else:
+        secured_line = f"Export erstellt am {m.meta.get('extracted_at', '')}"
 
     timeline = build_timeline(m, proofs)
 
@@ -637,7 +646,6 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
         ("Report erzeugt am", header.get("generated_at", "")),
         ("Report-Generator", f"fritzreport {__version__}"),
         ("Belegtheits-Schema", f"{GRADE_SCHEMA} ({len(GRADE_LABEL)} Grade)"),
-        ("Roh-Report-Hash (SHA256)", raw_report_id),
     ]
     s1 = (
         "<h3>Metadaten des Beweismittels</h3><table class='kv'>"
@@ -825,8 +833,10 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
 <div id="pbanner">
   <strong>GEFILTERTE SICHT — NICHT DER ORIGINAL-REPORT.</strong><br>
   Aktive Filter: <span id="pfilters">—</span><br>
-  Roh-Report-Hash (SHA256): <span class="mono">{esc(raw_report_id)}</span><br>
-  Case {esc(header.get('case_id',''))} · Item {esc(header.get('item_id',''))} · SB {esc(header.get('sb',''))} · {esc(header.get('generated_at',''))}
+  {esc(secured_line)}<br>
+  Case {esc(header.get('case_id',''))} · Item {esc(header.get('item_id',''))} · SB {esc(header.get('sb',''))} · {esc(header.get('generated_at',''))}<br>
+  SHA256 dieses Reports: siehe die zugehörige <span class="mono">.sha256</span>-Datei
+  neben dem Original-Report.
 </div>
 
 <h1>Forensik-Report — {esc(device.get('model','') or 'FRITZ!Box')}</h1>
@@ -835,7 +845,9 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
 {integrity_banner}
 <div class="banner">
   <strong>Interaktive Sicht.</strong> Die Filter oben ändern ausschließlich die Anzeige —
-  der Report selbst bleibt unverändert und über seinen SHA256-Hash identifizierbar.
+  die Datei selbst bleibt unverändert; ihr SHA256 steht in der zugehörigen
+  <span class="mono">.sha256</span>-Datei und ist mit <span class="mono">sha256sum -c</span>
+  prüfbar.
   Ein per Browser erzeugter Ausdruck ist eine <em>gefilterte Sicht</em>, kein Beweismittel-Original.
 </div>
 

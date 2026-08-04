@@ -63,7 +63,7 @@ Begründung (siehe [Abweichungen](#abweichungen-vom-ursprungskatalog)).
 | ID | Anforderung | Status | Nachweis |
 |---|---|---|---|
 | C1 | Gefilterte Sicht per Browser-Druck (Ctrl+P) ausdruckbar | erfüllt | — |
-| C2 | Ausdruck erkennbar als **gefilterte Sicht** gekennzeichnet: Kopf mit aktiven Filterkriterien und Hash des Ur-Reports; nicht als „der Report" ausgewiesen | erfüllt, angepasst | siehe [Abweichungen](#abweichungen-vom-ursprungskatalog) · #12 |
+| C2 | Ausdruck erkennbar als **gefilterte Sicht** gekennzeichnet: Kopf mit aktiven Filterkriterien und Bezug zum Ur-Report; nicht als „der Report" ausgewiesen | erfüllt, angepasst | `test_kein_irrefuehrender_report_hash_im_dokument` · siehe [Abweichungen](#abweichungen-vom-ursprungskatalog) |
 
 ## D. Belegtheits-Grade
 
@@ -109,7 +109,7 @@ Verbindungsnachweise: methode.md-Parser → **D1+D2**, 802.11-Log-Parser → **D
 | E1a | HTML-Report selbst SHA256-signiert | erfüllt | `test_report_sidecar_written_and_verifies`, `test_report_sidecar_detects_tampering` |
 | E1b | Report in der Datenbank als Beweismittel registriert | entfällt | Eigenständiges Feldwerkzeug ohne Datenbank; die Sidecar tritt an diese Stelle |
 | E2 | Filter/Druck manipulieren nur die Anzeige — Ur-Report bleibt hash-stabil | erfüllt | `test_report_sidecar_written_and_verifies` |
-| E3 | Report-Kopf enthält: Erstellungs-Zeitstempel, Werkzeug-Versionen, Case-ID, Roh-Report-Hash, Chain-of-Custody-Tabelle aller Quelldateien mit SHA256 | erfüllt, angepasst | siehe [Abweichungen](#abweichungen-vom-ursprungskatalog) · #12 |
+| E3 | Report-Kopf enthält: Erstellungs-Zeitstempel, Werkzeug-Versionen, Case-ID, Chain-of-Custody-Tabelle aller Quelldateien mit SHA256 | erfüllt, angepasst | siehe [Abweichungen](#abweichungen-vom-ursprungskatalog) |
 | E3b | Job-ID im Report-Kopf | entfällt | Keine Job-Verwaltung; an ihre Stelle treten Case-ID und Asservat-/Item-ID |
 | E4 | HTML-Report zusätzlich zu ODT/PDF, ersetzt sie nicht | entfällt | Es gibt keine ODT/PDF-Erzeugung; der HTML-Report ist das Ergebnis. Langzeitarchivierung ist Sache des einsetzenden Hauses |
 
@@ -180,14 +180,19 @@ Daraus folgen die Umformulierungen:
 - **E3b** — die Job-ID entfällt; Case-ID und Asservat-/Item-ID treten an ihre Stelle.
 - **E4** — ohne ODT/PDF-Erzeugung gegenstandslos.
 
-**Offene Abweichung bei C2 und E3 — „Roh-Report-Hash" (#12).**
-Beide verlangen den Hash des Ur-Reports im Kopf bzw. im Druckbanner, und beide sind
-formal erfüllt: Der Report weist einen Wert unter diesem Namen aus. Der Wert ist
-jedoch ein SHA256 über *Bundle-Metadaten* (Extraktionszeitpunkt + Host), **nicht**
-über den Report. Wer die Angabe mit `sha256sum report.html` prüft, erhält einen
-anderen Wert. Was der Katalog meinte — die Rückbindung eines Ausdrucks an das
-unveränderte Original — leistet der Wert damit nicht.
+**C2 und E3 — der Hash steht in der Sidecar, nicht im Report (#12, erledigt).**
+Beide verlangen den „Hash des Ur-Reports" im Kopf bzw. im Druckbanner. Das ist so
+nicht erfüllbar: **Ein Dokument kann seinen eigenen Hash nicht enthalten** — der Wert
+verändert das Dokument und damit sich selbst.
 
-Seit E1a existiert der echte Report-Digest in der Sidecar. Wie beides
-zusammengeführt wird, ist offen (#12); der Selbstbezug macht es nicht trivial: Ein
-Hash, der im Report steht, verändert den Report und damit seinen Hash.
+Der Report wies zeitweise einen Wert unter diesem Namen aus, tatsächlich ein SHA256
+über *Bundle-Metadaten* (Extraktionszeitpunkt + Host). Wer ihn mit
+`sha256sum report.html` prüfte, erhielt einen anderen — genau die Art Abweichung, die
+in einer Hauptverhandlung erklärungsbedürftig wird. Der Wert ist entfernt; er trug
+zudem nichts bei, was Host-URL, Sicherungszeitraum und Chain-of-Custody-Tabelle nicht
+schon zeigen.
+
+**Stattdessen:** Der echte Digest liegt seit E1a in der `.sha256`-Sidecar neben dem
+Report, mit `sha256sum -c` prüfbar. Report und Druckbanner **verweisen** darauf,
+statt einen Wert zu behaupten. Die Zuordnung eines Ausdrucks zum Abzug leistet im
+Banner der **Sicherungszeitraum** zusammen mit dem Fallkopf.
