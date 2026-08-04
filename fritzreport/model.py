@@ -19,6 +19,13 @@ from datetime import datetime, timezone
 from .bundle import Bundle, Dataset
 
 # Neues 3-Grade-System (kombinierbar).
+#
+# Der Report weist dieses Schema aus, weil das Vorgängersystem VIER Grade hatte und
+# die Bedeutungen sich beim Umstieg verschoben haben: dort war D3 "durch eigene
+# forensische Versuche belegt" — hier ist das D2, und D3 heißt "abgeleitet". Wer
+# einen Report neben eine alte Unterlage legt, liest Badges sonst in die belastende
+# Richtung falsch. Umrechnung siehe ANFORDERUNGEN.md, Abschnitt D.
+GRADE_SCHEMA = "v2"
 GRADE_LABEL = {
     "D1": "Plausibel innerhalb Rohdaten",
     "D2": "Durch eigene forensische Tests verifiziert",

@@ -14,7 +14,7 @@ import hashlib
 import html
 
 from . import __version__
-from .model import GRADE_LABEL, NO_AP, Model
+from .model import GRADE_LABEL, GRADE_SCHEMA, NO_AP, Model
 
 # ───────────────────────── CSS (aus PoC, 3 Grade) ────────────────────────────
 CSS = """
@@ -587,6 +587,7 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
         ("Export erstellt am", m.meta.get("extracted_at", "")),
         ("Report erzeugt am", header.get("generated_at", "")),
         ("Report-Generator", f"fritzreport {__version__}"),
+        ("Belegtheits-Schema", f"{GRADE_SCHEMA} ({len(GRADE_LABEL)} Grade)"),
         ("Roh-Report-Hash (SHA256)", raw_report_id),
     ]
     s1 = (
@@ -670,7 +671,13 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
                      f'<tr><th>DNS</th><td class="mono">{esc(d["dns"])}</td></tr>'
                      "</table>")
 
-    legend = ("<table class='kv'>"
+    legend = (f"<p><strong>Belegtheits-Schema {GRADE_SCHEMA}</strong> "
+              f"({len(GRADE_LABEL)} Grade, kombinierbar). Ältere Unterlagen können ein "
+              "4-Grade-Schema nennen, in dem <span class='mono'>D3</span> „durch eigene "
+              "forensische Versuche belegt&#8220; bedeutete — das entspricht hier "
+              "<span class='mono'>D2</span>. Badges dieses Reports sind ausschließlich nach "
+              "der folgenden Tabelle zu lesen.</p>"
+              "<table class='kv'>"
               + "".join(f'<tr><th>{badges([g])}</th><td>{esc(l)}</td></tr>' for g, l in GRADE_LABEL.items())
               + "</table>"
               "<p>Zeile ohne Badge = reine Rohdaten-Wiedergabe (impliziter Normalfall). "
