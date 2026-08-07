@@ -60,6 +60,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      # Node nur fürs Testen: ohne jsdom skippt tests/report/test_filter.py still,
+      # der Lauf wäre grün ohne geprüfte Filterlogik. Geht ins Binary nicht ein.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install test deps (jsdom)
+        run: npm ci
       - name: Install build deps
         run: |
           python -m pip install --upgrade pip
@@ -79,31 +86,9 @@ jobs:
           if-no-files-found: error
           retention-days: ${{ startsWith(github.ref, 'refs/tags/') && 1 || 7 }}
 
-  build-export-arm32:
-    needs: setup
-    if: contains(fromJSON('["export","all"]'), needs.setup.outputs.tool)
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: uraimo/run-on-arch-action@v2
-        name: Build on armv7 (QEMU)
-        with:
-          arch: armv7
-          distro: ubuntu22.04
-          githubToken: ${{ github.token }}
-          install: |
-            apt-get update -q -y
-            apt-get install -y python3-pip python3-dev binutils
-            pip3 install "pyinstaller>=6" certifi "requests>=2.31" pytest
-          run: |
-            python3 -m pytest
-            python3 scripts/build.py --tool export
-      - uses: actions/upload-artifact@v4
-        with:
-          name: fritzexport-linux-armv7l
-          path: dist/fritzexport-*-linux-armv7l
-          if-no-files-found: error
-          retention-days: ${{ startsWith(github.ref, 'refs/tags/') && 1 || 7 }}
+  # armv7 (32-bit ARM) wird nicht mehr gebaut — der Job lief QEMU-emuliert und
+  # kostete bei jedem Release unverhältnismäßig viel Zeit. Für 32-bit-ARM gibt es
+  # daher kein Binary; 64-bit ARM (linux-aarch64) bleibt unverändert bestehen.
 
   build-report:
     needs: setup
@@ -127,6 +112,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      # Node nur fürs Testen: ohne jsdom skippt tests/report/test_filter.py still,
+      # der Lauf wäre grün ohne geprüfte Filterlogik. Geht ins Binary nicht ein.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install test deps (jsdom)
+        run: npm ci
       # requests wird nur für die Export-Tests der gemeinsamen Suite gebraucht,
       # nicht für das Report-Binary — fritzreport importiert es nicht, PyInstaller
       # bündelt deshalb auch nichts davon ein.
@@ -149,7 +141,7 @@ jobs:
   # (inkl. SHA256SUMS). Läuft NICHT bei workflow_dispatch — dort gibt es keinen
   # Tag, dann bleiben die Artefakte wie gehabt nur am Actions-Run hängen.
   release:
-    needs: [build-export, build-export-arm32, build-report]
+    needs: [build-export, build-report]
     if: >-
       always()
       && startsWith(github.ref, 'refs/tags/')

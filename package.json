@@ -1,0 +1,11 @@
+{
+  "name": "fritzforensik-testtooling",
+  "private": true,
+  "description": "Nur Testwerkzeug: jsdom für tests/report/test_filter.py. Die ausgelieferten Werkzeuge enthalten kein JavaScript-Paket und brauchen Node nicht.",
+  "scripts": {
+    "test": "echo \"Filtertest läuft über pytest: python3 -m pytest tests/report/test_filter.py\" && exit 1"
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1"
+  }
+}

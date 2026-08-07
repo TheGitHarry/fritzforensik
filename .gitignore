@@ -22,10 +22,12 @@ reports/
 # Referenzmaterial (PoC, fremder Parser, Testkopien) — NICHT ausliefern
 _material/
 
-# Node (nur für den jsdom-Filtertest lokal installiert)
+# Node — nur Testwerkzeug (jsdom für den Filtertest).
+# package.json und package-lock.json sind bewusst EINGECHECKT: sie sind die
+# einzige Stelle, an der steht, dass der Filtertest jsdom braucht. Ohne sie
+# skippt tests/report/test_filter.py in fremden Klonen still — grüner Lauf
+# ohne geprüfte Filterlogik. Nur die Installation bleibt draußen.
 node_modules/
-package-lock.json
-package.json
 
 # PyInstaller-Build-Artefakte
 build/

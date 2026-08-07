@@ -353,6 +353,17 @@ Live-LAN-Tests (`@pytest.mark.network`) und Golden-Tests (`@pytest.mark.golden`)
 Default-Lauf deselektiert. Die Golden-Tests brauchen echte Bundles, die bewusst **nicht**
 im Repo liegen.
 
+Ein Test fällt aus dem Rahmen: `tests/report/test_filter.py` treibt die Filter-Logik des
+Reports über Node und jsdom. Fehlt jsdom, **skippt er still** — der Lauf ist dann grün,
+ohne dass die clientseitige Filterlogik geprüft wurde. Einmalig aktivieren:
+
+```bash
+npm ci                        # installiert jsdom (nur Testwerkzeug)
+```
+
+Node wird ausschließlich hierfür gebraucht; die ausgelieferten Werkzeuge enthalten kein
+JavaScript-Paket.
+
 Besonders relevant sind die Vertragstests in `tests/format/`: sie halten die
 Extractor-Registry und die Datenart-Liste synchron, prüfen den Rundlauf
 *schreiben → lesen* über beide Werkzeuge und sichern die stdlib-Freiheit von fritzreport ab.
