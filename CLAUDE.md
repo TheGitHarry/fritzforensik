@@ -136,6 +136,10 @@ stillschweigend. Sie ist zur Veröffentlichung bestimmt und darf keine Seriennum
 Aktenzeichen, Hostnamen oder Datensatzzahlen enthalten; `tests/format/test_abdeckung.py`
 prüft beides mechanisch.
 
+Für einen **neuen Abzug** gibt es den Skill `neuer-abzug` — er führt den ganzen Ablauf
+(entpacken → Integrität → Report → Golden-Tests → Matrix → KORPUS.md → Bericht) samt
+der Fallen, die dabei schon aufgetreten sind.
+
 Dass sie zum Korpus passt, bewacht `test_abdeckung_ist_aktuell` in `test_golden.py`:
 Kommt ein Abzug dazu, schlägt `pytest -m golden` fehl und nennt den Befehl zur
 Neuerzeugung. Der Wächter greift nur dort, wo der Korpus liegt — in fremden Klonen
