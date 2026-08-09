@@ -58,6 +58,17 @@ def firmware_kurz(roh: str) -> str:
     return ".".join(teile[1:]) if len(teile) >= 3 else kern
 
 
+def _brauchbar(wert: str) -> bool:
+    """Taugt der Wert zum Unterscheiden von Geräten?
+
+    Leer oder durchgängig genullt heißt: das Feld wurde mit einem Vorgabewert
+    beschrieben, nicht mit einer Gerätekennung. Im Korpus trifft das auf die
+    ``SerialNumber`` eines 7490 zu.
+    """
+    wert = wert.strip()
+    return bool(wert) and set(wert) > {"0"}
+
+
 def _geraetekennung(zeilen: list[str]) -> str:
     """Stabile, nicht rückrechenbare Kennung eines Geräts.
 
@@ -65,20 +76,28 @@ def _geraetekennung(zeilen: list[str]) -> str:
     Ohne das läse sich „3 Abzüge" wie „3 Geräte", und die Hardware-Abdeckung
     erschiene besser als sie ist.
 
-    Es wird nur ein gekürzter SHA256 über Seriennummer und Hardware-Revision
-    gebildet; weder der Hash noch die Serial erscheinen in der Ausgabe. Ein
-    Rückschluss auf die Serial ist damit ausgeschlossen — der Wert verlässt
-    diese Funktion nur als Zählmerkmal.
+    Herangezogen werden zwei Felder in fester **Rangfolge**, nicht in
+    Kombination: zuerst ``tr069_serial``, ersatzweise ``SerialNumber``.
+
+    Die Rangfolge ist wesentlich. Beide Felder zusammen zu hashen wäre falsch —
+    dann gälten zwei Abzüge derselben Box als verschiedene Geräte, sobald eines
+    der Felder in einem Abzug fehlt. Und ``tr069_serial`` steht zuerst, weil es
+    sich im Korpus als das robustere erwiesen hat: Es wird aus der MAC gebildet
+    (``00040E-<maca ohne Doppelpunkte>``) und überlebt damit ein Zurücksetzen,
+    bei dem ``SerialNumber`` auf Nullen fällt.
+
+    Ausgegeben wird nur ein gekürzter SHA256; weder er noch die Rohwerte
+    erscheinen in der Matrix. Der Wert verlässt diese Funktion als reines
+    Zählmerkmal.
     """
-    serial = _feld(zeilen, "SerialNumber").strip()
-    # Manche Boxen liefern eine genullte oder leere Serial (im Korpus: ein
-    # 7490). Sie taugt dann nicht zum Unterscheiden — zwei solche Geräte
-    # würden zu einem verschmelzen. In dem Fall lieber kein Gerät zählen als
-    # eines zu wenig; der Aufrufer behandelt "" als "unbekannt".
-    if not serial or set(serial) <= {"0"}:
-        return ""
-    roh = serial + "|" + _feld(zeilen, "HWRevision")
-    return hashlib.sha256(roh.encode("utf-8")).hexdigest()[:16]
+    for feld in ("tr069_serial", "SerialNumber"):
+        wert = _feld(zeilen, feld)
+        if _brauchbar(wert):
+            roh = f"{feld}={wert.strip()}|{_feld(zeilen, 'HWRevision')}"
+            return hashlib.sha256(roh.encode("utf-8")).hexdigest()[:16]
+    # Kein brauchbares Feld — der Aufrufer zählt solche Abzüge einzeln,
+    # statt sie fälschlich zu verschmelzen.
+    return ""
 
 
 def _feld(zeilen: list[str], name: str) -> str:

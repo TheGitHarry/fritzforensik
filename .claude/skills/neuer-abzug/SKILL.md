@@ -100,12 +100,17 @@ HWRevision identifiziert das Modell: **185**=7490, **226**=7590, **256**=7530 AX
 
 Drei Dinge, die schon aufgetreten sind und leicht übersehen werden:
 
-- **Dieselbe Box wie ein früherer Abzug?** Seriennummern über alle Bundles
-  vergleichen. Drei der 7690-Abzüge im Korpus teilen sich eine Seriennummer —
-  das ist *eine* Box, dreimal gezogen, nicht drei Geräte. Für die
-  Hardware-Abdeckung zählt sie einfach. `ABDECKUNG.md` weist das in der Spalte
-  „Geräte" aus (ohne die Serial zu zeigen); die Klartext-Serials stehen nur in
-  `KORPUS.md`.
+- **Dieselbe Box wie ein früherer Abzug?** Drei der 7690-Abzüge im Korpus
+  stammen von *einem* Gerät, dreimal gezogen — für die Hardware-Abdeckung zählt
+  es einfach. `ABDECKUNG.md` weist das in der Spalte „Geräte" aus (ohne
+  Kennungen zu zeigen); Klartext-Serials stehen nur in `KORPUS.md`.
+
+  Zum Vergleichen **`tr069_serial` heranziehen, nicht nur `SerialNumber`**: Ein
+  7490 im Korpus hat `SerialNumber 0000000000000000` — als einziges genulltes
+  Feld im sonst intakten Urlader-Environment, mutmaßlich nach Wiederherstellung
+  aus einem generischen AVM-Image. `tr069_serial` überlebt das, weil es aus der
+  MAC gebildet wird (`00040E-<maca ohne Doppelpunkte>`). Bei einer solchen Box
+  taugt `SerialNumber` nicht zur Identifikation, MAC und `tr069_serial` schon.
 - **`calls` exakt 400?** Das ist die box-seitige Obergrenze, nicht die echte
   Listenlänge. Nie als Mengenaussage berichten.
 - **Leere Datenarten**: `records: []` heißt entweder „Box hat das nicht"

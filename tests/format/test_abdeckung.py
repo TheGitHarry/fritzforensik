@@ -28,6 +28,8 @@ _spec.loader.exec_module(abdeckung)
 #: Werte, die im präparierten Bundle stehen und NIE in der Ausgabe landen dürfen.
 GEHEIM = {
     "seriennummer": "X99999999999999",
+    "tr069_serial": "00040E-AABBCCDDEEFF",
+    "mac": "AA:BB:CC:DD:EE:FF",
     "aktenzeichen": "VG/SH/999999/2026",
     "hostname": "geheime-box.example.lan",
     "ip": "10.11.12.13",
@@ -44,6 +46,8 @@ def praepariertes_bundle(tmp_path: Path) -> Path:
         "HWRevision\t285\n"
         "HWSubRevision\t2\n"
         f"SerialNumber\t{GEHEIM['seriennummer']}\n"
+        f"tr069_serial\t{GEHEIM['tr069_serial']}\n"
+        f"maca\t{GEHEIM['mac']}\n"
         "firmware_info\t285.08.25,slot0=08.22-129542,slot1=08.25-134025\n"
         f"Hostname\t{GEHEIM['hostname']}\n",
         encoding="utf-8",
@@ -98,32 +102,51 @@ def test_generator_gibt_keine_datensatzzahlen_aus(praepariertes_bundle: Path) ->
     assert befunde[0]["datenarten"]["calls"] == "ja"
 
 
-def _kopf(serial: str, hwrev: str = "285") -> list[str]:
-    return [f"SerialNumber\t{serial}\n", f"HWRevision\t{hwrev}\n"]
+def _kopf(serial: str, hwrev: str = "285", tr069: str | None = None) -> list[str]:
+    zeilen = [f"SerialNumber\t{serial}\n", f"HWRevision\t{hwrev}\n"]
+    if tr069 is not None:
+        zeilen.append(f"tr069_serial\t{tr069}\n")
+    return zeilen
 
 
-def test_geraetekennung_verraet_die_serial_nicht() -> None:
-    """Die Kennung dient nur dem Zählen — sie darf die Serial nicht preisgeben."""
-    serial = "S49589630118571"
-    kennung = abdeckung._geraetekennung(_kopf(serial))
+def test_geraetekennung_verraet_die_rohwerte_nicht() -> None:
+    """Die Kennung dient nur dem Zählen — sie darf nichts preisgeben."""
+    serial, tr069 = "S49589630118571", "00040E-B4FC7D6DC067"
+    kennung = abdeckung._geraetekennung(_kopf(serial, tr069=tr069))
     assert serial not in kennung
+    assert tr069 not in kennung
+    assert "B4FC7D6DC067" not in kennung
     assert len(kennung) == 16
-    # gleiche Box → gleiche Kennung, andere Box → andere
-    assert kennung == abdeckung._geraetekennung(_kopf(serial))
-    assert kennung != abdeckung._geraetekennung(_kopf("K02562730245700"))
+    assert kennung == abdeckung._geraetekennung(_kopf(serial, tr069=tr069))
 
 
-def test_genullte_serial_zaehlt_als_eigenes_geraet() -> None:
-    """Zwei Boxen mit genullter Serial dürfen nicht zu einer verschmelzen."""
+def test_tr069_serial_hat_vorrang_und_ueberlebt_genullte_serial() -> None:
+    """Der 7490-Fall: SerialNumber genullt, tr069_serial intakt."""
+    intakt = abdeckung._geraetekennung(_kopf("0000000000000000", "185", "00040E-3810D53D0D43"))
+    assert intakt, "tr069_serial hätte die Kennung liefern müssen"
+
+    # Dieselbe Box, aber mit gefüllter SerialNumber → weiterhin dieselbe
+    # Kennung, weil tr069_serial Vorrang hat. Ohne Rangfolge (etwa beide
+    # Felder kombiniert) zerfiele eine Box in zwei Geräte.
+    spaeter = abdeckung._geraetekennung(_kopf("X12345678901234", "185", "00040E-3810D53D0D43"))
+    assert intakt == spaeter
+
+    # Verschiedene Boxen bleiben unterscheidbar.
+    andere = abdeckung._geraetekennung(_kopf("0000000000000000", "185", "00040E-444E6D260163"))
+    assert intakt != andere
+
+
+def test_ohne_brauchbares_feld_zaehlt_einzeln() -> None:
+    """Sind beide Felder unbrauchbar, dürfen Geräte nicht verschmelzen."""
     assert abdeckung._geraetekennung(_kopf("0000000000000000")) == ""
-    assert abdeckung._geraetekennung(_kopf("")) == ""
-    eintraege = [{"geraet": ""}, {"geraet": ""}]
-    assert abdeckung.geraetezahl(eintraege) == 2
+    assert abdeckung._geraetekennung(_kopf("", tr069="")) == ""
+    assert abdeckung._geraetekennung(_kopf("0000", tr069="000000")) == ""
+    assert abdeckung.geraetezahl([{"geraet": ""}, {"geraet": ""}]) == 2
 
 
 def test_geraetezahl_fuehrt_gleiche_box_zusammen() -> None:
-    gleiche = abdeckung._geraetekennung(_kopf("S49589630118571"))
-    andere = abdeckung._geraetekennung(_kopf("P40262732383692"))
+    gleiche = abdeckung._geraetekennung(_kopf("S49589630118571", tr069="00040E-B4FC7D6DC067"))
+    andere = abdeckung._geraetekennung(_kopf("P40262732383692", tr069="00040E-50E636D393F3"))
     assert abdeckung.geraetezahl([{"geraet": gleiche}] * 3) == 1
     assert abdeckung.geraetezahl(
         [{"geraet": gleiche}, {"geraet": gleiche}, {"geraet": andere}]
