@@ -21,6 +21,7 @@ from fritzformat import (
     TOOL_NAME,
     build_envelope,
     dataset_filename,
+    session_log_filename,
     sha256_bytes,
     support_filename,
     write_sidecar,
@@ -49,6 +50,7 @@ def _write_json(d: Path, ts, type_, records):
 
 SUPPORT = """\
 ##### TITLE Version 8.20
+##### TITLE Datum Tue Jan  6 11:00:02 CET 2026
 ##### BEGIN SECTION dhcpd
 lease list:
 wlease {MAC} 192.168.1.20 3600 "TestPhone" 01-aa AA:BB:CC:DD:EE:01 "" dynamic
@@ -103,6 +105,19 @@ def build_bundle(d: Path) -> Path:
     body = SUPPORT.encode("utf-8")
     sup.write_bytes(body)
     write_sidecar(sup, sha256_bytes(body))
+
+    # Sitzungslog mit Uhr-Klammer: Box meldet 11:00:02 CET (= 10:00:02Z), die
+    # Referenzmarken liegen bei 10:00:00Z und 10:00:40Z. Erwartete obere Schranke
+    # also +3 s (2 s Differenz + 1 s Quantisierung), die untere −38 s ist reine
+    # Übertragungsdauer und darf im Report nicht als Messwert erscheinen.
+    # Bewusst **ohne** SICHERUNG-Marker: Ein anderer Test prüft an diesem Fixture,
+    # dass der Sicherungszeitraum aus den `extracted_at` abgeleitet wird.
+    (d / session_log_filename(ts)).write_text(
+        "2026-01-06 11:00:00,000 INFO UHRZEIT ANFRAGE supportdata:standard "
+        "2026-01-06T10:00:00.000Z\n"
+        "2026-01-06 11:00:40,000 INFO UHRZEIT ANTWORT supportdata:standard "
+        "2026-01-06T10:00:40.000Z\n",
+        encoding="utf-8")
     return d
 
 

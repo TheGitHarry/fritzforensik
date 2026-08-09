@@ -362,3 +362,86 @@ def test_kein_irrefuehrender_report_hash_im_dokument(synth_bundle):
     banner = html.split('id="pbanner"', 1)[1].split("</div>", 1)[0]
     assert ".sha256" in banner, "Ausdruck nennt nicht, wo der echte Hash zu finden ist"
     assert "Gesichert" in banner, "Ausdruck ohne Zuordnung zum Sicherungszeitraum"
+
+
+# ───────────────────────── Versatz der Box-Uhr ───────────────────────────────
+
+def _render(b):
+    m = build_model(b)
+    res = analyze(b, m.real_aps, m.master.get("name", ""))
+    return build_html(b, m, res, {"case_id": "C-1", "item_id": "A-1", "sb": "X",
+                                  "date": "2026-01-06", "generated_at": "x"})
+
+
+def test_supportdata_klammer_wird_berechnet(synth_bundle):
+    """Box meldet 11:00:02 CET (= 10:00:02Z), Marken 10:00:00Z / 10:00:40Z.
+    Obere Schranke = 2 s Differenz + 1 s Quantisierung."""
+    b = load_bundle(synth_bundle)
+    assert len(b.clock_offsets) == 1
+    c = b.clock_offsets[0]
+    assert c.quelle == "supportdata:standard"
+    assert c.versatz_max_s == 3
+    assert c.beidseitig is False
+    assert c.herkunft == "marker"
+
+
+def test_supportdata_zeigt_keine_untere_schranke(synth_bundle):
+    """Der Wächter gegen die Rückkehr einer irreführenden Zahl.
+
+    ``versatz_min_s`` ist bei dieser Quelle die Übertragungsdauer, kein gemessener
+    Rückstand — im Bericht gelesen würde „−38 s" zu einer Behauptung über die
+    Box-Uhr, die niemand gemessen hat.
+    """
+    b = load_bundle(synth_bundle)
+    assert b.clock_offsets[0].versatz_min_s == -38   # steht im Modell …
+    html = _render(b)
+    assert "-38" not in html and "−38" not in html   # … aber nie im Bericht
+    assert "geht nicht mehr als 3 s vor" in html
+
+
+def test_report_behauptet_keine_korrekte_box_uhr(synth_bundle):
+    """Gemessen ist eine Schranke, keine Übereinstimmung. Formulierungen wie
+    „Uhr ist korrekt" oder „synchron" behaupteten mehr als die Messung hergibt."""
+    html = _render(load_bundle(synth_bundle))
+    for verboten in ("Uhr ist korrekt", "korrekte Uhr", "synchron", "Uhr stimmt"):
+        assert verboten not in html, f"zu starke Aussage im Report: {verboten}"
+
+
+def test_box_zeit_wird_woertlich_wiedergegeben(synth_bundle):
+    """Die Kopfzeile wird zeichengenau gezeigt. Eine nach UTC umgerechnete Zeit mit
+    dem Ortszeit-Kürzel dahinter („10:00:02 CET") wäre falsch etikettiert."""
+    html = _render(load_bundle(synth_bundle))
+    assert "Tue Jan  6 11:00:02 CET 2026" in html
+
+
+def test_ohne_quelle_steht_nicht_geprueft(tmp_path):
+    """Bundle ohne Supportdaten und ohne boxtime: Der Report muss das benennen,
+    statt die Zeile wegzulassen — „ungeprüft" ist selbst eine Aussage."""
+    from fritzformat import dataset_filename, sha256_bytes, write_sidecar, build_envelope
+    import json
+    body = json.dumps(build_envelope(tool="fritzexport", version="0.1", host="h",
+                                     type_name="hosts", records=[]),
+                      indent=2).encode("utf-8")
+    p = tmp_path / dataset_filename("h", "20260106T100000Z", "hosts")
+    p.write_bytes(body)
+    write_sidecar(p, sha256_bytes(body))
+
+    b = load_bundle(tmp_path)
+    assert b.clock_offsets == []
+    html = _render(b)
+    assert "nicht geprüft" in html
+    assert ">None<" not in html
+
+
+def test_tr064_zeigt_beide_grenzen(synth_bundle):
+    """Gegenstück zur einseitigen Quelle: Bei TR-064 ist die Klammer die
+    Round-Trip-Zeit, dort tragen beide Schranken — es wird ein Intervall gezeigt."""
+    from fritzreport.bundle import ClockOffset
+    b = load_bundle(synth_bundle)
+    b.clock_offsets = [ClockOffset(
+        quelle="tr064:time", box_lokal="2026-01-06T11:00:02+01:00",
+        ref_von="2026-01-06T10:00:01.900Z", ref_bis="2026-01-06T10:00:02.100Z",
+        versatz_min_s=0, versatz_max_s=1, beidseitig=True, herkunft="marker")]
+    html = _render(b)
+    assert "Abweichung zwischen +0 s und +1 s" in html
+    assert "geht nicht mehr als" not in html

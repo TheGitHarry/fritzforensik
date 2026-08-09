@@ -18,7 +18,7 @@ bewusst weggelassen — hier zählt nur die reine Methode.
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # ───────────────────────── Konstanten / Regexes (aus fritz_processor.py) ─────
 
@@ -114,6 +114,56 @@ def parse_event_ts(ts):
         except ValueError:
             return None
     return None
+
+
+#: Kopfzeile der Supportdaten: ``##### TITLE Datum Sat Aug  8 00:01:38 CEST 2026``.
+#: Die Box schreibt sie am Anfang der Erzeugung — kurz nach dem Request, nicht am Ende.
+_BOX_HEADER_RE = re.compile(
+    r"#####\s+TITLE\s+Datum\s+\w+\s+(\w{3})\s+(\d{1,2})\s+"
+    r"(\d{2}):(\d{2}):(\d{2})\s+(\w+)\s+(\d{4})")
+
+_MONATE = {m: i + 1 for i, m in enumerate(
+    "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split())}
+
+#: UTC-Offset je Zeitzonenkürzel, in Sekunden.
+#:
+#: Bewusst eine **feste Tabelle** statt `zoneinfo`: `fritzreport` soll ohne Fremdpakete
+#: und ohne Netz auskommen, und die tzdata-Datenbank fehlt im Windows-Binary — dort
+#: löste `zoneinfo` still das Falsche auf. Ein unbekanntes Kürzel liefert deshalb
+#: `None`; der Report weist dann „nicht geprüft" aus, statt zu raten.
+TZ_OFFSETS = {
+    "CET": 3600, "MEZ": 3600,
+    "CEST": 7200, "MESZ": 7200,
+    "UTC": 0, "GMT": 0, "Z": 0,
+}
+
+
+def parse_box_header_time(text):
+    """Kopfzeile der Supportdaten → ``(utc_datetime, tz_kuerzel, zeilennr)``.
+
+    Gibt ``(None, kuerzel, zeilennr)`` zurück, wenn die Zeitzone unbekannt ist —
+    der Aufrufer kann dann benennen, *warum* keine Messung möglich war. Fehlt die
+    Kopfzeile ganz (z. B. beim Mesh-Dump, der keine hat), ist alles ``None``.
+    """
+    if not text:
+        return None, "", None
+    m = _BOX_HEADER_RE.search(text)
+    if not m:
+        return None, "", None
+
+    mon, tag, std, minute, sek, tz, jahr = m.groups()
+    zeilennr = text[:m.start()].count("\n") + 1
+    if mon not in _MONATE:
+        return None, tz, zeilennr
+    offset = TZ_OFFSETS.get(tz)
+    if offset is None:
+        return None, tz, zeilennr
+    try:
+        lokal = datetime(int(jahr), _MONATE[mon], int(tag),
+                         int(std), int(minute), int(sek))
+    except ValueError:
+        return None, tz, zeilennr
+    return lokal - timedelta(seconds=offset), tz, zeilennr
 
 
 def _classify_event(event_text):

@@ -96,3 +96,44 @@ def test_abdeckung_ist_aktuell() -> None:
             "ABDECKUNG.md passt nicht mehr zum Korpus — neu erzeugen mit:\n"
             f"    python3 scripts/abdeckung.py {BASE} > ABDECKUNG.md"
         )
+
+
+def test_box_uhr_wird_im_altbestand_geprueft(echtes_bundle: Path) -> None:
+    """Jeder Abzug des Korpus muss eine Aussage zur Box-Uhr hergeben.
+
+    Die Bundles stammen sämtlich aus der Zeit **vor** den Uhr-Markern; die Klammer
+    wird deshalb aus den Logzeilen des Supportdaten-Extractors abgeleitet. Der Test
+    hält fest, dass dieser Rückweg funktioniert — er ist der Grund, warum der
+    Zeitabgleich nicht erst für künftige Abzüge gilt.
+    """
+    b = load_bundle(echtes_bundle)
+    assert b.clock_offsets, "keine Messung der Box-Uhr — Altbestands-Rückweg greift nicht"
+
+    for c in b.clock_offsets:
+        assert c.quelle == "supportdata:standard", (
+            f"nur 'standard' ist rückwirkend auswertbar, nicht {c.quelle!r}: bei "
+            "'enhanced' läge die Wartezeit auf den Tastendruck mit in der Klammer")
+        assert c.versatz_min_s <= c.versatz_max_s, "Klammer verkehrt herum"
+        assert abs(c.versatz_max_s) < 300, (
+            f"Box-Uhr meldet {c.versatz_max_s} s Abweichung — entweder ein echter "
+            "Befund oder die Anker-/Zeitzonenlogik ist verrutscht")
+
+
+def test_report_nennt_die_box_uhr(echtes_bundle: Path) -> None:
+    """Der gerenderte Bericht darf die untere Schranke nicht als Messwert zeigen."""
+    b = load_bundle(echtes_bundle)
+    m = build_model(b)
+    res = analyze(b, m.real_aps, m.master.get("name", ""))
+    html = build_html(b, m, res, {"case_id": "C", "item_id": "I", "sb": "X",
+                                  "date": "2026-01-01", "generated_at": "x"})
+
+    assert "Zeitversatz Box" in html
+
+    # Gezielt die Metadaten-Zeile prüfen, nicht das ganze Dokument: Zahlen wie
+    # „-41" kommen auch in den eingebetteten Rohdaten vor („uid": "nl-41").
+    zeile = html.split("Zeitversatz Box", 1)[1].split("</tr>", 1)[0]
+    for c in b.clock_offsets:
+        if not c.beidseitig and c.versatz_min_s < 0:
+            assert str(c.versatz_min_s) not in zeile, (
+                "die Übertragungsdauer erscheint als vermeintlicher Rückstand")
+    assert "geht nicht mehr als" in zeile

@@ -62,12 +62,30 @@ Zusage darf nicht ohne Not aufgeweicht werden. Ausgenommen ist `webbrowser`
   Bundle-Datei, auch nicht in den Supportdaten (dort tauchen nur die Dienste auf, die
   fritzexport selbst aufgerufen hat).
 
+- **Zeitmarken statt Rechnung**: `boxtime` (TR-064 `Time:1`) und `supportdata` holen
+  beide eine Zeitangabe der Box und klammern ihren Abruf in zwei Markerzeilen
+  (`UHRZEIT ANFRAGE`/`ANTWORT` je Quelle, siehe `fritzformat/sessionlog.py`). Den
+  Versatz rechnet **keiner der beiden** — das tut `fritzreport` einmal für beide
+  Quellen. Wer hier eine Differenz `box − referenz` einbaut, baut einen Fehler ein:
+  Beide Quellen sind sekundengenau, die Differenz ist deshalb systematisch verschoben.
+
 ## Wie fritzreport arbeitet
 
 `{bundle,model,supportdata,render}.py`. `bundle.py` lädt und **verifiziert** jede Datei
 gegen ihre Sidecar und stellt je Datensatz die Fundstelle bereit (Zeilennummer + wörtlicher
 Auszug). `supportdata.py` parst die Roh-Supportdaten (Sektionen, 802.11-Logs) — der Export
 *holt* diese Dateien nur, er parst sie nicht; hier gibt es keine doppelte Logik.
+
+`_resolve_clock_offset` (in `bundle.py`, neben `_resolve_secured_span`) bildet den
+**Versatz der Box-Uhr** — aus Box-Zeit und Sitzungslog-Marken, für beide Quellen
+gleich. Zwei Fallen, die dort im Docstring belegt sind:
+
+- Die Klammer der Supportdaten ist **einseitig**: Ihr Kopf entsteht am Anfang der
+  Erzeugung, die untere Schranke enthält also nur die Übertragungsdauer. Sie wird
+  deshalb nie als Messwert gezeigt — „−189 s" läse sich wie ein Rückstand, den
+  niemand gemessen hat. Bei TR-064 (Round-Trip) tragen beide Schranken.
+- Rückwirkend ist **nur `standard`** auswertbar. Bei `enhanced` liegt ohne eigene
+  Marker die Wartezeit auf den Tastendruck mit in der Klammer (7490: 595 s).
 
 **Belegtheits-Grade** (kombinierbar): **D1** plausibel innerhalb der Rohdaten · **D2** durch
 eigene forensische Tests verifiziert ([methode.md](methode.md)) ·

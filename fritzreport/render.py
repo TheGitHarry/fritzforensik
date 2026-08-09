@@ -416,6 +416,65 @@ def _secured_rows(bundle, m) -> list[tuple]:
     return rows
 
 
+def _sek(wert: int) -> str:
+    """Sekunden mit deutschem Vorzeichen-Wortlaut, z. B. „1 s" / „3 min 20 s"."""
+    betrag = abs(wert)
+    if betrag < 60:
+        return f"{betrag} s"
+    if betrag < 3600:
+        return f"{betrag // 60} min {betrag % 60} s"
+    return f"{betrag // 3600} h {(betrag % 3600) // 60} min"
+
+
+def _clock_rows(bundle) -> list[tuple]:
+    """Metadaten-Zeilen zum Versatz der Box-Uhr — je Quelle eine.
+
+    Belegtheit nach derselben Regel wie beim Sicherungszeitraum: Die Zeitangabe der
+    Box ist roh (kein Badge), der daraus gerechnete Versatz ist **D3**.
+
+    Zwei Darstellungen, weil die Quellen unterschiedlich scharf sind:
+
+    - **beidseitig** (TR-064) — beide Schranken tragen, es wird das Intervall gezeigt.
+    - **einseitig** (Supportdaten-Kopf) — nur die obere Schranke ist ein Messwert; die
+      untere enthält die Übertragungsdauer. Sie wird deshalb **nicht** als Zahl
+      ausgewiesen: „−189 s" läse sich wie ein gemessener Rückstand, obwohl nichts
+      dergleichen gemessen wurde. Stattdessen die Aussage, die wirklich belegt ist.
+    """
+    offsets = getattr(bundle, "clock_offsets", None)
+    if not offsets:
+        return [("Box-Uhr", "nicht geprüft (weder TR-064 Time:1 noch Supportdaten "
+                            "im Abzug)")]
+
+    rows: list[tuple] = []
+    # TR-064 zuerst: die schärfere Aussage steht oben.
+    for c in sorted(offsets, key=lambda o: not o.beidseitig):
+        herkunft = ("Supportdaten-Kopf" if c.quelle.startswith("supportdata")
+                    else "TR-064 Time:1")
+        if c.quelle.startswith("supportdata"):
+            variante = c.quelle.split(":", 1)[1]
+            herkunft = f"{herkunft}, {variante}"
+        if c.herkunft == "berechnet":
+            herkunft += ", Klammer aus Sitzungslog abgeleitet"
+
+        rows.append((f"Box-Uhr laut {'TR-064' if c.beidseitig else 'Supportdaten'}",
+                     c.box_lokal))
+        if c.beidseitig:
+            wert = (f"Abweichung zwischen {c.versatz_min_s:+d} s und "
+                    f"{c.versatz_max_s:+d} s ({herkunft}, Klammer {_sek(c.klammer_s)})")
+        elif c.versatz_max_s >= 0:
+            wert = (f"geht nicht mehr als {_sek(c.versatz_max_s)} vor "
+                    f"({herkunft})")
+        else:
+            # Obere Schranke negativ → die Box geht nachweislich nach.
+            wert = (f"geht nachweislich mindestens {_sek(c.versatz_max_s)} nach "
+                    f"({herkunft})")
+        rows.append(("Zeitversatz Box ↔ Referenz", wert, " " + badges(["D3"])))
+
+    rows.append(("Referenzuhr", "Systemuhr der Abzugsmaschine — nicht unabhängig "
+                                "verbürgt"))
+    return rows
+
+
 def data_attrs(rec) -> str:
     return (
         f' data-mac="{esc((rec.get("mac") or "").upper())}"'
@@ -643,6 +702,7 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
         ("Host-URL", m.meta.get("host", "")),
         ("Extraktionswerkzeug", f'{m.meta.get("tool","?")} {m.meta.get("version","?")}'),
         *_secured_rows(bundle, m),
+        *_clock_rows(bundle),
         ("Report erzeugt am", header.get("generated_at", "")),
         ("Report-Generator", f"fritzreport {__version__}"),
         ("Belegtheits-Schema", f"{GRADE_SCHEMA} ({len(GRADE_LABEL)} Grade)"),
