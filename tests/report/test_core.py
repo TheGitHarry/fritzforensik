@@ -384,6 +384,68 @@ def test_varianten_mit_eigenen_zeitstempeln_bleiben_ein_bundle(synth_bundle):
     assert {e.status for e in b.coc} == {"ok"}
 
 
+# ─────────────────────────── Betriebszeit ────────────────────────────────────
+
+def _uptime(zeile: str, extracted_at: str = "2026-08-03T13:20:12Z") -> dict:
+    """`_parse_uptime` über eine einzelne ``uptime:``-Zeile."""
+    from fritzreport.bundle import SupportFile
+    from fritzreport.supportdata import _parse_uptime
+    sf = SupportFile(variant="standard", path=None, name="supportdata_standard.txt",
+                     text=f"{zeile}\nip4_uptime=3600\n")
+    return _parse_uptime(sf, extracted_at)
+
+
+@pytest.mark.parametrize("zeile,text,boot", [
+    # belegt im Korpus: alle Golden-Bundles
+    ("uptime: 11:41:13 up 85 days, 14:24,  load average: 0.1",
+     "85 days, 14:24", "2026-05-09"),
+    # belegt: 7690 nach Firmware-Neustart, 21 min Laufzeit
+    ("uptime: 15:20:12 up 21 min,  load average: 0.21, 0.14, 0.10",
+     "21 min", "2026-08-03"),
+    # Einzahl-Variante
+    ("uptime: 15:20:12 up 1 day, 2:03,  load average: 0.1",
+     "1 day, 2:03", "2026-08-02"),
+    # 1–24 h: nur Stunden:Minuten, ohne Tagesangabe
+    ("uptime: 15:20:12 up  1:23,  load average: 0.1", "1:23", "2026-08-03"),
+    # procps schreibt bei vollen Stunden Minuten aus, auch mit Tagen davor
+    ("uptime: 15:20:12 up 2 days, 21 min,  load average: 0.1",
+     "2 days, 21 min", "2026-08-01"),
+])
+def test_uptime_formen_werden_geparst(zeile, text, boot):
+    """Vier der fünf Formen fielen früher durch: Erkannt wurden nur ganze Tage.
+
+    Forensisch ist die kurze Laufzeit der wahrscheinliche Fall — eine beschlagnahmte
+    Box wird für den Transport vom Netz genommen und am Auswerteplatz neu gestartet.
+    Genau dann blieb das abgeleitete Boot-Datum leer und die Rohzeile stand samt
+    ``load average`` im Bericht.
+    """
+    up = _uptime(zeile)
+    assert up["uptime_text"] == text
+    assert up["boot_derived"] == boot
+
+
+def test_boot_datum_rechnet_die_stunden_mit():
+    """Nur die Tage abzuziehen verschiebt das Boot-Datum um einen Tag, sobald die
+    Stunden der Laufzeit über der Tageszeit des Abzugs liegen.
+
+    Abzug am 13.07. um 11:41 Uhr, Laufzeit 85 Tage 14:24 → der Start liegt am
+    **18.04.** um 21:17, nicht am 19.04.
+    """
+    up = _uptime("uptime: 11:41:13 up 85 days, 14:24,  load average: 0.1",
+                 extracted_at="2026-07-13T11:41:13Z")
+    assert up["boot_derived"] == "2026-04-18"
+
+
+def test_unbekannte_uptime_form_behauptet_kein_boot_datum():
+    """Was nicht geparst wird, wird nicht gerechnet — und die Zeile im Bericht sagt
+    das, statt ein leeres Feld neben Label und D3-Badge zu zeigen."""
+    up = _uptime("uptime: irgendwas ganz anderes")
+    assert up["boot_derived"] == ""
+
+    from fritzreport.render import _uptime_block
+    assert "nicht ableitbar" in _uptime_block(up)
+
+
 # ───────────────────────── Versatz der Box-Uhr ───────────────────────────────
 
 def _zeilen(html: str, schluessel: str) -> list[str]:

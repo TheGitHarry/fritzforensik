@@ -426,6 +426,31 @@ def _sek(wert: int) -> str:
     return f"{betrag // 3600} h {(betrag % 3600) // 60} min"
 
 
+def _uptime_block(up: dict) -> str:
+    """Die Betriebszeit-Tabelle — leer, wenn die Supportdaten keine Uptime führen.
+
+    Ist die Form der ``uptime:``-Zeile unbekannt, steht die Rohzeile im „roh"-Feld,
+    aber das Boot-Datum wird **benannt** statt leer gelassen: Ein leeres Feld neben
+    Label und D3-Badge liest sich wie ein fehlgeschlagener Wert, nicht wie eine
+    bewusst unterlassene Ableitung.
+    """
+    if not up.get("uptime_text"):
+        return ""
+    boot = esc(up.get("boot_derived", "")) or "nicht ableitbar (Uptime-Form unbekannt)"
+    return (
+        "<h3>Betriebszeit (aus Supportdaten)</h3><table class='kv'>"
+        f"<tr><th>Uptime der Box, roh</th>"
+        f"<td class='mono'>{esc(up.get('uptime_text',''))}</td></tr>"
+        f"<tr><th>hochgefahren am, berechnet {badges(['D3'])}</th>"
+        f"<td class='mono'>{boot}</td></tr>"
+        f"<tr><th>WAN-Verbindungsdauer (ip4_uptime), roh</th>"
+        f"<td class='mono'>{esc(up.get('wan_s',''))} s ≈ {esc(up.get('wan_h',''))} h</td></tr>"
+        f"<tr><th>Fundstelle</th><td class='mono'>{esc(up.get('file',''))}"
+        f" — Zeile {up.get('up_line')} (Uptime), Zeile {up.get('wan_line')} (WAN)</td></tr>"
+        "</table>"
+    )
+
+
 def _clock_rows(bundle) -> list[tuple]:
     """Metadaten-Zeilen zum Versatz der Box-Uhr — je Quelle eine.
 
@@ -742,15 +767,7 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
         + "".join(f'<tr><td>{esc(k)}</td><td class="num">{v}</td></tr>'
                   for k, v in sorted(m.cat_counts.items(), key=lambda x: -x[1]))
         + "</tbody></table>"
-        + (("<h3>Betriebszeit (aus Supportdaten)</h3><table class='kv'>"
-            f"<tr><th>Uptime der Box, roh</th><td class='mono'>{esc(up.get('days',''))}</td></tr>"
-            f"<tr><th>hochgefahren am, berechnet {badges(['D3'])}</th>"
-            f"<td class='mono'>{esc(up.get('boot_derived',''))}</td></tr>"
-            f"<tr><th>WAN-Verbindungsdauer (ip4_uptime), roh</th>"
-            f"<td class='mono'>{esc(up.get('wan_s',''))} s ≈ {esc(up.get('wan_h',''))} h</td></tr>"
-            f"<tr><th>Fundstelle</th><td class='mono'>{esc(up.get('file',''))}"
-            f" — Zeile {up.get('up_line')} (Uptime), Zeile {up.get('wan_line')} (WAN)</td></tr>"
-            "</table>") if up.get("days") else "")
+        + _uptime_block(up)
     )
 
     def coc_badge(st):

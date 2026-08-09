@@ -476,28 +476,56 @@ def analyze(bundle, real_aps, master_name) -> dict:
     return {"proofs": proofs, "uptime": uptime}
 
 
-def _parse_uptime(sf, extracted_at: str) -> dict:
+#: Die Laufzeit hinter ``up`` in der ``uptime:``-Zeile. procps/busybox wählen die
+#: Form nach der Länge der Laufzeit: ``85 days, 14:24`` · ``1 day, 2:03`` ·
+#: ``2 days, 21 min`` (volle Stunde) · ``1:23`` (unter einem Tag) · ``21 min``
+#: (unter einer Stunde). Erkannt wurden früher nur ganze Tage — und ausgerechnet die
+#: kurze Laufzeit ist der forensisch wahrscheinliche Fall: Eine beschlagnahmte Box
+#: wird für den Transport vom Netz genommen und am Auswerteplatz neu gestartet.
+_UPTIME_RE = re.compile(
+    r"\bup\s+(?P<text>(?:(?P<d>\d+)\s+days?)?(?:,\s*)?"
+    r"(?:(?P<h>\d+):(?P<hm>\d{2})|(?P<min>\d+)\s+min)?)"
+)
+
+
+def _uptime_spanne(line: str):
+    """``uptime:``-Zeile → (Laufzeit wörtlich, timedelta); ``("", None)`` bei Unbekanntem."""
     from datetime import timedelta
-    days = wan_s = ""
+    m = _UPTIME_RE.search(line)
+    if not m or not (m.group("d") or m.group("h") or m.group("min")):
+        return "", None
+    return m.group("text").strip().rstrip(","), timedelta(
+        days=int(m.group("d") or 0),
+        hours=int(m.group("h") or 0),
+        minutes=int(m.group("hm") or 0) + int(m.group("min") or 0),
+    )
+
+
+def _parse_uptime(sf, extracted_at: str) -> dict:
+    text = wan_s = ""
+    spanne = None
     up_ln = wan_ln = None
     for lineno, line in enumerate(sf.lines, 1):
-        if not days and line.startswith("uptime:"):
-            um = re.search(r"up (\d+ days?(?:,\s*\d+:\d+)?)", line)
-            days, up_ln = (um.group(1) if um else line.strip()), lineno
+        if not text and line.startswith("uptime:"):
+            text, spanne = _uptime_spanne(line)
+            # Unbekannte Form: die Rohzeile stehen lassen, statt sie zu verschweigen —
+            # das Feld heißt „roh". Gerechnet wird daraus nichts.
+            text, up_ln = text or line.strip(), lineno
         if not wan_s and (wm := re.match(r"\s*ip4_uptime=(\d+)\s*$", line)):
             wan_s, wan_ln = wm.group(1), lineno
-        if days and wan_s:
+        if text and wan_s:
             break
     boot = ""
-    dm = re.match(r"(\d+) days?", days)
-    if dm:
+    if spanne is not None:
         try:
             base = datetime.fromisoformat(extracted_at.replace("Z", "+00:00"))
-            boot = (base - timedelta(days=int(dm.group(1)))).strftime("%Y-%m-%d")
+            # Volle Spanne, nicht nur die Tage: Liegen die Stunden der Laufzeit über
+            # der Tageszeit des Abzugs, verschöbe das Weglassen den Start um einen Tag.
+            boot = (base - spanne).strftime("%Y-%m-%d")
         except Exception:
             boot = ""
     return {
-        "file": sf.name, "days": days, "up_line": up_ln,
+        "file": sf.name, "uptime_text": text, "up_line": up_ln,
         "wan_s": wan_s, "wan_line": wan_ln,
         "wan_h": f"{int(wan_s) / 3600:.1f}" if wan_s else "",
         "boot_derived": boot,
