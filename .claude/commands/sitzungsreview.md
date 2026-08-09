@@ -23,9 +23,11 @@ Ist der aktuelle Branch `main` (oder ergibt der Vergleich nichts), stattdessen d
 uncommitteten Änderungen samt der Commits nehmen, die seit dem Sitzungsbeginn entstanden
 sind — im Zweifel den Nutzer fragen, wogegen verglichen werden soll, statt zu raten.
 
-**Nachbarschaft mitgeben:** Für jede geänderte Datei den **vollständigen** aktuellen
-Inhalt lesen (gelöschte überspringen). Erst dadurch sehen die Agenten das Neue im
-Zusammenhang mit dem, was schon da war — die Fehlerklasse, um die es hier vor allem geht.
+**Die Dateiinhalte werden nicht mitgegeben** — nur ihre Pfade. Der Prüfgegenstand einer
+großen Sitzung erreicht schnell mehrere hundert KB (eine gemessene Sitzung: 319 KB,
+~180k Token); durch diesen Kontext geschleust wäre er allein deshalb nicht handhabbar.
+Die Agenten holen sich Diff und Dateien selbst, sie haben Bash und Read. Der Workflow
+sagt ihnen im Prompt, dass sie die **ganzen** Dateien lesen sollen, nicht nur die Hunks.
 
 ## 2. Abbruchbedingungen — Hinweis statt Lauf
 
@@ -46,9 +48,9 @@ Workflow({
   name: "sitzungsreview",
   args: {
     branch:  "<aktueller Branch>",
+    basis:   "main",                        // wogegen verglichen wird
     stat:    "<Ausgabe von git diff --stat>",
-    diff:    "<vollständiger Diff>",
-    dateien: [ { pfad: "...", inhalt: "<ganze Datei>" }, ... ]
+    dateien: ["pfad/eins.py", "pfad/zwei.md", ...]   // nur Pfade, keine Inhalte
   }
 })
 ```

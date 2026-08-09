@@ -9,27 +9,40 @@ export const meta = {
   ],
 }
 
-// args: { stat, diff, dateien: [{pfad, inhalt}], branch }
+// args: { branch, basis, stat, dateien: ["pfad", ...] }
+//
+// Bewusst **keine** Dateiinhalte in args: Der Prüfgegenstand einer großen Sitzung
+// erreicht schnell mehrere hundert KB (diese Sitzung: 319 KB / ~180k Token). Durch den
+// Hauptkontext geschleust wäre er allein deshalb nicht mehr handhabbar. Die Agenten
+// holen sich Diff und Dateien selbst — sie haben Bash und Read.
 const A = args || {}
-if (!A.diff) throw new Error('kein Diff übergeben — der Slash-Command muss ihn mitliefern')
+const BASIS = A.basis || 'main'
+const DATEIEN = A.dateien || []
+if (!DATEIEN.length) throw new Error('keine geänderten Dateien übergeben')
 
 const KONTEXT = `
 ## Prüfgegenstand
 
-Branch: ${A.branch || '(unbekannt)'}
+Branch: ${A.branch || '(unbekannt)'} · Vergleichsbasis: \`${BASIS}\`
 
 ### Überblick
 ${A.stat || '(kein --stat)'}
 
-### Die Änderung
-\`\`\`diff
-${A.diff}
+### So kommst du an den Stoff
+
+Hol ihn dir selbst — arbeite im Repo-Verzeichnis:
+
+\`\`\`bash
+git diff ${BASIS}...HEAD              # die Änderung
+git diff ${BASIS}...HEAD -- <datei>   # gezielt eine Datei
 \`\`\`
 
-### Die berührten Dateien vollständig
-${(A.dateien || []).map(d => `
---- ${d.pfad} ---
-${d.inhalt}`).join('\n')}
+Und lies die **vollständigen** Dateien (Read-Tool), nicht nur die Hunks: Die
+Fehlerklasse, um die es hier vor allem geht, sind Widersprüche zwischen dem Neuen und
+dem, was schon da war. Die sieht man im Hunk nicht.
+
+### Berührte Dateien (${DATEIEN.length})
+${DATEIEN.map(p => `- ${p}`).join('\n')}
 `
 
 const GEMEINSAM = `
