@@ -103,13 +103,14 @@ einwilligen. Bitte prüfen Sie vor dem Bereitstellen, wessen Daten Sie weitergeb
 
 Zwei Dinge, die auseinanderzuhalten sind:
 
-- **Die Werkzeuge selbst enthalten keine KI.** `fritzexport` und `fritzreport`
-  sind gewöhnliche Programme ohne Modell, ohne Dienstaufruf. `fritzexport`
-  spricht ausschließlich mit der Box im eigenen Netz, `fritzreport` liest nur
-  das Bündel auf der Platte — dass es **kein netzfähiges Modul** verwendet,
-  auch keines aus der Standardbibliothek, ist durch einen Test festgehalten
-  (`tests/format/test_stdlib_only.py`). Wer die Werkzeuge herunterlädt und auf
-  eigenen Geräten einsetzt, gibt keine Daten heraus.
+- **Die Werkzeuge selbst enthalten keine KI** — kein Modell, kein Dienstaufruf.
+  `fritzexport` greift naturgemäß aufs Netz zu, aber nur ins lokale: auf die Box
+  unter `--host` oder die per SSDP im eigenen Netz gefundene. Eine **fest
+  verdrahtete Gegenstelle gibt es nicht** — kein Update-Check, keine Telemetrie,
+  kein Cloud-Dienst. `fritzreport` greift gar nicht aufs Netz zu und verwendet
+  kein netzfähiges Modul, auch keines aus der Standardbibliothek. Beides hält
+  `tests/format/test_stdlib_only.py` statisch fest. Wer die Werkzeuge auf
+  eigenen Geräten einsetzt, gibt damit keine Daten heraus.
 - **Die Weiterentwicklung dieses Projekts läuft KI-gestützt.** Wird ein Abzug
   bereitgestellt, um eine Lücke zu schließen, werden seine Inhalte dabei von
   einem KI-Assistenten verarbeitet — und damit an dessen Anbieter übermittelt.

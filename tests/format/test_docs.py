@@ -144,6 +144,12 @@ def test_readme_trennt_werkzeug_und_entwicklung_bei_ki() -> None:
     text = README.read_text(encoding="utf-8")
     assert "Die Werkzeuge selbst enthalten keine KI" in text
     assert "KI-gestützt ist die Entwicklung" in text
+    # Der Netzzugriff von fritzexport wird benannt, nicht verschwiegen — samt
+    # der belastbaren Einschränkung. Zeilenumbrüche im Zitat stören sonst den
+    # Vergleich, deshalb auf normalisiertem Text prüfen.
+    fliess = " ".join(text.split())
+    assert "verdrahtete Gegenstelle gibt es nicht" in fliess
+    assert "test_stdlib_only.py" in text, "die Zusage muss ihren Nachweis nennen"
     # Der Verweis auf die ausführliche Fassung muss auf einen echten Anker zeigen.
     assert "ABDECKUNG.md#bevor-sie-einen-abzug-bereitstellen" in text
     ueberschriften = (REPO_ROOT / "ABDECKUNG.md").read_text(encoding="utf-8")

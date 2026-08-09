@@ -19,11 +19,16 @@ fritzreport greift **nie** auf die Box zu — es wertet nur ein vorhandenes Bund
 Beide Werkzeuge sind eigenständige Single-File-Binaries für den USB-Stick-Feldeinsatz
 ohne installiertes Python.
 
-> **Die Werkzeuge selbst enthalten keine KI.** fritzexport spricht ausschließlich mit
-> der Box im eigenen Netz, fritzreport liest nur das Bundle auf der Platte — kein
-> Modell, kein Dienstaufruf, nichts verlässt das Gerät. Dass fritzreport **kein
-> netzfähiges Modul** verwendet, auch keines aus der Standardbibliothek, hält
-> `tests/format/test_stdlib_only.py` statisch fest.
+> **Die Werkzeuge selbst enthalten keine KI** — kein Modell, kein Dienstaufruf.
+>
+> **fritzexport** greift naturgemäß aufs Netz zu, aber nur ins lokale: Es spricht mit
+> der Box unter `--host` bzw. der per SSDP im eigenen Netz gefundenen. Eine **fest
+> verdrahtete Gegenstelle gibt es nicht** — kein Update-Check, keine Telemetrie, kein
+> Cloud-Dienst. **fritzreport** greift gar nicht aufs Netz zu und verwendet kein
+> netzfähiges Modul, auch keines aus der Standardbibliothek.
+>
+> Beides hält [`tests/format/test_stdlib_only.py`](tests/format/test_stdlib_only.py)
+> statisch fest, samt der Zusage, dass die SSDP-Suche link-lokal bleibt.
 >
 > **KI-gestützt ist die Entwicklung dieses Projekts.** Das betrifft Sie nur, wenn Sie
 > uns ein Bundle *bereitstellen*: Dessen Inhalte werden dann von einem KI-Assistenten

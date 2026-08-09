@@ -8,6 +8,7 @@ Geprüft wird statisch über den AST, nicht über Laufzeit-Imports.
 from __future__ import annotations
 
 import ast
+import re
 import sys
 from pathlib import Path
 
@@ -116,6 +117,67 @@ def test_kein_netzzugriff(package: str) -> None:
         f"{package} darf keine netzfähigen Module verwenden, tut es aber: {treffer}. "
         "README und ABDECKUNG.md sagen zu, dass das Werkzeug nichts sendet."
     )
+
+
+#: Hosts, die im Export-Code als Zeichenkette stehen dürfen.
+#:
+#: ``fritz.box`` ist AVMs Standardname der Box im lokalen Netz.
+#: ``schemas.xmlsoap.org`` sind XML-Namensräume im SOAP-Rumpf — Bezeichner,
+#: die nie abgerufen werden. ``239.255.255.250`` ist die link-lokale
+#: SSDP-Multicast-Adresse, die das eigene Netz nicht verlässt.
+ERLAUBTE_HOSTS = {"fritz.box", "schemas.xmlsoap.org", "239.255.255.250"}
+
+_HOST_IM_CODE = re.compile(r"https?://([a-zA-Z0-9.-]+)")
+
+
+def test_export_kennt_keine_externe_gegenstelle() -> None:
+    """fritzexport darf nur mit der Box sprechen, nicht mit dem Internet.
+
+    Der Netzzugriff ist hier der Zweck — „sendet nichts" wäre falsch. Belastbar
+    ist die engere Aussage: Es gibt **keine fest verdrahtete Gegenstelle**.
+    Jede Adresse stammt aus ``--host`` oder aus der SSDP-Discovery im eigenen
+    Netz; es gibt keinen Update-Check, keine Telemetrie, keinen Cloud-Dienst.
+
+    Das ist bei einem Forensikwerkzeug wesentlich: Wer es im Netz eines
+    Betroffenen einsetzt, muss wissen, dass dabei nichts nach außen geht.
+    """
+    treffer: dict[str, set[str]] = {}
+    for py in sorted((REPO_ROOT / "fritzexport").rglob("*.py")):
+        hosts = set(_HOST_IM_CODE.findall(py.read_text(encoding="utf-8")))
+        fremd = hosts - ERLAUBTE_HOSTS
+        if fremd:
+            treffer[str(py.relative_to(REPO_ROOT))] = fremd
+    assert not treffer, (
+        f"fritzexport nennt fest verdrahtete Gegenstellen: {treffer}. "
+        "Jede Adresse muss aus --host oder der Discovery stammen."
+    )
+
+
+def test_ssdp_bleibt_im_lokalen_netz() -> None:
+    """Die Discovery darf nur link-lokal suchen.
+
+    ``239.255.255.250`` ist per Definition nicht routbar; entscheidend ist
+    zusätzlich die TTL. Ein hoher Wert würde die Suche über Router hinaus
+    tragen — im Einsatz beim Betroffenen ein unerwünschter Nebeneffekt.
+    """
+    quelle = (REPO_ROOT / "fritzexport" / "discover.py").read_text(encoding="utf-8")
+    assert 'SSDP_MULTICAST = "239.255.255.250"' in quelle, (
+        "SSDP-Adresse geändert — ist sie noch link-lokal?"
+    )
+    tree = ast.parse(quelle)
+    ttls = [
+        node.args[2].value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "setsockopt"
+        and len(node.args) == 3
+        and isinstance(node.args[1], ast.Attribute)
+        and node.args[1].attr == "IP_MULTICAST_TTL"
+        and isinstance(node.args[2], ast.Constant)
+    ]
+    assert ttls, "IP_MULTICAST_TTL wird nicht mehr gesetzt — Suche könnte weiter reichen"
+    assert all(t <= 4 for t in ttls), f"SSDP-TTL zu hoch: {ttls}"
 
 
 def test_netzwaechter_ist_scharf() -> None:
