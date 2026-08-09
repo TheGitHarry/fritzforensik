@@ -284,7 +284,7 @@ Umrechnung steht in [ANFORDERUNGEN.md](ANFORDERUNGEN.md), Abschnitt D.
 | **D2** | Durch eigene forensische Tests verifiziert |
 | **D3** | Abgeleitet / Interpretation |
 
-Grundlage für **D2** ist die Methodik in [ressourcen/methode.md](ressourcen/methode.md).
+Grundlage für **D2** ist die Methodik in [methode.md](methode.md).
 
 **Verbindungsnachweise** (Sektion 6): Treffer des Methoden-Parsers tragen **D1+D2**, die aus
 den 802.11-Logs **D1+D3**. Beide Parser laufen auf jeder Box, Ergebnisse werden vereint

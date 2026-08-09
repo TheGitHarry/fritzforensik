@@ -61,7 +61,7 @@ Auszug). `supportdata.py` parst die Roh-Supportdaten (Sektionen, 802.11-Logs) �
 *holt* diese Dateien nur, er parst sie nicht; hier gibt es keine doppelte Logik.
 
 **Belegtheits-Grade** (kombinierbar): **D1** plausibel innerhalb der Rohdaten · **D2** durch
-eigene forensische Tests verifiziert ([ressourcen/methode.md](ressourcen/methode.md)) ·
+eigene forensische Tests verifiziert ([methode.md](methode.md)) ·
 **D3** abgeleitet/Interpretation. Zeile ohne Badge = reine Rohdaten-Wiedergabe.
 Verbindungsnachweise: methode.md-Parser → D1+D2, 802.11-Log-Parser → D1+D3.
 
@@ -123,9 +123,15 @@ Jede Aussage hat **genau einen** Ort — dasselbe Prinzip wie bei `fritzformat`:
 | [ANFORDERUNGEN.md](ANFORDERUNGEN.md) | Was die Werkzeuge leisten müssen, inkl. entfallener Anforderungen |
 | [README.md](README.md) | Bedienung, Flags, Bundle-Format, Distribution |
 | CLAUDE.md | Orientierung, Fallen, Konventionen (diese Datei) |
-| [ressourcen/methode.md](ressourcen/methode.md) | Forensische Methodik + empirische Parser-Begründung |
+| [methode.md](methode.md) | Forensische Methodik + empirische Parser-Begründung |
 | [ABDECKUNG.md](ABDECKUNG.md) | Welche Modelle/Firmware getestet sind — **erzeugt**, nie von Hand ändern |
+| [SECURITY.md](SECURITY.md) | Meldeweg für Sicherheitslücken, und was ausdrücklich keine ist |
+| [LICENSE](LICENSE) | Apache-2.0 |
 | GitHub-Issues | Backlog — **ausschließlich** |
+
+Alle Doku liegt im **Stammverzeichnis**, bewusst ohne `docs/`-Unterordner: Es sind
+wenige Dateien, und README/LICENSE/SECURITY/CLAUDE müssen ohnehin dort liegen, damit
+GitHub und Claude Code sie finden. Ein Unterordner hätte nur einzelne davon versteckt.
 
 Drei Regeln, die verhindern, dass es wieder auseinanderläuft:
 

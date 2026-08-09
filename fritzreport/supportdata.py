@@ -3,7 +3,7 @@
 Zwei Wege, beide auf jeder Box, Ergebnisse vereint:
 
 1. **methode.md-Parser** — übernommen aus dem `fritz`-Worker des it-forensic-automat
-   (`_material/supportdata-methode/fritz_processor.py`, Methodik `ressourcen/methode.md`).
+   (`_material/supportdata-methode/fritz_processor.py`, Methodik `methode.md`).
    Geräteregister aus `dhcpd`, Verbindungsnachweise aus 5 Log-Sektionen mit
    Vertrauensregeln. Empirisch nötig auf Boxen mit WLAN_EVENTS-ID 30005 (7530ax/7590).
    → Grade **D1+D2** (plausibel + durch Tests verifizierte Methode).
