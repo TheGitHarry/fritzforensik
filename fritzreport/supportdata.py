@@ -17,6 +17,7 @@ bewusst weggelassen — hier zählt nur die reine Methode.
 """
 from __future__ import annotations
 
+import json
 import re
 from datetime import datetime, timedelta
 
@@ -394,7 +395,7 @@ def _sec_display(dt: datetime | None, fallback: str) -> tuple[str, str]:
 # ───────────────────────── Vereinigung ───────────────────────────────────────
 
 def analyze(bundle, real_aps, master_name) -> dict:
-    """→ {'proofs': [...], 'uptime': {...}}.
+    """→ {'proofs': [...], 'uptime': {...}, 'system_kpi': {...}}.
 
     ``proofs`` = vereinte, deduplizierte Verbindungsnachweise (Sektion 6/Timeline).
     Jeder Nachweis: iso · sortkey · display · mac · event · event_de · band · ap ·
@@ -473,7 +474,10 @@ def analyze(bundle, real_aps, master_name) -> dict:
     # 3) Betriebszeit (aus standard) — roh (kein Badge) + abgeleitet (D3)
     uptime = _parse_uptime(sf80, bundle.meta.get("extracted_at", "")) if sf80 else {}
 
-    return {"proofs": proofs, "uptime": uptime}
+    # 4) Kennzahlen der Box (erst ab FRITZ!OS 08.25 vorhanden) — roh
+    kpi = parse_system_kpi(sf80) if sf80 else {}
+
+    return {"proofs": proofs, "uptime": uptime, "system_kpi": kpi}
 
 
 #: Die Laufzeit hinter ``up`` in der ``uptime:``-Zeile. procps/busybox wählen die
@@ -499,6 +503,51 @@ def _uptime_spanne(line: str):
         hours=int(m.group("h") or 0),
         minutes=int(m.group("hm") or 0) + int(m.group("min") or 0),
     )
+
+
+def parse_system_kpi(sf) -> dict:
+    """Sektion ``system_kpi`` → ``{starts, lifetime, uptime_s, file, line}``.
+
+    Die Sektion gibt es erst **ab FRITZ!OS 08.25** — aber nicht auf jeder Plattform:
+    7530 AX (HW 256) und 7690 (285) führen sie unter 08.25, die 7590 (226) unter
+    demselben Stand **nicht**. Sie ist damit weder allein an die Firmware noch allein
+    an die Hardware gebunden; wer eine Regel daraus ableitet, sollte sie am Korpus
+    prüfen. Fehlt sie, kommt ``{}`` zurück — kein Fehlerfall.
+
+    Nicht zu verwechseln mit der Sektion ``KPI Current KPI data``, die die 7590 statt
+    dessen führt: WLAN-Kennzahlen, ohne ``starts``/``lifetime``. Der Name wird deshalb
+    **vollständig** gematcht.
+
+    Übernommen werden nur die drei forensisch verwertbaren Felder, und zwar **roh**:
+
+    - ``starts`` — Startzähler. Woher er zählt (Werksauslieferung, Reset,
+      Firmware-Update), ist aus den Daten nicht ableitbar und bleibt offen.
+    - ``lifetime`` — Gesamtbetriebsdauer als Freitext, mit **aufsteigender**
+      Einheitenfolge (``17 hours 24 days 6 months 1 years``). Bewusst ungeparst: Ein
+      daraus gerechnetes Inbetriebnahme-Datum wäre eine Ableitung (D3) auf einem
+      Format, dessen Rundungsregeln hier niemand belegt hat.
+    - ``uptime`` — laufende Betriebszeit in Sekunden, die maschinenlesbare Fassung
+      dessen, was `_parse_uptime` aus der ``uptime:``-Zeile liest.
+    """
+    section, lineno = extract_section_ln(
+        sf.text, "##### BEGIN SECTION system_kpi\n", "##### END SECTION system_kpi")
+    if not section:
+        return {}
+    try:
+        kpi = json.loads(section).get("kpi", {})
+    except (ValueError, AttributeError):
+        return {}
+    if not isinstance(kpi, dict):
+        return {}
+    befund = {
+        "starts": kpi.get("starts"),
+        "lifetime": kpi.get("lifetime") or "",
+        "uptime_s": kpi.get("uptime"),
+        "file": sf.name,
+        "line": lineno,
+    }
+    return befund if any(befund[k] is not None and befund[k] != ""
+                         for k in ("starts", "lifetime", "uptime_s")) else {}
 
 
 def _parse_uptime(sf, extracted_at: str) -> dict:

@@ -446,6 +446,86 @@ def test_unbekannte_uptime_form_behauptet_kein_boot_datum():
     assert "nicht ableitbar" in _uptime_block(up)
 
 
+# ─────────────────── system_kpi (ab FRITZ!OS 08.25) ──────────────────────────
+
+#: Wörtlich gekürzt aus einem 7690-Abzug (285.08.25) — Feldreihenfolge wie dort.
+KPI_SEKTION = (
+    "##### BEGIN SECTION system_kpi\n"
+    '{ "sv":"gen/v1", "kpi": { "socType": null, "memoryUsage": 44, "starts": 32,'
+    ' "lifetime": "17 hours 24 days 6 months 1 years", "uptime": 1347,'
+    ' "power": 8.76 } }\n'
+    "##### END SECTION system_kpi\n"
+)
+
+
+def _kpi(text: str) -> dict:
+    from fritzreport.bundle import SupportFile
+    from fritzreport.supportdata import parse_system_kpi
+    return parse_system_kpi(SupportFile(variant="standard", path=None,
+                                        name="supportdata_standard.txt", text=text))
+
+
+def test_system_kpi_wird_gelesen():
+    """Drei Felder sind forensisch verwertbar: Startzähler, Gesamtbetriebsdauer und
+    die maschinenlesbare Uptime in Sekunden."""
+    kpi = _kpi("uptime: 15:20:12 up 21 min\n" + KPI_SEKTION)
+    assert kpi["starts"] == 32
+    assert kpi["lifetime"] == "17 hours 24 days 6 months 1 years"
+    assert kpi["uptime_s"] == 1347
+    assert kpi["line"] == 3, "Fundstelle zeigt nicht auf den JSON-Blob"
+
+
+def test_ohne_system_kpi_bleibt_der_bericht_still(synth_bundle):
+    """Vor FRITZ!OS 08.25 gibt es die Sektion nicht — und auch danach nicht überall
+    (die 7590 des Korpus führt sie unter 08.25 nicht). Ihr Fehlen ist kein Fehler und
+    darf keine leeren Zeilen erzeugen."""
+    b = load_bundle(synth_bundle)
+    m = build_model(b)
+    assert analyze(b, m.real_aps, m.master.get("name", ""))["system_kpi"] == {}
+    assert "system_kpi" not in _render(b)
+
+
+def test_wlan_kpi_sektion_ist_nicht_system_kpi():
+    """Die 7590 führt unter 08.25 eine Sektion ``KPI Current KPI data`` — WLAN-Zahlen
+    ohne ``starts``/``lifetime``. Ein unvollständig gematchter Sektionsname zöge daraus
+    Kennzahlen, die dort nicht stehen."""
+    assert _kpi("##### BEGIN SECTION KPI Current KPI data\n"
+                'KPI version 10:\n{ "sv": "gen/v1", "cfg": {} }\n'
+                "##### END SECTION KPI\n") == {}
+
+
+def test_unlesbares_system_kpi_wird_verworfen():
+    """Ein Blob, der kein JSON ist, darf den Report nicht abbrechen — und erst recht
+    keine halb geratenen Zahlen liefern."""
+    assert _kpi("##### BEGIN SECTION system_kpi\nkein json\n"
+                "##### END SECTION system_kpi\n") == {}
+
+
+def test_system_kpi_erscheint_im_bericht(synth_bundle):
+    """Die ganze Strecke: Sektion in der Datei → analyze → gerenderte Zeilen."""
+    from fritzformat import sha256_bytes, write_sidecar
+    p = next(synth_bundle.glob("supportdata_standard_*.txt"))
+    body = p.read_bytes() + KPI_SEKTION.encode()
+    p.write_bytes(body)
+    write_sidecar(p, sha256_bytes(body))
+
+    html = _render(load_bundle(synth_bundle))
+    zeile = _zeile(html, "Startvorgänge (system_kpi)")
+    assert "32" in zeile
+    assert "17 hours 24 days 6 months 1 years" in html
+    assert "1347" in html
+
+
+def test_startzaehler_nennt_seinen_offenen_bezugspunkt():
+    """Was `starts` zählt — seit Werksauslieferung, Reset oder Firmware-Update — ist
+    aus den Daten nicht ableitbar. Eine nackte „32" liest sich wie eine Aussage über
+    die Lebensdauer des Geräts; die Einschränkung gehört daneben."""
+    from fritzreport.render import _system_kpi_block
+    block = _system_kpi_block({"starts": 32, "lifetime": "1 years", "uptime_s": 1347,
+                               "file": "f.txt", "line": 3})
+    assert "nicht belegt" in block
+
+
 # ───────────────────────── Versatz der Box-Uhr ───────────────────────────────
 
 def _zeilen(html: str, schluessel: str) -> list[str]:

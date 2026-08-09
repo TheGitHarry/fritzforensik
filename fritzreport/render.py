@@ -451,6 +451,38 @@ def _uptime_block(up: dict) -> str:
     )
 
 
+def _system_kpi_block(kpi: dict) -> str:
+    """Kennzahlen aus ``system_kpi`` — leer, wo die Sektion fehlt (vor FRITZ!OS 08.25).
+
+    Alles **roh**, kein Badge: Die drei Werte stehen wörtlich in der Datei, deren Hash
+    in der Chain of Custody steht. Gerechnet wird nichts — insbesondere kein
+    Inbetriebnahme-Datum aus ``lifetime``.
+
+    Der Startzähler trägt seine Einschränkung mit: Woher er zählt, ist nicht belegt.
+    Eine nackte „32" läse sich sonst wie eine Aussage über die Lebensdauer des Geräts.
+    """
+    if not kpi:
+        return ""
+    zeilen = []
+    if kpi.get("starts") is not None:
+        zeilen.append(
+            "<tr><th>Startvorgänge (system_kpi)</th><td class='mono'>"
+            f"{esc(str(kpi['starts']))} — Bezugspunkt nicht belegt "
+            "(Werksauslieferung, Reset oder Firmware-Update)</td></tr>")
+    if kpi.get("lifetime"):
+        zeilen.append(
+            "<tr><th>Gesamtbetriebsdauer (system_kpi), roh</th>"
+            f"<td class='mono'>{esc(kpi['lifetime'])}</td></tr>")
+    if kpi.get("uptime_s") is not None:
+        zeilen.append(
+            "<tr><th>Uptime (system_kpi), roh</th>"
+            f"<td class='mono'>{esc(str(kpi['uptime_s']))} s</td></tr>")
+    return ("<h3>Kennzahlen der Box (system_kpi, ab FRITZ!OS 08.25)</h3>"
+            "<table class='kv'>" + "".join(zeilen)
+            + f"<tr><th>Fundstelle</th><td class='mono'>{esc(kpi.get('file',''))}"
+              f" — Zeile {kpi.get('line')}</td></tr></table>")
+
+
 def _clock_rows(bundle) -> list[tuple]:
     """Metadaten-Zeilen zum Versatz der Box-Uhr — je Quelle eine.
 
@@ -768,6 +800,7 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
                   for k, v in sorted(m.cat_counts.items(), key=lambda x: -x[1]))
         + "</tbody></table>"
         + _uptime_block(up)
+        + _system_kpi_block(support.get("system_kpi", {}))
     )
 
     def coc_badge(st):
