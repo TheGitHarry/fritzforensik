@@ -90,9 +90,23 @@ const SCHEMA = {
   },
 }
 
+// Denkaufwand je Rolle. Nicht überall gleich: Wer Bruchszenarien durchspielen muss,
+// braucht ihn; wer Formulierungen sucht, nicht.
+//
+//   xhigh — test-kritik, code-review, skeptiker: "Was müsste brechen, damit dieser Test
+//           fällt?" lässt sich nicht ablesen, das muss durchgespielt werden.
+//   high  — doku-eigentum, kurator: Widersprüche über sechs Dateien erkennen, danach
+//           priorisieren und deckeln.
+//   medium— inline-doku: Docstring gegen Code halten, lokal und überschaubar.
+//   low   — prosa-status: sucht Formulierungen wie "alles grün". Mehr Aufwand ändert
+//           daran nichts.
+//
+// `max` bleibt bewusst ungenutzt: der Zugewinn gegenüber xhigh ist ungewiss, die Kosten
+// laufen weiter. Falls ein xhigh-Lauf nachweislich etwas übersieht, ist das der Anlass.
 const PRUEFER = [
   {
     key: 'code-review',
+    effort: 'xhigh',
     prompt: `Prüfe die **Korrektheit** der geänderten Logik und ob sie **einfacher** ginge.
 
 Korrektheit: Fehlerpfade, Grenzfälle, Off-by-one, falsche Annahmen über Eingaben,
@@ -107,6 +121,7 @@ Klasse: \`korrektheit\` oder \`vereinfachung\`.`,
   },
   {
     key: 'test-kritik',
+    effort: 'xhigh',
     prompt: `Prüfe die **Güte der Tests**, nicht den Code.
 
 Für jeden neuen oder geänderten Test:
@@ -126,6 +141,7 @@ nichts prüft, ist schlimmer als kein Test.`,
   },
   {
     key: 'inline-doku',
+    effort: 'medium',
     prompt: `Prüfe **Docstrings und Kommentare gegen das tatsächliche Verhalten** des Codes.
 
 - Behauptet ein Docstring etwas, das der Code nicht (mehr) tut?
@@ -140,6 +156,7 @@ widerspricht.`,
   },
   {
     key: 'doku-eigentum',
+    effort: 'high',
     prompt: `Prüfe die **Projektdoku auf Widersprüche und Dubletten**.
 
 Der Skill nennt die Eigentumstabelle: jede Aussage hat genau einen Ort. Prüfe:
@@ -158,6 +175,7 @@ Netzfreiheit, Datenschutz) sind \`hoch\`.`,
   },
   {
     key: 'prosa-status',
+    effort: 'low',
     prompt: `Ein einziger, enger Auftrag: Finde **neu eingefügten Status in Prosa**.
 
 Das Repo verbietet ihn, weil er mit dem nächsten Commit veraltet: Testanzahlen,
@@ -179,7 +197,7 @@ log(`Prüfgegenstand: ${(A.dateien || []).length} Dateien`)
 
 const roh = await parallel(PRUEFER.map(p => () =>
   agent(`${GEMEINSAM}\n\n## Dein Auftrag: ${p.key}\n\n${p.prompt}`,
-        { label: p.key, phase: 'Sammeln', schema: SCHEMA })
+        { label: p.key, phase: 'Sammeln', schema: SCHEMA, effort: p.effort })
     .then(r => (r?.befunde || []).map((b, i) => ({ ...b, id: `${p.key}-${i + 1}`, agent: p.key })))
 ))
 
@@ -248,7 +266,8 @@ Fehlalarm. Im Zweifel \`strittig\`.
 ## Zu prüfende Befunde
 
 ${JSON.stringify(g, null, 1)}`,
-      { label: `skeptiker-${i + 1}`, phase: 'Prüfen', schema: URTEIL_SCHEMA })
+      { label: `skeptiker-${i + 1}`, phase: 'Prüfen', schema: URTEIL_SCHEMA,
+        effort: 'xhigh' })
   ))).filter(Boolean).flatMap(r => r.urteile || [])
 }
 
@@ -310,7 +329,7 @@ ${JSON.stringify(bleibt, null, 1)}
 ## Widerlegt (nur zählen)
 
 ${widerlegt.length} Befunde: ${widerlegt.map(b => b.id).join(', ') || '—'}
-`, { label: 'kurator', phase: 'Bericht' })
+`, { label: 'kurator', phase: 'Bericht', effort: 'high' })
 
 return {
   bericht,
