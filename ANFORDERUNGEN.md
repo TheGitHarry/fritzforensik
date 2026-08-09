@@ -45,6 +45,7 @@ Begründung (siehe [Abweichungen](#abweichungen-vom-ursprungskatalog)).
 | A1 | Report enthält **alle Daten** eines Abzugs; keine Vorabfilterung bei der Erzeugung | erfüllt | — |
 | A2 | Rohdaten 1:1 abgebildet (jede JSON-Zeile, jeder relevante Supportdaten-Block) plus abgeleitete Aggregate | erfüllt | `test_provenance_exact` |
 | A3 | Report offline eigenständig lesbar — keine externen Ressourcen (kein CDN, kein Nachladen) | erfüllt | — |
+| A4 | Steht eine Datenart an einer **box-seitigen Speichergrenze**, weist der Report das aus — eine Liste an der Grenze sieht aus wie eine vollständige, ist aber nur ab ihrem ältesten Eintrag belastbar | erfüllt | `test_anrufliste_an_der_speichergrenze_wird_gekennzeichnet`, `test_kurze_anrufliste_ohne_hinweis` |
 
 ## B. Filter im Report
 

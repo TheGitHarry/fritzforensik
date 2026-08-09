@@ -446,6 +446,46 @@ def test_unbekannte_uptime_form_behauptet_kein_boot_datum():
     assert "nicht ableitbar" in _uptime_block(up)
 
 
+# ──────────────────── Speichergrenze der Anrufliste ──────────────────────────
+
+def _mit_anrufen(d, anzahl: int):
+    """Ersetzt die calls.json des Bundles durch `anzahl` Datensätze."""
+    import json
+    from fritzformat import build_envelope, sha256_bytes, write_sidecar
+    p = next(d.glob("*_calls.json"))
+    records = [{"Typ": "1", "Datum": f"01.01.26 {i // 60:02d}:{i % 60:02d}",
+                "Name": "", "Rufnummer": "0048123",
+                "Landes-/Ortsnetzbereich": "", "Nebenstelle": "",
+                "Eigene Rufnummer": "", "Dauer": "0:30"} for i in range(anzahl)]
+    body = json.dumps(build_envelope(tool="fritzexport", version="0.3.1",
+                                     host="https://fritz.box", type_name="calls",
+                                     records=records, extracted_at="2026-01-06T10:00:00Z"),
+                      indent=2, ensure_ascii=False).encode("utf-8")
+    p.write_bytes(body)
+    write_sidecar(p, sha256_bytes(body))
+    return d
+
+
+def test_anrufliste_an_der_speichergrenze_wird_gekennzeichnet(synth_bundle):
+    """Die Box hält nur die neuesten 400 Anrufe — nachgewiesen an lückenlosen, weit
+    über 400 hinaus laufenden `Id`-Werten (#26). Genau 400 Einträge heißen deshalb:
+    Es gab mehr, der Rest ist **auf der Box** verloren, nicht beim Export.
+
+    Eine Liste an der Grenze sieht aus wie eine vollständige. Wer aus der Abwesenheit
+    eines Anrufs schließt, muss das sehen."""
+    html = _render(load_bundle(_mit_anrufen(synth_bundle, 400)))
+    hinweis = html.split('id="s7"', 1)[1].split("</details>", 1)[0]
+    assert "Speichergrenze" in hinweis
+    assert "400" in hinweis
+
+
+def test_kurze_anrufliste_ohne_hinweis(synth_bundle):
+    """Unter der Grenze ist die Liste vollständig — ein Hinweis wäre dort eine
+    Behauptung ins Blaue."""
+    html = _render(load_bundle(_mit_anrufen(synth_bundle, 399)))
+    assert "Speichergrenze" not in html
+
+
 # ─────────────────── system_kpi (ab FRITZ!OS 08.25) ──────────────────────────
 
 #: Wörtlich gekürzt aus einem 7690-Abzug (285.08.25) — Feldreihenfolge wie dort.

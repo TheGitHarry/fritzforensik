@@ -615,6 +615,32 @@ def section(sid, num, title, key, count, body, note="", noun="Zeilen") -> str:
     )
 
 
+#: Die FRITZ!Box hält nur die neuesten 400 Anrufe und verwirft ältere.
+#: Belegt an zwei Boxen: Die ``Id``-Werte der Anrufliste laufen lückenlos, aber weit
+#: über 400 hinaus (15305–15704 bzw. 607–1006). Die Box vergibt also fortlaufend und
+#: behält 400 — es ist eine Speicher-, keine Exportgrenze. Weder der CSV-Weg noch
+#: TR-064 (`X_AVM-DE_OnTel`) liefern mehr, auch nicht mit ``max``/``days``.
+CALLLIST_LIMIT = 400
+
+
+def _calls_note(anzahl: int) -> str:
+    """Hinweis, wenn die Anrufliste an der Speichergrenze der Box steht (A4).
+
+    Unterhalb der Grenze bleibt der Hinweis weg: Dort *ist* die Liste vollständig,
+    und ein Vorbehalt wäre eine Behauptung ins Blaue.
+    """
+    if anzahl < CALLLIST_LIMIT:
+        return ""
+    return (
+        f"Diese Liste steht mit {anzahl} Einträgen an der <b>Speichergrenze der "
+        f"Box</b>: Die FRITZ!Box hält nur die neuesten {CALLLIST_LIMIT} Anrufe und "
+        "verwirft ältere. Ältere Anrufe sind damit <b>auf der Box</b> nicht mehr "
+        "vorhanden — kein Abzugswerkzeug kann sie nachholen. Belastbar ist die Liste "
+        "deshalb nur ab ihrem ältesten Eintrag; aus der Abwesenheit eines Anrufs "
+        "davor folgt nichts."
+    )
+
+
 def table(tid, headers, rows_html) -> str:
     th = "".join(f"<th>{esc(h)}</th>" for h in headers)
     return (f'<table id="{tid}"><thead><tr><th class="exp"></th>{th}<th>Belegt</th></tr></thead>'
@@ -891,7 +917,8 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
                         "(Verbindungsnachweise stehen in Sektion 6)."))
         + section("s6", "6", "Verbindungsnachweise (WLAN, aus Supportdaten)", "wlan", len(proofs), s6,
                   noun="Nachweise", note=wlan_note)
-        + section("s7", "7", "Anrufhistorie", "calls", len(m.calls), s7, noun="Anrufe")
+        + section("s7", "7", "Anrufhistorie", "calls", len(m.calls), s7,
+                  note=_calls_note(len(m.calls)), noun="Anrufe")
         + section("s8", "8", "Telefonbuch", "pb", len(m.phonebook), s8, noun="Einträge")
         + section("s9", "9", "Ereignisse", "events", len(m.events), s9, noun="Ereignisse")
         + section("s10", "10", "Vollständige Timeline (quellenübergreifend)", "timeline", len(timeline), s10,
