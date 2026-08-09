@@ -11,7 +11,19 @@ Ziel: FRITZ!Box Supportdaten forensisch auswerten → gerätebezogene Verbindung
 ## Kontext
 
 **Zielformat:** AVM FRITZ!Box Supportdatei (Textdatei)  
-**Validiert für:** FRITZ!OS 8.20, Hardware-Plattform 259 (FRITZ!Box 7590)  
+**Validiert für:** FRITZ!OS 8.20 auf der Plattform, die das Papier **259** nennt
+(Dateiname seiner Testdaten: `support_Fritz.Box_7590_259.08.20.zip`)  
+
+> **Anmerkung dieser Zusammenfassung** — nicht Teil des Papiers: Frühere Fassungen gaben
+> das als „Hardware-Plattform 259 (FRITZ!Box 7590)" wieder. Beides ist so nicht haltbar.
+> `259` steht im Dateinamen in der Position `<Kennung>.<FRITZ!OS>` des Versionsstrings,
+> und diese Kennung ist **nicht** das Feld `HWRevision`: Sie fällt nur auf manchen
+> Modellen mit ihm zusammen (7530 AX 256, 7690 285), auf anderen nicht (7590: Kennung 154
+> bei `HWRevision` 226; 7490: 113 bei 185) — belegt in
+> `test_kennung_im_versionsstring_ist_nicht_die_hwrevision`. Welches Gerät hinter 259
+> steht, ist von hier aus **nicht** bestimmbar: Keine geprüfte Box trägt die Zahl in einer
+> der beiden Größen, auch keine 7590. Die Gleichsetzung mit „unserer" 7590 war deshalb
+> unbelegt; sie bleibt offen, statt geraten zu werden.
 **Portabilität:** Die Übertragbarkeit auf andere FRITZ!OS-Versionen oder Hardware-Plattformen
 wird **nicht vorausgesetzt** und ist im Einzelfall gesondert zu prüfen. Insbesondere die
 Plattform 285 (FRITZ!Box 7690) ist **nicht** validiert, auch wenn dafür umfangreiche
@@ -214,4 +226,4 @@ Nachweise ausschließlich diese Methodik.
 | Status ≠ 1 → Zeitpunkt nicht bestimmbar (Verbindungsabbruch) | STATION_MODULE |
 | Events Events: nur Erstanmeldungen | Events Events |
 | Kein Personenbezug aus MAC allein ableitbar | alle |
-| Methodik validiert nur für FRITZ!OS 8.20 / HW 259 (FRITZ!Box 7590); Übertragbarkeit auf andere Versionen/Plattformen im Einzelfall zu prüfen | alle |
+| Methodik validiert nur für FRITZ!OS 8.20 auf der Plattform 259 des Papiers — welches Gerät das ist, ist hier nicht bestimmbar (siehe Anmerkung unter *Kontext*); Übertragbarkeit auf andere Versionen/Plattformen im Einzelfall zu prüfen | alle |

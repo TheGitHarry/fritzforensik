@@ -69,10 +69,10 @@ abgedeckt. Sie zu melden ist doppelte Arbeit und verwässert den Bericht:
 | GitHub-Issues | Backlog — **ausschließlich** |
 
 **methode.md ist der empfindlichste Fall.** Sie fasst ein externes, validiertes
-Methodenpapier zusammen („Bei Abweichungen gilt das Methodenpapier"); validiert ist dort
-FRITZ!OS 8.20 auf HW 259. Eigene Messreihen dort einzutragen liehe ihnen fälschlich diese
-Autorität — sie gehören in Modul-Docstrings und benannte Tests. Ein Befund dieser Art
-wiegt schwer.
+Methodenpapier zusammen („Bei Abweichungen gilt das Methodenpapier"); für welche
+Plattform es validiert ist, steht dort — und **nur** dort, nicht hier nacherzählt.
+Eigene Messreihen dort einzutragen liehe ihnen fälschlich diese Autorität — sie gehören
+in Modul-Docstrings und benannte Tests. Ein Befund dieser Art wiegt schwer.
 
 ## Fallen des Repos
 

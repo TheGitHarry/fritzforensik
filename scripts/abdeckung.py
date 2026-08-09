@@ -50,8 +50,15 @@ def firmware_kurz(roh: str) -> str:
     des Dual-Boot-Systems auf. Die sind hier nicht nur überflüssig breit,
     sondern schädlich: Zwei Boxen mit demselben FRITZ!OS-Stand hätten je nach
     Slot-Belegung verschiedene Werte und würden in der Matrix als
-    unterschiedliche Zeilen erscheinen. Vor dem Komma steht
-    ``<HWRevision>.<FRITZ!OS>``; die Revision hat eine eigene Spalte.
+    unterschiedliche Zeilen erscheinen.
+
+    Vor dem Komma steht ``<Kennung>.<FRITZ!OS>``. Die Kennung ist **nicht** die
+    ``HWRevision``, auch wenn sie auf manchen Modellen mit ihr zusammenfällt
+    (7530 AX 256, 7690 285): Die 7590 führt hier 154 bei ``HWRevision`` 226, die
+    7490 113 bei 185. Sie wird deshalb abgeschnitten und nirgends ausgewertet —
+    das Modell kommt allein aus ``HWRevision`` (`HWREV_MODELL`). Belegt in
+    ``test_kennung_im_versionsstring_ist_nicht_die_hwrevision``; dieselbe
+    Verwechslung stand in `methode.md` (Issue #17).
     """
     kern = roh.split(",", 1)[0].strip()
     teile = kern.split(".")

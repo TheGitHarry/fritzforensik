@@ -300,6 +300,31 @@ def test_firmware_ohne_slot_angaben() -> None:
     assert abdeckung.firmware_kurz("") == ""
 
 
+def test_kennung_im_versionsstring_ist_nicht_die_hwrevision(tmp_path: Path) -> None:
+    """Die Zahl vor dem FRITZ!OS-Stand ist **nicht** die ``HWRevision``.
+
+    Auf manchen Modellen fallen beide zusammen (7530 AX 256, 7690 285), auf anderen
+    nicht: Die 7590 des Bestands führt ``firmware_info 154.08.02`` bei ``HWRevision
+    226``, die 7490 ``113.07.62`` bei ``185`` — und die 154 bleibt über zwei
+    FRITZ!OS-Stände (08.02, 08.25) dieselbe. Wer die beiden Größen gleichsetzt, ordnet
+    Boxen dem falschen Modell zu; genau diese Verwechslung stand in `methode.md`
+    (#17) und im Docstring von `firmware_kurz`.
+    """
+    b = tmp_path / "export_20260101T000000Z_7590"
+    b.mkdir()
+    (b / "supportdata_standard_20260101T000000Z.txt").write_text(
+        "HWRevision\t226\n"
+        "SerialNumber\tX1\n"
+        "firmware_info\t154.08.02\n",
+        encoding="utf-8",
+    )
+    befund = abdeckung.lies_bundle(b)
+
+    assert befund["hwrev"] == "226"
+    assert befund["firmware"] == "08.02", "Kennung nicht als solche abgetrennt"
+    assert befund["modell"] == "FRITZ!Box 7590", "Modell folgt der HWRevision, nicht 154"
+
+
 @pytest.mark.skipif(not ABDECKUNG.exists(), reason="ABDECKUNG.md nicht vorhanden")
 def test_eingecheckte_datei_ist_sauber() -> None:
     """Die Datei im Repo selbst — sie ist es, die veröffentlicht wird."""
