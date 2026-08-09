@@ -194,9 +194,13 @@ def test_hinweis_auf_ki_auswertung_ist_vorhanden() -> None:
     assert "enthalten keine KI" in text
     assert "KI-gestützt" in text
     assert "einverstanden" in text
-    # Der datenarme Weg muss angeboten werden, sonst ist die Einwilligung
-    # eine Scheinwahl.
-    assert "ohne personenbezogene Daten" in text
+    # Alternativen müssen angeboten werden, sonst ist die Einwilligung eine
+    # Scheinwahl: der Testlabor-Weg (keine Dritten) und der ganz datenfreie.
+    assert "Testlabor" in text
+    assert "Ganz ohne Daten" in text, "der datenfreie Weg fehlt"
+    # Ein dünn befüllter Testaufbau genügt — sonst hält sich jemand für
+    # nutzlos, dessen Beitrag die Matrix sehr wohl weiterbringt.
+    assert "dünn befüllter Testaufbau" in text
     # Dritte, die nicht selbst einwilligen können.
     assert "nicht selbst" in text and "einwilligen" in text
 

@@ -113,13 +113,28 @@ Zwei Dinge, die auseinanderzuhalten sind:
   einem KI-Assistenten verarbeitet — und damit an dessen Anbieter übermittelt.
 
 **Wer einen Abzug bereitstellt, muss damit einverstanden sein.** Sind Sie es
-nicht, stellen Sie bitte keinen bereit — es gibt einen Weg ohne Daten, siehe
-unten.
+nicht, stellen Sie bitte keinen bereit — es gibt zwei Wege ohne fremde Daten,
+siehe unten.
 
-### Der einfachere Weg: nur die Abdeckungsinformation
+### Am wertvollsten: Abzüge aus einem Testlabor
 
-Für diese Matrix genügt in aller Regel schon, **was ohne personenbezogene Daten**
-auskommt:
+Wer in einer Dienststelle oder einem Labor mit **Testboxen** arbeitet, kann das
+Problem an der Wurzel umgehen: Dort gibt es keine unbeteiligten Dritten, deren
+Daten mitwandern. Ein solcher Abzug ist deshalb die mit Abstand unbedenklichste
+Art beizutragen — und für dieses Projekt zugleich die nützlichste.
+
+**Auch ein dünn befüllter Testaufbau hilft.** Es kommt nicht auf die Menge an,
+sondern darauf, dass eine Datenart **überhaupt** Datensätze liefert. Ein paar
+Testanrufe, ein Telefonbucheintrag, ein verbundenes Endgerät genügen bereits, um
+ein ○ in dieser Matrix zu einem ✓ zu machen — und damit zu belegen, dass der
+Codepfad auf dieser Modell-/Firmware-Kombination funktioniert. Gerade bei
+`portforward`, das bisher in keinem einzigen Abzug gefüllt war, reicht eine
+einzige eingerichtete Portfreigabe.
+
+### Ganz ohne Daten: nur die Abdeckungsinformation
+
+Kommt auch das nicht in Frage, genügt für diese Matrix oft schon, **was ohne
+personenbezogene Daten** auskommt:
 
 - Modell, HWRevision und FRITZ!OS-Stand (aus der Box-Oberfläche ablesbar)
 - welche Datenarten Daten enthielten — also die Zeile, die in dieser Tabelle

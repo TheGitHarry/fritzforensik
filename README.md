@@ -1,4 +1,4 @@
-# fritzforensik
+# fritzforensik <sub><sup>(an AI vibecoding project)</sup></sub>
 
 Zwei zusammengehörige Werkzeuge für die forensische Auswertung einer AVM FRITZ!Box:
 
@@ -18,6 +18,16 @@ Zwei zusammengehörige Werkzeuge für die forensische Auswertung einer AVM FRITZ
 fritzreport greift **nie** auf die Box zu — es wertet nur ein vorhandenes Bundle aus.
 Beide Werkzeuge sind eigenständige Single-File-Binaries für den USB-Stick-Feldeinsatz
 ohne installiertes Python.
+
+> **Die Werkzeuge selbst enthalten keine KI.** fritzexport spricht ausschließlich mit
+> der Box im eigenen Netz, fritzreport liest nur das Bundle auf der Platte — kein
+> Modell, kein Dienstaufruf, nichts verlässt das Gerät.
+>
+> **KI-gestützt ist die Entwicklung dieses Projekts.** Das betrifft Sie nur, wenn Sie
+> uns ein Bundle *bereitstellen*: Dessen Inhalte werden dann von einem KI-Assistenten
+> verarbeitet und damit an dessen Anbieter übermittelt. Was das bedeutet und welchen
+> datenarmen Weg es stattdessen gibt, steht in
+> [ABDECKUNG.md](ABDECKUNG.md#bevor-sie-einen-abzug-bereitstellen).
 
 Das gemeinsame Bundle-Format liegt in **`fritzformat/`** — Dateinamen, Hüllformat und
 SHA256-Sidecars stehen dort *einmal* und werden von beiden Seiten benutzt.

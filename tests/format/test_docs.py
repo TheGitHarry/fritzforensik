@@ -130,3 +130,23 @@ def test_anforderungs_ids_sind_eindeutig() -> None:
     ids = [r[0] for r in _REQ_ROW.findall(ANFORDERUNGEN.read_text(encoding="utf-8"))]
     doppelt = {i for i in ids if ids.count(i) > 1}
     assert not doppelt, f"ANFORDERUNGEN.md vergibt IDs doppelt: {sorted(doppelt)}"
+
+
+def test_readme_trennt_werkzeug_und_entwicklung_bei_ki() -> None:
+    """Die README muss die KI-Frage sofort und unmissverständlich klären.
+
+    Sie trägt den Zusatz „an AI vibecoding project" im Titel. Ohne die
+    Klarstellung daneben liest sich das so, als steckte KI in den Werkzeugen —
+    also als sende ein Forensikwerkzeug Boxdaten an einen Dienst. Genau das
+    ist nicht der Fall, und bei einem Werkzeug, dessen Ergebnisse vor Gericht
+    landen, ist dieses Missverständnis teuer.
+    """
+    text = README.read_text(encoding="utf-8")
+    assert "Die Werkzeuge selbst enthalten keine KI" in text
+    assert "KI-gestützt ist die Entwicklung" in text
+    # Der Verweis auf die ausführliche Fassung muss auf einen echten Anker zeigen.
+    assert "ABDECKUNG.md#bevor-sie-einen-abzug-bereitstellen" in text
+    ueberschriften = (REPO_ROOT / "ABDECKUNG.md").read_text(encoding="utf-8")
+    assert "## Bevor Sie einen Abzug bereitstellen" in ueberschriften, (
+        "Anker in der README zeigt ins Leere — Überschrift in ABDECKUNG.md geändert?"
+    )
