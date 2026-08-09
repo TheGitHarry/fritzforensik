@@ -213,8 +213,11 @@ Bestätigung, öffnet schon dieser erste Aufruf das Zeitfenster; dann erscheint 
 **nur diese Variante** übersprungen.
 
 Pro Variante wird die Rohdatei als `supportdata_<typ>_<ts>.txt` + `.sha256`-Sidecar abgelegt.
-`extra_meta` listet `supportdata_fetched` und `supportdata_missing`, sodass im Bericht
-sichtbar bleibt, welche Variante fehlt.
+`<ts>` datiert den **Request dieser Variante** — die drei Dateien tragen also verschiedene
+Stempel, bei `enhanced` den des Abrufs nach dem Tastendruck. Der Stempel ist die einzige
+Zeitangabe, die eine Rohdatei von sich aus trägt; ein gemeinsamer datierte zwei von drei
+Dateien falsch. `extra_meta` listet `supportdata_fetched` und `supportdata_missing`,
+sodass im Bericht sichtbar bleibt, welche Variante fehlt.
 
 ## Exit-Codes
 

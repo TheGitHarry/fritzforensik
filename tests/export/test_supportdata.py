@@ -19,6 +19,10 @@ def _client(content: bytes = b"##### TITLE Datum Sat Aug  8 00:01:38 CEST 2026\n
     return client
 
 
+#: Dateinamen-Stempel, den `_fetch_one` neben den Rohdaten zurückgibt.
+TS = "20260722T141807Z"
+
+
 def _uhr_marker(caplog) -> list[str]:
     """Nur die Uhrzeit-Markerzeilen, in Reihenfolge — ohne Log-Kopf."""
     return [r.getMessage() for r in caplog.records
@@ -29,25 +33,26 @@ def test_enhanced_ohne_tastendruck(monkeypatch):
     """Box mit deaktivierter erweiterter Sicherheit: Direktversuch liefert
     Daten, es wird nicht auf einen Tastendruck gewartet."""
     calls = []
-    monkeypatch.setattr(sd, "_fetch_one", lambda c, f, s: calls.append(f) or b"DATA")
+    monkeypatch.setattr(sd, "_fetch_one",
+                        lambda c, f, s: calls.append(f) or (b"DATA", TS))
 
     def fail_wait(_timeout):
         raise AssertionError("Es darf nicht auf Bestätigung gewartet werden.")
 
     monkeypatch.setattr(sd, "_wait_for_enter", fail_wait)
 
-    assert sd._fetch_enhanced(_client()) == b"DATA"
+    assert sd._fetch_enhanced(_client()) == (b"DATA", TS)
     assert calls == ["SupportDataEnhanced"]
 
 
 def test_enhanced_mit_tastendruck(monkeypatch):
     """Box verlangt Bestätigung: erster Abruf None → nach bestätigtem
     Tastendruck zweiter Abruf mit Daten."""
-    responses = iter([None, b"DATA"])
+    responses = iter([None, (b"DATA", TS)])
     monkeypatch.setattr(sd, "_fetch_one", lambda c, f, s: next(responses))
     monkeypatch.setattr(sd, "_wait_for_enter", lambda _timeout: True)
 
-    assert sd._fetch_enhanced(_client()) == b"DATA"
+    assert sd._fetch_enhanced(_client()) == (b"DATA", TS)
 
 
 def test_enhanced_timeout(monkeypatch):
@@ -62,7 +67,8 @@ def test_enhanced_timeout(monkeypatch):
 def test_extract_ohne_tastendruck_liefert_alle_drei(monkeypatch, tmp_path):
     """Vollständiger Extract-Lauf: alle drei Varianten liefern Daten,
     kein interaktives Warten."""
-    monkeypatch.setattr(sd, "_fetch_one", lambda c, f, s: b"RAW-" + f.encode())
+    monkeypatch.setattr(sd, "_fetch_one",
+                        lambda c, f, s: (b"RAW-" + f.encode(), TS))
     monkeypatch.setattr(
         sd, "_wait_for_enter",
         lambda _t: (_ for _ in ()).throw(AssertionError("kein Warten erwartet")),
@@ -76,6 +82,59 @@ def test_extract_ohne_tastendruck_liefert_alle_drei(monkeypatch, tmp_path):
     for r in records:
         assert (tmp_path / r["filename"]).exists()
         assert (tmp_path / f"{r['filename']}.sha256").exists()
+
+
+# ──────────────────────── Datierung der Rohdateien ───────────────────────────
+
+def test_jede_variante_traegt_ihren_eigenen_zeitstempel(monkeypatch, tmp_path) -> None:
+    """Der Zeitstempel im Dateinamen ist die einzige Zeitangabe, die eine Roh-
+    Supportdatei von sich aus trägt — die Hülle mit ``extracted_at`` gibt es nur für
+    die JSON-Datenarten. Ein gemeinsamer Stempel für alle drei Varianten datierte
+    zwei von drei Dateien auf den Request der ersten.
+    """
+    zeiten = iter([
+        "2026-07-22T14:18:07.000Z", "2026-07-22T14:18:52.000Z",   # standard
+        "2026-07-22T14:19:00.000Z", "2026-07-22T14:19:30.000Z",   # mesh
+        "2026-07-22T14:23:12.000Z", "2026-07-22T14:23:41.000Z",   # enhanced
+    ])
+    monkeypatch.setattr(sd, "uhr_jetzt_iso", lambda: next(zeiten))
+
+    records, _ = sd.extract(_client(b"DATA"), output_dir=tmp_path)
+
+    assert [r["filename"] for r in records] == [
+        "supportdata_standard_20260722T141807Z.txt",
+        "supportdata_mesh_20260722T141900Z.txt",
+        "supportdata_enhanced_20260722T142312Z.txt",
+    ]
+    for r in records:
+        assert (tmp_path / r["filename"]).exists()
+
+
+def test_enhanced_wird_auf_den_zweiten_abruf_datiert(monkeypatch) -> None:
+    """Der Tastendruck-Pfad ruft zweimal ab; abgelegt wird die Datei des **zweiten**
+    Abrufs. Der Dateiname muss ihn datieren, nicht den verworfenen Probeversuch —
+    dazwischen liegt die Wartezeit auf den Knopf (7490 des Korpus: 595 s).
+
+    Es ist derselbe Fehler wie beim ersten Marker-Paar in `parse_uhr_spans`: Wer den
+    verworfenen Versuch datiert, klebt der abgelegten Datei eine fremde Zeit an.
+    """
+    zeiten = iter([
+        "2026-07-22T14:18:07.000Z", "2026-07-22T14:18:08.000Z",   # Probe → HTML
+        "2026-07-22T14:23:12.000Z", "2026-07-22T14:23:41.000Z",   # nach Tastendruck
+    ])
+    monkeypatch.setattr(sd, "uhr_jetzt_iso", lambda: next(zeiten))
+    monkeypatch.setattr(sd, "_wait_for_enter", lambda _timeout: True)
+    antworten = iter([b"", b"DATA"])
+    client = _client()
+
+    def post(*_a, **_kw):
+        antwort = MagicMock()
+        antwort.content = next(antworten)
+        return antwort
+
+    client.session.post = post
+
+    assert sd._fetch_enhanced(client) == (b"DATA", "20260722T142312Z")
 
 
 # ─────────────────────────── Uhrzeit-Klammern ────────────────────────────────
@@ -164,7 +223,8 @@ def test_enhanced_klammert_beide_versuche_getrennt(caplog, monkeypatch) -> None:
     client.session.post = post
     monkeypatch.setattr(sd, "_wait_for_enter", lambda _timeout: True)
 
-    assert sd._fetch_enhanced(client) == b"DATA"
+    inhalt, _ts = sd._fetch_enhanced(client)
+    assert inhalt == b"DATA"
 
     marker = _uhr_marker(caplog)
     assert [m.split()[1] for m in marker] == ["ANFRAGE", "ANTWORT", "ANFRAGE", "ANTWORT"]

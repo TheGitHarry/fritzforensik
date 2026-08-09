@@ -33,11 +33,17 @@ def compact_from_iso(value: str) -> str:
     (``extracted_at``), braucht ihn für den Dateinamen aber kompakt — sonst bilden
     Abzug und Report nicht denselben Namensstamm. Unbrauchbare Werte ergeben einen
     leeren String; der Aufrufer entscheidet dann über den Rückfall.
+
+    Die **Millisekundenform** von `uhr_jetzt_iso` gehört ausdrücklich dazu: Der
+    Supportdaten-Extractor datiert seine Rohdateien aus derselben Uhrablesung, mit der
+    er die Marke ins Sitzungslog schreibt. Zwei Ablesungen könnten über eine
+    Sekundengrenze fallen und denselben Abruf verschieden datieren.
     """
     raw = (value or "").strip()
     if not raw:
         return ""
-    for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S"):
+    for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S",
+                "%Y-%m-%dT%H:%M:%S.%fZ"):
         try:
             return _dt.datetime.strptime(raw, fmt).strftime("%Y%m%dT%H%M%SZ")
         except ValueError:

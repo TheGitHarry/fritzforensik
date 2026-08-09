@@ -364,6 +364,26 @@ def test_kein_irrefuehrender_report_hash_im_dokument(synth_bundle):
     assert "Gesichert" in banner, "Ausdruck ohne Zuordnung zum Sicherungszeitraum"
 
 
+def test_varianten_mit_eigenen_zeitstempeln_bleiben_ein_bundle(synth_bundle):
+    """Seit jede Roh-Supportdatei ihren eigenen Abruf datiert, teilen die Varianten
+    eines Bundles **keinen** gemeinsamen Zeitstempel mehr.
+
+    Bestätigt, was `support_glob` zusagt (Wildcard auf dem Stempel): Der Report ordnet
+    beide Dateien demselben Bundle zu und verifiziert sie einzeln. Der Test hätte auch
+    vor der Umstellung gehalten — er hält die Annahme fest, statt sie zu glauben.
+    """
+    from fritzformat import sha256_bytes, support_filename, write_sidecar
+    body = b"##### BEGIN SECTION mesh\nx\n##### END SECTION mesh\n"
+    mesh = synth_bundle / support_filename("mesh", "20260106T101530Z")  # 15 min später
+    mesh.write_bytes(body)
+    write_sidecar(mesh, sha256_bytes(body))
+
+    b = load_bundle(synth_bundle)
+    assert b.support["standard"].present and b.support["mesh"].present
+    assert b.support["mesh"].name == mesh.name
+    assert {e.status for e in b.coc} == {"ok"}
+
+
 # ───────────────────────── Versatz der Box-Uhr ───────────────────────────────
 
 def _zeilen(html: str, schluessel: str) -> list[str]:

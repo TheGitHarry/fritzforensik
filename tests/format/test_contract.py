@@ -316,6 +316,15 @@ def test_uhr_marker_rundlauf() -> None:
         "tr064:time": ("2026-08-09T15:55:36Z", "2026-08-09T15:55:36Z")}
 
 
+def test_compact_from_iso_liest_die_millisekundenform() -> None:
+    """`uhr_jetzt_iso` liefert Millisekunden. Dieselbe Uhrablesung datiert auch den
+    Dateinamen der Roh-Supportdaten — beherrschte `compact_from_iso` diese Form nicht,
+    bräuchte der Aufrufer eine zweite Ablesung, und Dateiname und Sitzungslog könnten
+    verschiedene Sekunden nennen."""
+    assert compact_from_iso("2026-07-22T14:23:12.412Z") == "20260722T142312Z"
+    assert compact_from_iso(uhr_jetzt_iso()) != ""
+
+
 def test_uhr_jetzt_iso_ist_millisekundengenau() -> None:
     """Die Klammer wird aus zwei dieser Werte gebildet. Bei Sekundenauflösung
     schlüge die Quantisierung doppelt durch und machte einen 50-ms-Abruf zu einer

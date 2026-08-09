@@ -13,13 +13,13 @@ Das JSON-Record enthält nur Metadaten (Typ, Pfad, Größe, Hash).
 """
 from __future__ import annotations
 
-import datetime as _dt
 import logging
 import sys
 import time
 from pathlib import Path
 
 from fritzformat import (
+    compact_from_iso,
     sha256_bytes,
     support_filename,
     uhr_anfrage_line,
@@ -40,10 +40,6 @@ _VARIANTS: list[tuple[str, str]] = [
     ("MeshSupportData",     "mesh"),
     ("SupportDataEnhanced", "enhanced"),
 ]
-
-
-def _utc_now_compact() -> str:
-    return _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
 def _wait_for_enter(timeout_seconds: int) -> bool:
@@ -118,16 +114,26 @@ def _is_html(content: bytes) -> bool:
     return snippet.startswith(b"<!DOCTYPE") or snippet.startswith(b"<html")
 
 
-def _fetch_one(client: FritzClient, field_name: str, short_name: str) -> bytes | None:
+def _fetch_one(
+    client: FritzClient, field_name: str, short_name: str
+) -> tuple[bytes, str] | None:
     """Lädt eine Supportdaten-Variante; gibt None bei HTML-Fehlerseite zurück.
 
-    Klammert den Abruf in zwei Zeitmarken ein. Die Box schreibt ihre eigene Uhrzeit
-    in den Kopf der Datei (``##### TITLE Datum …``); zusammen mit diesen beiden
+    Zurück kommen die Rohdaten **und der Zeitstempel ihres Requests** in
+    Dateinamen-Form. Der Aufrufer benennt die Datei damit, statt selbst auf die Uhr
+    zu sehen: Der Stempel im Dateinamen ist die einzige Zeitangabe, die eine
+    Roh-Supportdatei von sich aus trägt, und er soll den Abruf datieren, aus dem sie
+    stammt — nicht den ersten der Runde und nicht einen verworfenen Probeversuch.
+
+    Klammert den Abruf außerdem in zwei Zeitmarken ein. Die Box schreibt ihre eigene
+    Uhrzeit in den Kopf der Datei (``##### TITLE Datum …``); zusammen mit diesen beiden
     Referenzzeiten kann `fritzreport` daraus den Versatz der Box-Uhr bestimmen.
     Die Marker stehen **eng** um den Aufruf, weil die Klammer sonst um die Laufzeit
-    des übrigen Abzugs zu weit würde.
+    des übrigen Abzugs zu weit würde. Dateiname und Marke entstehen aus **einer**
+    Ablesung — zwei könnten über eine Sekundengrenze fallen.
     """
-    log.info(uhr_anfrage_line(f"supportdata:{short_name}", uhr_jetzt_iso()))
+    angefragt = uhr_jetzt_iso()
+    log.info(uhr_anfrage_line(f"supportdata:{short_name}", angefragt))
     try:
         resp = client.session.post(
             client.base_url + FIRMWARECFG_PATH,
@@ -146,10 +152,10 @@ def _fetch_one(client: FritzClient, field_name: str, short_name: str) -> bytes |
     resp.raise_for_status()
     if _is_html(resp.content) or not resp.content.strip():
         return None
-    return resp.content
+    return resp.content, compact_from_iso(angefragt)
 
 
-def _fetch_enhanced(client: FritzClient) -> bytes | None:
+def _fetch_enhanced(client: FritzClient) -> tuple[bytes, str] | None:
     """Erweiterte Supportdaten — erst ohne, dann ggf. mit Tasten-Bestätigung.
 
     1. Direktversuch: Boxen mit deaktivierter "erweiterter Sicherheit"
@@ -159,13 +165,13 @@ def _fetch_enhanced(client: FritzClient) -> bytes | None:
        für den Tastendruck zu öffnen. Wir fragen interaktiv nach und
        rufen nach der Bestätigung erneut ab.
     """
-    content = _fetch_one(client, "SupportDataEnhanced", "enhanced")
-    if content is not None:
+    abruf = _fetch_one(client, "SupportDataEnhanced", "enhanced")
+    if abruf is not None:
         log.info(
             "Erweiterte Supportdaten ohne Tastendruck erhalten "
             "(erweiterte Sicherheit auf der Box deaktiviert)."
         )
-        return content
+        return abruf
 
     sys.stderr.write(
         "\n"
@@ -186,10 +192,10 @@ def _fetch_enhanced(client: FritzClient) -> bytes | None:
         )
         return None
 
-    content = _fetch_one(client, "SupportDataEnhanced", "enhanced")
-    if content is None:
+    abruf = _fetch_one(client, "SupportDataEnhanced", "enhanced")
+    if abruf is None:
         log.warning("Erweiterte Supportdaten auch nach Bestätigung nicht erhalten.")
-    return content
+    return abruf
 
 
 def extract(
@@ -199,21 +205,25 @@ def extract(
 
     Gibt immer ein (records, extra_meta)-Tupel zurück.
     """
-    ts = _utc_now_compact()
     records: list[dict] = []
     fetched: list[str] = []
     missing: list[str] = []
 
     for field_name, short_name in _VARIANTS:
         if field_name == "SupportDataEnhanced":
-            content = _fetch_enhanced(client)
+            abruf = _fetch_enhanced(client)
         else:
-            content = _fetch_one(client, field_name, short_name)
-        if content is None:
+            abruf = _fetch_one(client, field_name, short_name)
+        if abruf is None:
             log.info("Supportdaten '%s': nicht verfügbar oder kein Recht.", field_name)
             missing.append(short_name)
             continue
 
+        # Der Zeitstempel kommt vom Abruf, nicht von hier: Zwischen der ersten und der
+        # letzten Variante liegen Minuten, bei `enhanced` zusätzlich die Wartezeit auf
+        # den Tastendruck. Ein gemeinsamer Stempel datierte zwei von drei Dateien auf
+        # den Request der ersten.
+        content, ts = abruf
         sha256 = sha256_bytes(content)
         filename = support_filename(short_name, ts)
 
