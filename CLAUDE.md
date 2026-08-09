@@ -136,6 +136,12 @@ stillschweigend. Sie ist zur Veröffentlichung bestimmt und darf keine Seriennum
 Aktenzeichen, Hostnamen oder Datensatzzahlen enthalten; `tests/format/test_abdeckung.py`
 prüft beides mechanisch.
 
+Dass sie zum Korpus passt, bewacht `test_abdeckung_ist_aktuell` in `test_golden.py`:
+Kommt ein Abzug dazu, schlägt `pytest -m golden` fehl und nennt den Befehl zur
+Neuerzeugung. Der Wächter greift nur dort, wo der Korpus liegt — in fremden Klonen
+und auf CI-Runnern ist er deselektiert. Einen automatischen Trigger beim Build kann
+es nicht geben: Der Generator braucht die Abzüge, und die sind bewusst nicht im Repo.
+
 `tests/format/test_docs.py` erzwingt die gefährlichsten Punkte mechanisch: Die
 Grade-Tabellen in README und ANFORDERUNGEN müssen `fritzreport.model.GRADE_LABEL`
 wörtlich wiedergeben, Nachweise müssen auf existierende Tests zeigen.

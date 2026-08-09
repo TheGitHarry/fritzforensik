@@ -11,6 +11,7 @@ bevor sie im Feld auffallen.
 """
 from __future__ import annotations
 
+import importlib.util
 import os
 from pathlib import Path
 
@@ -65,3 +66,33 @@ def test_report_baut_durch(echtes_bundle: Path) -> None:
     assert model.hosts, "keine Hosts im Modell — Bundle wurde nicht ausgewertet"
     # Der Kopf muss aus dem Bundle stammen, nicht leer bleiben.
     assert b.meta.get("host"), "Hüllformat lieferte keinen Host"
+
+
+def test_abdeckung_ist_aktuell() -> None:
+    """ABDECKUNG.md muss zum Korpus passen.
+
+    Die Matrix wird erzeugt, nicht gepflegt — ohne diesen Wächter zeigt sie nach
+    einem neuen Abzug stillschweigend den alten Stand. Der Test kann nur dort
+    greifen, wo der Korpus liegt; auf Runnern und in fremden Klonen ist er
+    ohnehin deselektiert (Marker ``golden``).
+    """
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    datei = repo_root / "ABDECKUNG.md"
+    if not datei.exists():
+        pytest.skip("ABDECKUNG.md nicht vorhanden")
+
+    spec = importlib.util.spec_from_file_location(
+        "abdeckung_gen", repo_root / "scripts" / "abdeckung.py"
+    )
+    gen = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gen)
+
+    befunde = [b for b in (gen.lies_bundle(p) for p in _bundles()) if b]
+    assert befunde, f"in {BASE} liegt kein auswertbares Bundle"
+
+    erwartet = gen.erzeuge(befunde)
+    if erwartet != datei.read_text(encoding="utf-8"):
+        pytest.fail(
+            "ABDECKUNG.md passt nicht mehr zum Korpus — neu erzeugen mit:\n"
+            f"    python3 scripts/abdeckung.py {BASE} > ABDECKUNG.md"
+        )
