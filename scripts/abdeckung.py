@@ -285,10 +285,20 @@ def erzeuge(befunde: list[dict]) -> str:
 
     # Lücken: Datenarten, die NIRGENDS Daten lieferten, sind die wertvollsten
     # Hinweise für Beitragende — dort ist der Codepfad faktisch ungetestet.
+    #
+    # Getrennt davon die Datenarten, die in KEINEM Abzug auch nur enthalten
+    # sind: Das sind neu hinzugekommene, für die es schlicht noch keinen Abzug
+    # gibt. Beides zusammenzuwerfen führt in die Irre — "nie gefüllt trotz
+    # Abfrage" ist ein Befund, "noch nie erhoben" nur ein Datum.
+    def _werte(art: str) -> set[str]:
+        return {e["datenarten"].get(art, "fehlt") for e in befunde}
+
+    neu = [art for art in JSON_TYPES if _werte(art) <= {"fehlt"}]
     nie = [art for art in JSON_TYPES
-           if all(e["datenarten"].get(art) != "ja" for e in befunde)]
+           if art not in neu and all(e["datenarten"].get(art) != "ja" for e in befunde)]
     teils = [art for art in JSON_TYPES
-             if art not in nie and any(e["datenarten"].get(art) != "ja" for e in befunde)]
+             if art not in nie and art not in neu
+             and any(e["datenarten"].get(art) != "ja" for e in befunde)]
 
     a("## Wo Abzüge dem Projekt am meisten helfen")
     a("")
@@ -297,6 +307,14 @@ def erzeuge(befunde: list[dict]) -> str:
         a("faktisch ungetestet:")
         a("")
         for art in nie:
+            a(f"- `{art}`")
+        a("")
+    if neu:
+        a("**In keinem Abzug enthalten** — diese Datenarten kamen erst nach den")
+        a("bisherigen Abzügen hinzu. Kein Befund über die Boxen, sondern schlicht noch")
+        a("nicht erhoben; ein frischer Abzug einer beliebigen Box füllt sie:")
+        a("")
+        for art in neu:
             a(f"- `{art}`")
         a("")
     if teils:

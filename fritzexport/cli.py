@@ -25,6 +25,7 @@ from . import __version__, discover, output
 from .auth import AuthError, fetch_users
 from .client import FritzClient
 from .extractors import EXTRACTORS, EXTRACTORS_WITH_AUDIO, EXTRACTORS_WITH_DIR
+from .extractors.services import genutzte_services
 
 EXIT_OK = 0
 EXIT_AUTH = 1
@@ -529,6 +530,21 @@ def main(argv: list[str] | None = None) -> int:
             "Extractoren ohne TR-064 oder Port-49000-Fallback werden leere Ergebnisse liefern: "
             "wan, dhcp, portforward, storage"
         )
+    else:
+        # Was die Box anbietet, wissen wir erst jetzt — und nur jetzt. Der
+        # Hinweis nennt Dienste, die kein Extractor abholt; das ist keine
+        # Fehlfunktion, sondern die Kandidatenliste für künftige Extractoren.
+        # Vollständig steht der Abgleich in der Datenart `services`.
+        angeboten = client.tr064_services() if hasattr(client, "tr064_services") else []
+        if angeboten:
+            genutzt = genutzte_services()
+            offen = sorted(d["service_type"] for d in angeboten
+                           if d["service_type"] not in genutzt)
+            if offen:
+                log.info(
+                    "Box bietet %d TR-064-Dienste an, davon %d ohne Extractor: %s",
+                    len(angeboten), len(offen), ", ".join(offen),
+                )
 
     failures: list[str] = []
     # Sicherungsvorgang = erster bis letzter Datenabruf. Der Report weist diesen

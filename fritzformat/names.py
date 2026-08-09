@@ -18,6 +18,7 @@ TOOL_NAME = "fritzexport"
 JSON_TYPES = [
     "calls", "phonebook", "wifi", "events", "tam", "mesh", "hosts",
     "wan", "dhcp", "portforward", "storage", "supportdata", "tr069",
+    "services",
 ]
 
 #: Roh-Supportdaten-Varianten (Textdateien mit Sektionen / Logs).

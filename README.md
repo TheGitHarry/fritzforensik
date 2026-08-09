@@ -67,7 +67,13 @@ das Report-Binary schlank und netzwerkfrei bleibt.
 
 Deckt ab: Anrufliste, Telefonbuch, WLAN-Geräteliste, Ereignislog (alle Kategorien),
 Anrufbeantworter, Mesh-Topologie, Hosts, WAN-Status, DHCP-Konfiguration, Port-Forwards,
-USB-Storage, erweiterte Supportdaten und TR-069-Konfiguration.
+USB-Storage, erweiterte Supportdaten, TR-069-Konfiguration und das
+TR-064-Dienstverzeichnis der Box.
+
+Letzteres beantwortet eine Frage, die sich sonst niemand stellt: **Bietet die Box
+Datenquellen an, die kein Extractor abholt?** Die Extractor-Liste ist eine Setzung —
+ohne diesen Abgleich fiele eine neue Datenquelle einer neueren Firmware nicht auf. Die
+Information ist **nur beim Abzug** erfassbar; sie steht in keiner anderen Bundle-Datei.
 
 Authentifizierung über das offizielle AVM Web-UI-SID-Verfahren (PBKDF2-Challenge-Response,
 MD5-Fallback für ältere Firmware). Die Box wird per SSDP-Auto-Discovery im LAN gefunden
@@ -136,6 +142,7 @@ mitsamt vollständiger Logdatei, die ab der ersten Zeile geschrieben wird.
 | `--storage` | TR-064 | USB-/NAS-Storage-Konfiguration und User |
 | `--supportdata` | Web-UI | Erweiterte Supportdaten (vollständiger Text-Dump) |
 | `--tr069` | TR-064 | TR-069-Konfiguration (ACS-URL, Fernwartungsstatus) |
+| `--services` | TR-064 | Dienstverzeichnis der Box — welche TR-064-Dienste sie anbietet und welche davon ein Extractor abholt |
 
 Ohne explizite Auswahl laufen alle Extractoren (`--all`).
 

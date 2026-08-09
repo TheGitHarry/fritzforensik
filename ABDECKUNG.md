@@ -19,14 +19,14 @@ Ein ○ ist nicht zwingend ein Fehler — eine Box ohne Anrufbeantworter liefert
 `tam` zu Recht nichts. Es heißt nur: an dieser Kombination ist der Codepfad noch
 nie mit echten Daten gelaufen.
 
-| Modell | HWRev | FRITZ!OS | Geräte | Abzüge | calls | phonebook | wifi | events | tam | mesh | hosts | wan | dhcp | portforward | storage | supportdata | tr069 |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| FRITZ!Box 7490 | 185 | 07.62 | 1 | 1 | ○ | ✓ | ○ | ✓ | ○ | ✓ | ✓ | ○ | ○ | ○ | ○ | ✓ | ○ |
-| FRITZ!Box 7530 AX | 256 | 08.25 | 1 | 1 | ✓ | ✓ | ○ | ✓ | ○ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | ✓ | ✓ |
-| FRITZ!Box 7590 | 226 | 08.02 | 1 | 1 | ✓ | ✓ | ○ | ✓ | ○ | ✓ | ✓ | ○ | ○ | ○ | ○ | ✓ | ○ |
-| FRITZ!Box 7590 | 226 | 08.25 | 1 | 1 | ○ | ✓ | ○ | ✓ | ○ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | ✓ | ✓ |
-| FRITZ!Box 7690 | 285 | 08.22 | 1 | 1 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | ✓ | ✓ |
-| FRITZ!Box 7690 | 285 | 08.25 | 1 | 2 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | ✓ | ✓ |
+| Modell | HWRev | FRITZ!OS | Geräte | Abzüge | calls | phonebook | wifi | events | tam | mesh | hosts | wan | dhcp | portforward | storage | supportdata | tr069 | services |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| FRITZ!Box 7490 | 185 | 07.62 | 1 | 1 | ○ | ✓ | ○ | ✓ | ○ | ✓ | ✓ | ○ | ○ | ○ | ○ | ✓ | ○ | — |
+| FRITZ!Box 7530 AX | 256 | 08.25 | 1 | 1 | ✓ | ✓ | ○ | ✓ | ○ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | ✓ | ✓ | — |
+| FRITZ!Box 7590 | 226 | 08.02 | 1 | 1 | ✓ | ✓ | ○ | ✓ | ○ | ✓ | ✓ | ○ | ○ | ○ | ○ | ✓ | ○ | — |
+| FRITZ!Box 7590 | 226 | 08.25 | 1 | 1 | ○ | ✓ | ○ | ✓ | ○ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | ✓ | ✓ | — |
+| FRITZ!Box 7690 | 285 | 08.22 | 1 | 1 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | ✓ | ✓ | — |
+| FRITZ!Box 7690 | 285 | 08.25 | 1 | 2 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ○ | ✓ | ✓ | ✓ | — |
 
 **Mehrere Abzüge derselben Box.** Die Spalte „Geräte" zählt verschiedene
 Exemplare, „Abzüge" die Sicherungen davon. Wo beide auseinandergehen,
@@ -76,6 +76,12 @@ nicht allein auf `SerialNumber` verlassen.
 faktisch ungetestet:
 
 - `portforward`
+
+**In keinem Abzug enthalten** — diese Datenarten kamen erst nach den
+bisherigen Abzügen hinzu. Kein Befund über die Boxen, sondern schlicht noch
+nicht erhoben; ein frischer Abzug einer beliebigen Box füllt sie:
+
+- `services`
 
 **Nur auf einem Teil der Modelle mit Daten gesehen** — Abzüge der übrigen
 Modelle schließen die Lücke:

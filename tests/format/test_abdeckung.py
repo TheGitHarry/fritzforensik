@@ -269,6 +269,29 @@ def test_beitrag_weist_fremdes_format_ab(tmp_path: Path) -> None:
         abdeckung.lies_beitrag(fremd)
 
 
+def test_neue_datenart_gilt_nicht_als_ungetestete_luecke() -> None:
+    """„Nie gefüllt trotz Abfrage" und „noch nie erhoben" sind zweierlei.
+
+    Eine frisch hinzugekommene Datenart fehlt in allen Altabzügen. Sie neben
+    einer echten Lücke zu listen, führt Beitragende in die Irre: Das eine ist
+    ein Befund über die Boxen, das andere nur ein Datum.
+    """
+    def mit(werte: dict[str, str]) -> dict:
+        b = _befund(False)
+        b["datenarten"] = {art: werte.get(art, "ja") for art in abdeckung.JSON_TYPES}
+        return b
+
+    text = abdeckung.erzeuge([mit({"portforward": "leer", "services": "fehlt"})])
+
+    ungetestet = text.split("**In keinem Abzug enthalten**")[0]
+    assert "`portforward`" in ungetestet, "echte Lücke fehlt im Ungetestet-Block"
+    assert "`services`" not in ungetestet, (
+        "nie erhobene Datenart steht fälschlich unter 'ungetestet'"
+    )
+    assert "**In keinem Abzug enthalten**" in text
+    assert "nicht erhoben" in " ".join(text.split()), "die Einordnung fehlt"
+
+
 def test_firmware_ohne_slot_angaben() -> None:
     """Slot-Angaben würden gleiche FRITZ!OS-Stände als verschiedene Zeilen zeigen."""
     assert abdeckung.firmware_kurz("285.08.25,slot0=08.22-1,slot1=08.25-2") == "08.25"

@@ -121,6 +121,12 @@ Ebenfalls erwähnenswert: Export-Version im Hüllkopf. Abzüge mit **0.3.1** hab
 `wan`/`dhcp`/`storage`/`tr069` durchgängig leer — eine Eigenschaft jener Version,
 nicht der Box.
 
+- **Fehlt `services`?** Die Datenart kam später hinzu; ältere Abzüge haben sie
+  nicht (in der Matrix `—`, nicht `○`). Kein Befund über die Box. Enthält der
+  Abzug sie, lohnt der Blick auf Einträge mit `genutzt: false`: Das sind
+  Datenquellen der Box, für die es keinen Extractor gibt — die einzige Stelle,
+  an der ein blinder Fleck überhaupt sichtbar wird.
+
 ## 6. Report rendern und prüfen
 
 Testet den echten Auswertepfad, nicht nur das Format:

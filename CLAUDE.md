@@ -52,6 +52,15 @@ Zusage darf nicht ohne Not aufgeweicht werden. Ausgenommen ist `webbrowser`
 - **Extractoren**: ein Modul je Datenart in [fritzexport/extractors/](fritzexport/extractors/),
   CLI-Glue in [cli.py](fritzexport/cli.py). Die Registry `EXTRACTORS` muss deckungsgleich
   mit `fritzformat.JSON_TYPES` bleiben — ein Test prüft das.
+- **`services` ist der Selbstprüfer**: `extractors/services.py` liest das
+  TR-064-Dienstverzeichnis der Box (`/tr64desc.xml`) und hält es gegen die Dienste, die
+  die übrigen Extractoren aufrufen. Was mit `genutzt: false` erscheint, ist keine
+  Fehlfunktion, sondern die Kandidatenliste für künftige Extractoren. Die Vergleichsbasis
+  wird aus den `*_SERVICE`-Modulkonstanten **eingesammelt**, nie gepflegt — eine zweite
+  Liste veraltete still, sobald jemand einen Extractor ergänzt.
+  Das Verzeichnis ist **nur beim Abzug** erfassbar: Es steht in keiner anderen
+  Bundle-Datei, auch nicht in den Supportdaten (dort tauchen nur die Dienste auf, die
+  fritzexport selbst aufgerufen hat).
 
 ## Wie fritzreport arbeitet
 

@@ -146,6 +146,38 @@ class FritzClient:
         except requests.RequestException:
             return False
 
+    #: Descriptor-Pfade, unter denen Boxen ihr Dienstverzeichnis anbieten.
+    #: Modellabhängig — deshalb der Reihe nach probieren.
+    DESCRIPTOR_PATHS = ("/tr64desc.xml", "/fboxdesc.xml", "/igddesc.xml")
+
+    def tr064_services(self) -> list[dict]:
+        """Welche TR-064-Dienste bietet diese Box an?
+
+        Liest das Dienstverzeichnis der Box (``/tr64desc.xml`` o. ä.) und gibt
+        je Dienst ``service_type`` und ``control_url`` zurück. Anders als
+        :meth:`tr064_available`, die nur den Port anpingt und die Antwort
+        verwirft, wird der Inhalt hier ausgewertet.
+
+        Ergebnis ist die einzige Quelle für die Frage, ob die Box Datenquellen
+        anbietet, die kein Extractor abholt — sie ist **nur im Moment des
+        Abzugs** erfassbar und steht in keinem Bundle-Bestandteil sonst.
+
+        Wie ``tr064_available`` bewusst tolerant: Ist nichts erreichbar oder
+        unparsbar, gibt es eben keine Liste. Kein Abbruch — die Abwesenheit
+        des Verzeichnisses ist kein Forensikfehler.
+        """
+        for pfad in self.DESCRIPTOR_PATHS:
+            try:
+                resp = self.session.get(self.tr064_url(pfad), timeout=10)
+            except requests.RequestException:
+                continue
+            if resp.status_code != 200 or not resp.content:
+                continue
+            dienste = _parse_service_list(resp.content)
+            if dienste:
+                return dienste
+        return []
+
     def close(self) -> None:
         auth.logout(self.base_url, self.sid, self.session)
         self.session.close()
@@ -155,6 +187,47 @@ class FritzClient:
 
     def __exit__(self, exc_type, exc, tb) -> None:
         self.close()
+
+
+def _parse_service_list(xml_bytes: bytes) -> list[dict]:
+    """Sammelt alle ``<service>``-Einträge einer Descriptor-XML.
+
+    Rekursiv über ``<deviceList>``: Boxen schachteln Geräte (das
+    InternetGatewayDevice enthält WANDevice, das wiederum
+    WANConnectionDevice …). Nur die oberste Ebene zu lesen unterschlägt
+    genau die Dienste, um die es hier geht.
+
+    Namespace-Behandlung wie in ``discover.parse_device_xml`` — der
+    Präfix steht am Wurzel-Tag.
+    """
+    try:
+        root = ET.fromstring(xml_bytes)
+    except ET.ParseError:
+        return []
+    ns = root.tag.split("}", 1)[0] + "}" if root.tag.startswith("{") else ""
+
+    gefunden: list[dict] = []
+    gesehen: set[str] = set()
+
+    def sammle(knoten) -> None:
+        for liste in knoten.findall(f"{ns}serviceList"):
+            for dienst in liste.findall(f"{ns}service"):
+                typ = (dienst.findtext(f"{ns}serviceType") or "").strip()
+                if not typ or typ in gesehen:
+                    continue
+                gesehen.add(typ)
+                gefunden.append({
+                    "service_type": typ,
+                    "control_url": (dienst.findtext(f"{ns}controlURL") or "").strip(),
+                    "scpd_url": (dienst.findtext(f"{ns}SCPDURL") or "").strip(),
+                })
+        for liste in knoten.findall(f"{ns}deviceList"):
+            for geraet in liste.findall(f"{ns}device"):
+                sammle(geraet)
+
+    for geraet in root.findall(f"{ns}device"):
+        sammle(geraet)
+    return sorted(gefunden, key=lambda d: d["service_type"])
 
 
 _SOAP_NS = "{http://schemas.xmlsoap.org/soap/envelope/}"

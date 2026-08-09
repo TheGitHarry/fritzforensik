@@ -11,7 +11,10 @@ venv/
 
 # Abzüge NIE einchecken — enthalten echte Forensikdaten.
 # fritzexport legt pro Lauf ein Verzeichnis mit Zeitstempel-Suffix an.
-export/
+# Nur im Wurzelverzeichnis (führender /): ohne den Anker verschluckt "export/"
+# auch tests/export/ — eine neue Testdatei wäre dort stillschweigend nie
+# eingecheckt worden.
+/export/
 export_*/
 
 # Erzeugte Reports NIE einchecken — enthalten ebenfalls echte Forensikdaten.
