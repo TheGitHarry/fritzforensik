@@ -1,0 +1,28 @@
+# Hält die wenigen Abhängigkeiten aktuell, ohne dass jemand daran denken muss.
+# Monatlich statt wöchentlich: das Projekt kann ruhen, und drei Ökosysteme mit
+# je einer Handvoll Pakete erzeugen sonst mehr Rauschen als Nutzen.
+version: 2
+updates:
+  # requests (nur fritzexport — fritzreport/fritzformat sind stdlib-only)
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "deps"
+
+  # jsdom — reines Testwerkzeug für tests/report/test_filter.py
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "deps"
+
+  # actions/checkout, setup-python, setup-node, upload-/download-artifact
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"

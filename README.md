@@ -367,3 +367,16 @@ JavaScript-Paket.
 Besonders relevant sind die Vertragstests in `tests/format/`: sie halten die
 Extractor-Registry und die Datenart-Liste synchron, prüfen den Rundlauf
 *schreiben → lesen* über beide Werkzeuge und sichern die stdlib-Freiheit von fritzreport ab.
+
+---
+
+# Lizenz
+
+Apache-2.0 — siehe [LICENSE](LICENSE). Nutzung, Änderung und Weitergabe sind erlaubt,
+**ohne jede Gewährleistung**: Die Werkzeuge werden „AS IS" bereitgestellt, es wird
+insbesondere nicht zugesichert, dass ein erzeugter Abzug oder Report einer gerichtlichen
+Prüfung standhält. Die Verantwortung für Methodik und Verwertbarkeit liegt bei dem, der
+sie einsetzt.
+
+Sicherheitslücken bitte **nicht** als öffentliches Issue melden — der Weg steht in
+[SECURITY.md](SECURITY.md).
