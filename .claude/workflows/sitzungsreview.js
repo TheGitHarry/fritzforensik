@@ -15,7 +15,10 @@ export const meta = {
 // erreicht schnell mehrere hundert KB (diese Sitzung: 319 KB / ~180k Token). Durch den
 // Hauptkontext geschleust wäre er allein deshalb nicht mehr handhabbar. Die Agenten
 // holen sich Diff und Dateien selbst — sie haben Bash und Read.
-const A = args || {}
+// `args` kommt in dieser Umgebung als JSON-**String** an, nicht als Objekt (gemessen:
+// `typeof args === "string"`, Object.keys liefert Zeichenpositionen). Beide Formen
+// annehmen, damit das Skript unabhängig davon läuft.
+const A = (typeof args === 'string' ? JSON.parse(args || '{}') : (args || {}))
 const BASIS = A.basis || 'main'
 const DATEIEN = A.dateien || []
 if (!DATEIEN.length) throw new Error('keine geänderten Dateien übergeben')

@@ -58,6 +58,18 @@ Workflow({
 Der Workflow läuft im Hintergrund und meldet sich, wenn er fertig ist. **Nicht** darauf
 warten, indem du pollst — die Benachrichtigung kommt von selbst.
 
+**Falle — `scriptPath` statt `name` benutzen.** Der Aufruf über `name: "sitzungsreview"`
+lädt eine **zwischengespeicherte** Fassung des Skripts, nicht die Datei im Repo. Nach
+jeder Änderung an `sitzungsreview.js` liefe damit weiter der alte Stand; kenntlich an
+einer Fehlermeldung, die zur aktuellen Datei nicht passt. Deshalb:
+
+```
+Workflow({ scriptPath: ".claude/workflows/sitzungsreview.js", args: { ... } })
+```
+
+Ob die richtige Fassung läuft, verrät die Zeile `Script file:` in der Antwort: Sie muss
+auf den Repo-Pfad zeigen, nicht auf eine Kopie unter `workflows/scripts/`.
+
 ## 4. Ergebnis
 
 Der Workflow gibt einen fertigen Bericht zurück (Abschnitte A–D). Gib ihn **wörtlich**
