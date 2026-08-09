@@ -7,11 +7,14 @@ Hand gepflegt, eine Abweichung wäre erst im Feld aufgefallen.
 from __future__ import annotations
 
 import json
+import re
 
 from fritzformat import (
     CASE_FILENAME,
     MARKER_BEGIN,
     MARKER_END,
+    MARKER_UHR_ANFRAGE,
+    MARKER_UHR_ANTWORT,
     begin_line,
     JSON_TYPES,
     SUPPORT_VARIANTS,
@@ -21,11 +24,15 @@ from fritzformat import (
     dataset_filename,
     end_line,
     parse_span,
+    parse_uhr_spans,
     read_case,
     run_slug,
     read_envelope_meta,
     sha256_bytes,
     support_filename,
+    uhr_anfrage_line,
+    uhr_jetzt_iso,
+    uhr_antwort_line,
     verify,
     write_case,
     write_sidecar,
@@ -219,6 +226,90 @@ def test_parse_span_mehrere_laeufe_umspannen_alles() -> None:
     text = (f"{MARKER_BEGIN} 2026-07-13T09:00:00Z\n{MARKER_END} 2026-07-13T09:10:00Z\n"
             f"{MARKER_BEGIN} 2026-07-13T10:00:00Z\n{MARKER_END} 2026-07-13T10:30:00Z\n")
     assert parse_span(text) == ("2026-07-13T09:00:00Z", "2026-07-13T10:30:00Z")
+
+
+# ──────────────────────── Uhrzeit-Klammern im Log ────────────────────────────
+
+def test_parse_uhr_spans_liest_paar_je_quelle() -> None:
+    text = (
+        f"2026-08-08 00:01:36,323 INFO {MARKER_UHR_ANFRAGE} supportdata:standard "
+        "2026-08-07T22:01:36Z\n"
+        "2026-08-08 00:02:00,000 INFO Irgendwas dazwischen\n"
+        f"2026-08-08 00:03:29,780 INFO {MARKER_UHR_ANTWORT} supportdata:standard "
+        "2026-08-07T22:03:29Z\n"
+        f"2026-08-08 00:03:30,000 INFO {MARKER_UHR_ANFRAGE} tr064:time "
+        "2026-08-07T22:03:30Z\n"
+        f"2026-08-08 00:03:30,077 INFO {MARKER_UHR_ANTWORT} tr064:time "
+        "2026-08-07T22:03:30Z\n"
+    )
+    assert parse_uhr_spans(text) == {
+        "supportdata:standard": ("2026-08-07T22:01:36Z", "2026-08-07T22:03:29Z"),
+        "tr064:time": ("2026-08-07T22:03:30Z", "2026-08-07T22:03:30Z"),
+    }
+
+
+def test_parse_uhr_spans_ohne_marker_ist_leer() -> None:
+    """Altbestand: Logs von vor der Einführung dürfen nicht zu Fehlern führen."""
+    assert parse_uhr_spans("2026-07-13 11:34:58 INFO Starte Extractor: calls\n") == {}
+    assert parse_uhr_spans("") == {}
+
+
+def test_parse_uhr_spans_nur_anfrage_bei_abbruch() -> None:
+    """Timeout mitten im Abruf: Die Anfrage steht, die Antwort fehlt. Der Report
+    darf daraus keine Klammer bilden — aber auch nicht abstürzen."""
+    spans = parse_uhr_spans(
+        f"INFO {MARKER_UHR_ANFRAGE} supportdata:enhanced 2026-08-07T22:01:36Z\n"
+        "WARNING Erweiterte Supportdaten übersprungen (Timeout 30 s).\n")
+    assert spans == {"supportdata:enhanced": ("2026-08-07T22:01:36Z", "")}
+
+
+def test_parse_uhr_spans_letztes_paar_gewinnt() -> None:
+    """Die erweiterten Supportdaten werden zweimal abgerufen: erst direkt, dann
+    nach Tastendruck. Abgelegt wird die Datei des **zweiten** Abrufs — das erste
+    Paar gehört zu einer verworfenen Antwort und verklammerte die Messung sonst
+    mit dem falschen Zeitraum."""
+    text = (
+        f"{MARKER_UHR_ANFRAGE} supportdata:enhanced 2026-08-07T22:01:00Z\n"
+        f"{MARKER_UHR_ANTWORT} supportdata:enhanced 2026-08-07T22:01:02Z\n"
+        "INFO Bestätigungsseite erhalten — warte auf Tastendruck\n"
+        f"{MARKER_UHR_ANFRAGE} supportdata:enhanced 2026-08-07T22:02:30Z\n"
+        f"{MARKER_UHR_ANTWORT} supportdata:enhanced 2026-08-07T22:03:10Z\n"
+    )
+    assert parse_uhr_spans(text) == {
+        "supportdata:enhanced": ("2026-08-07T22:02:30Z", "2026-08-07T22:03:10Z")}
+
+
+def test_uhr_marker_rundlauf() -> None:
+    """Was fritzexport schreibt, liest der Report wörtlich zurück."""
+    text = (
+        f"2026-08-09 17:55:36,412 INFO {uhr_anfrage_line('tr064:time', '2026-08-09T15:55:36Z')}\n"
+        f"2026-08-09 17:55:36,489 INFO {uhr_antwort_line('tr064:time', '2026-08-09T15:55:36Z')}\n"
+    )
+    assert parse_uhr_spans(text) == {
+        "tr064:time": ("2026-08-09T15:55:36Z", "2026-08-09T15:55:36Z")}
+
+
+def test_uhr_jetzt_iso_ist_millisekundengenau() -> None:
+    """Die Klammer wird aus zwei dieser Werte gebildet. Bei Sekundenauflösung
+    schlüge die Quantisierung doppelt durch und machte einen 50-ms-Abruf zu einer
+    2-Sekunden-Unschärfe."""
+    wert = uhr_jetzt_iso()
+    assert wert.endswith("Z")
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z", wert), wert
+
+
+def test_uhr_marker_stoeren_den_sicherungszeitraum_nicht() -> None:
+    """Beide Markerarten stehen im selben Log — `parse_span` darf die neuen Zeilen
+    nicht aufgreifen und umgekehrt."""
+    text = (
+        f"INFO {MARKER_BEGIN} 2026-08-07T22:00:00Z\n"
+        f"INFO {MARKER_UHR_ANFRAGE} supportdata:standard 2026-08-07T22:01:36Z\n"
+        f"INFO {MARKER_UHR_ANTWORT} supportdata:standard 2026-08-07T22:03:29Z\n"
+        f"INFO {MARKER_END} 2026-08-07T22:05:00Z\n"
+    )
+    assert parse_span(text) == ("2026-08-07T22:00:00Z", "2026-08-07T22:05:00Z")
+    assert parse_uhr_spans(text) == {
+        "supportdata:standard": ("2026-08-07T22:01:36Z", "2026-08-07T22:03:29Z")}
 
 
 def test_marker_rundlauf_export_zu_report(tmp_path) -> None:

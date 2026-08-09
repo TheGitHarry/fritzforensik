@@ -19,7 +19,14 @@ import sys
 import time
 from pathlib import Path
 
-from fritzformat import sha256_bytes, support_filename, write_sidecar
+from fritzformat import (
+    sha256_bytes,
+    support_filename,
+    uhr_anfrage_line,
+    uhr_antwort_line,
+    uhr_jetzt_iso,
+    write_sidecar,
+)
 
 from ..client import FritzClient
 
@@ -111,8 +118,16 @@ def _is_html(content: bytes) -> bool:
     return snippet.startswith(b"<!DOCTYPE") or snippet.startswith(b"<html")
 
 
-def _fetch_one(client: FritzClient, field_name: str) -> bytes | None:
-    """Lädt eine Supportdaten-Variante; gibt None bei HTML-Fehlerseite zurück."""
+def _fetch_one(client: FritzClient, field_name: str, short_name: str) -> bytes | None:
+    """Lädt eine Supportdaten-Variante; gibt None bei HTML-Fehlerseite zurück.
+
+    Klammert den Abruf in zwei Zeitmarken ein. Die Box schreibt ihre eigene Uhrzeit
+    in den Kopf der Datei (``##### TITLE Datum …``); zusammen mit diesen beiden
+    Referenzzeiten kann `fritzreport` daraus den Versatz der Box-Uhr bestimmen.
+    Die Marker stehen **eng** um den Aufruf, weil die Klammer sonst um die Laufzeit
+    des übrigen Abzugs zu weit würde.
+    """
+    log.info(uhr_anfrage_line(f"supportdata:{short_name}", uhr_jetzt_iso()))
     resp = client.session.post(
         client.base_url + FIRMWARECFG_PATH,
         files={
@@ -121,6 +136,8 @@ def _fetch_one(client: FritzClient, field_name: str) -> bytes | None:
         },
         timeout=120,
     )
+    # Vor raise_for_status, damit auch ein Fehlschlag seine Zeitmarke hinterlässt.
+    log.info(uhr_antwort_line(f"supportdata:{short_name}", uhr_jetzt_iso()))
     resp.raise_for_status()
     if _is_html(resp.content) or not resp.content.strip():
         return None
@@ -137,7 +154,7 @@ def _fetch_enhanced(client: FritzClient) -> bytes | None:
        für den Tastendruck zu öffnen. Wir fragen interaktiv nach und
        rufen nach der Bestätigung erneut ab.
     """
-    content = _fetch_one(client, "SupportDataEnhanced")
+    content = _fetch_one(client, "SupportDataEnhanced", "enhanced")
     if content is not None:
         log.info(
             "Erweiterte Supportdaten ohne Tastendruck erhalten "
@@ -164,7 +181,7 @@ def _fetch_enhanced(client: FritzClient) -> bytes | None:
         )
         return None
 
-    content = _fetch_one(client, "SupportDataEnhanced")
+    content = _fetch_one(client, "SupportDataEnhanced", "enhanced")
     if content is None:
         log.warning("Erweiterte Supportdaten auch nach Bestätigung nicht erhalten.")
     return content
@@ -186,7 +203,7 @@ def extract(
         if field_name == "SupportDataEnhanced":
             content = _fetch_enhanced(client)
         else:
-            content = _fetch_one(client, field_name)
+            content = _fetch_one(client, field_name, short_name)
         if content is None:
             log.info("Supportdaten '%s': nicht verfügbar oder kein Recht.", field_name)
             missing.append(short_name)

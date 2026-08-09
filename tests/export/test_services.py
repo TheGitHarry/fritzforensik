@@ -117,6 +117,9 @@ def test_genutzte_services_ist_nicht_leer() -> None:
     assert genutzt, "keine Extractor-Dienste gefunden — Einsammeln greift ins Leere"
     assert "urn:dslforum-org:service:Hosts:1" in genutzt
     assert "urn:dslforum-org:service:X_AVM-DE_TAM:1" in genutzt
+    # Seit dem Zeitabgleich holt ein Extractor auch Time:1 ab — der Dienst darf
+    # nicht länger als ungenutzt gemeldet werden.
+    assert "urn:dslforum-org:service:Time:1" in genutzt
     assert all(s.startswith("urn:") for s in genutzt)
 
 

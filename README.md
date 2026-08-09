@@ -143,8 +143,30 @@ mitsamt vollständiger Logdatei, die ab der ersten Zeile geschrieben wird.
 | `--supportdata` | Web-UI | Erweiterte Supportdaten (vollständiger Text-Dump) |
 | `--tr069` | TR-064 | TR-069-Konfiguration (ACS-URL, Fernwartungsstatus) |
 | `--services` | TR-064 | Dienstverzeichnis der Box — welche TR-064-Dienste sie anbietet und welche davon ein Extractor abholt |
+| `--boxtime` | TR-064 | Uhrzeit, Zeitzone und NTP-Server der Box — Grundlage für den Zeitabgleich |
 
 Ohne explizite Auswahl laufen alle Extractoren (`--all`).
+
+### Zeitabgleich der Box-Uhr
+
+Alle Zeitangaben im Report stammen von der Box. Weicht deren Uhr ab, sind sie
+systematisch verschoben — der Report weist den Versatz deshalb aus.
+
+Gemessen wird gegen die Uhr der Abzugsmaschine: Der Abruf wird in zwei Zeitmarken im
+Sitzungslog geklammert (`UHRZEIT ANFRAGE`/`ANTWORT`), die Box liefert ihre eigene Zeit.
+Zwei Quellen, unterschiedlich scharf:
+
+- **TR-064 `Time:1`** (`--boxtime`) — Klammer ≈ 1 s, **beidseitig**: schließt Vor- und
+  Nachgehen der Box gleichermaßen aus.
+- **Kopf der Supportdaten** (`--supportdata`) — greift auch ohne TR-064 und **rückwirkend
+  auf ältere Abzüge**. Nur **einseitig**: Die Box schreibt den Kopf am Anfang der
+  Erzeugung, danach folgt die Übertragung. Belegt ist damit „geht nicht mehr als *n* s
+  vor"; ein Nachgehen bliebe unentdeckt.
+
+Der Report nennt stets die Quelle und die Breite der Klammer. Ein Versatz von null wird
+nicht als „Uhr korrekt" ausgegeben — gemessen ist eine Schranke, keine Übereinstimmung.
+Die Referenzuhr ist die Systemuhr der Abzugsmaschine und verbürgt sich nicht selbst;
+der Abgleich zeigt Übereinstimmung *zweier Uhren*, nicht mit UTC.
 
 ### TR-064-Abhängigkeit
 

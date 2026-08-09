@@ -12,6 +12,7 @@ from .storage import extract as extract_storage
 from .supportdata import extract as extract_supportdata
 from .tr069 import extract as extract_tr069
 from .services import extract as extract_services
+from .boxtime import extract as extract_boxtime
 
 EXTRACTORS = {
     "calls": extract_calls,
@@ -28,6 +29,7 @@ EXTRACTORS = {
     "supportdata": extract_supportdata,
     "tr069": extract_tr069,
     "services": extract_services,
+    "boxtime": extract_boxtime,
 }
 
 # Extractoren, die einen audio_dir-Parameter akzeptieren und ein
