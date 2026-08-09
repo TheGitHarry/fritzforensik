@@ -125,6 +125,9 @@ def lies_bundle(verzeichnis: Path) -> dict | None:
         # Unterscheidung läse sich "3 Abzüge" wie "3 Geräte", obwohl es
         # dieselbe Box sein kann.
         "geraet": _geraetekennung(kopf),
+        # Für den Hinweis in der Ausgabe — die Serial selbst wird nie
+        # ausgegeben, nur die Tatsache, dass sie genullt ist.
+        "serial_genullt": not _brauchbar(_feld(kopf, "SerialNumber")),
         "modell": HWREV_MODELL.get(hwrev, f"unbekannt (HWRevision {hwrev})"),
         "firmware": firmware_kurz(_feld(kopf, "firmware_info")),
         "datenarten": {},
@@ -245,6 +248,29 @@ def erzeuge(befunde: list[dict]) -> str:
         a("")
         a("Ein Abzug eines **zweiten Exemplars** dieser Modelle ist deshalb weiterhin")
         a("wertvoll — auch wenn Modell und FRITZ!OS-Stand schon in der Tabelle stehen.")
+        a("")
+
+    genullt = sorted({b["modell"] for b in befunde if b.get("serial_genullt")})
+    if genullt:
+        a("### Genullte Seriennummer")
+        a("")
+        a("Bei " + ", ".join(genullt) + " im Korpus steht in `SerialNumber` eine Folge")
+        a("aus lauter Nullen. Das ist **kein Auslesefehler**: Das Feld ist beschrieben,")
+        a("nur eben mit einem Vorgabewert statt einer Gerätekennung.")
+        a("")
+        a("Das übrige Urlader-Environment ist dabei unversehrt — MAC-Adressen,")
+        a("Hardware-Revision und Bootloader-Version stehen normal darin. Das Muster")
+        a("passt zu einer **Wiederherstellung aus einem generischen AVM-Image**: Ein")
+        a("solches Image bringt die gerätespezifische Seriennummer nicht mit (sie steht")
+        a("auf dem Gehäuseaufkleber), und das Feld wird beim Neuaufbau des Environments")
+        a("mit Nullen belegt. Andere Ursachen sind nicht auszuschließen — ein Nachweis")
+        a("des Vorgangs selbst steckt nicht in den Daten.")
+        a("")
+        a("Praktische Folge: Bei einer solchen Box taugt `SerialNumber` **nicht** zur")
+        a("Identifikation. Diese Matrix unterscheidet Geräte deshalb vorrangig über")
+        a("`tr069_serial`, das aus der MAC-Adresse gebildet wird und den Vorgang")
+        a("übersteht. Wer Abzüge forensisch zuordnet, sollte sich aus demselben Grund")
+        a("nicht allein auf `SerialNumber` verlassen.")
         a("")
 
     a("## Supportdaten-Varianten")

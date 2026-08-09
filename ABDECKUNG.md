@@ -39,6 +39,26 @@ Firmware-Update. Solche Abzüge erweitern die **Hardware**-Abdeckung nicht:
 Ein Abzug eines **zweiten Exemplars** dieser Modelle ist deshalb weiterhin
 wertvoll — auch wenn Modell und FRITZ!OS-Stand schon in der Tabelle stehen.
 
+### Genullte Seriennummer
+
+Bei FRITZ!Box 7490 im Korpus steht in `SerialNumber` eine Folge
+aus lauter Nullen. Das ist **kein Auslesefehler**: Das Feld ist beschrieben,
+nur eben mit einem Vorgabewert statt einer Gerätekennung.
+
+Das übrige Urlader-Environment ist dabei unversehrt — MAC-Adressen,
+Hardware-Revision und Bootloader-Version stehen normal darin. Das Muster
+passt zu einer **Wiederherstellung aus einem generischen AVM-Image**: Ein
+solches Image bringt die gerätespezifische Seriennummer nicht mit (sie steht
+auf dem Gehäuseaufkleber), und das Feld wird beim Neuaufbau des Environments
+mit Nullen belegt. Andere Ursachen sind nicht auszuschließen — ein Nachweis
+des Vorgangs selbst steckt nicht in den Daten.
+
+Praktische Folge: Bei einer solchen Box taugt `SerialNumber` **nicht** zur
+Identifikation. Diese Matrix unterscheidet Geräte deshalb vorrangig über
+`tr069_serial`, das aus der MAC-Adresse gebildet wird und den Vorgang
+übersteht. Wer Abzüge forensisch zuordnet, sollte sich aus demselben Grund
+nicht allein auf `SerialNumber` verlassen.
+
 ## Supportdaten-Varianten
 
 | Modell | FRITZ!OS | standard | mesh | enhanced |

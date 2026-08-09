@@ -153,6 +153,32 @@ def test_geraetezahl_fuehrt_gleiche_box_zusammen() -> None:
     ) == 2
 
 
+def _befund(genullt: bool) -> dict:
+    return {
+        "modell": "FRITZ!Box 7490", "hwrev": "185", "firmware": "07.62",
+        "geraet": "abc1234567890def", "serial_genullt": genullt,
+        "support": ["standard"],
+        "datenarten": {art: "ja" for art in abdeckung.JSON_TYPES},
+    }
+
+
+def test_hinweis_zur_genullten_serial_nur_wenn_betroffen() -> None:
+    """Der Hinweis erklärt einen Befund — ohne Befund hat er nichts zu suchen."""
+    mit = abdeckung.erzeuge([_befund(True)])
+    assert "### Genullte Seriennummer" in mit
+    assert "generischen AVM-Image" in mit
+    assert "tr069_serial" in mit, "die praktische Folge fehlt"
+
+    ohne = abdeckung.erzeuge([_befund(False)])
+    assert "### Genullte Seriennummer" not in ohne
+
+
+def test_hinweis_nennt_keine_serial() -> None:
+    """Auch der erklärende Text darf den Rohwert nicht enthalten."""
+    text = abdeckung.erzeuge([_befund(True)])
+    assert "0000000000000000" not in text
+
+
 def test_firmware_ohne_slot_angaben() -> None:
     """Slot-Angaben würden gleiche FRITZ!OS-Stände als verschiedene Zeilen zeigen."""
     assert abdeckung.firmware_kurz("285.08.25,slot0=08.22-1,slot1=08.25-2") == "08.25"
