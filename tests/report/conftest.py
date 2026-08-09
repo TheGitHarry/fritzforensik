@@ -96,6 +96,18 @@ def build_bundle(d: Path) -> Path:
     _write_json(d, ts, "events", [
         {"date": "01.01.26", "time": "10:00:10", "category": "wlan", "id": 1,
          "message": f"WLAN-Gerät TestPhone angemeldet, MAC {MAC}"}])
+    # Zweite Uhr-Quelle: TR-064 Time:1. Die Box meldet 11:00:02+01:00 (= 10:00:02Z),
+    # geklammert von 10:00:01,900Z / 10:00:02,100Z — eine Round-Trip-Klammer, bei der
+    # **beide** Schranken tragen. Ohne diese Datenart im Fixture ließ sich der ganze
+    # TR-064-Zweig der Auswertung lahmlegen, ohne dass ein Test rot wurde.
+    _write_json(d, ts, "boxtime", [
+        {"record_type": "box_clock",
+         "box_current_local_time": "2026-01-06T11:00:02+01:00",
+         "box_local_timezone": "CET-1CEST,M3.5.0,M10.5.0/3",
+         "box_local_timezone_name": "", "box_daylight_savings_used": "0",
+         "box_daylight_savings_start": "", "box_daylight_savings_end": "",
+         "box_ntp_server1": "ntp.fritz.box", "box_ntp_server2": "",
+         "raw": {"NewCurrentLocalTime": "2026-01-06T11:00:02+01:00"}}])
     _write_json(d, ts, "dhcp", [
         {"record_type": "dhcp_config", "dhcp_server_enable": "1",
          "min_address": "192.168.1.20", "max_address": "192.168.1.200",
@@ -106,17 +118,27 @@ def build_bundle(d: Path) -> Path:
     sup.write_bytes(body)
     write_sidecar(sup, sha256_bytes(body))
 
-    # Sitzungslog mit Uhr-Klammer: Box meldet 11:00:02 CET (= 10:00:02Z), die
-    # Referenzmarken liegen bei 10:00:00Z und 10:00:40Z. Erwartete obere Schranke
-    # also +3 s (2 s Differenz + 1 s Quantisierung), die untere −38 s ist reine
-    # Übertragungsdauer und darf im Report nicht als Messwert erscheinen.
+    # Sitzungslog mit **beiden** Uhr-Klammern — der Fall, den der Report mit zwei
+    # Zeilen beantwortet:
+    #
+    #   supportdata:standard — Box meldet 11:00:02 CET (= 10:00:02Z), Marken 10:00:00Z
+    #     und 10:00:40Z. Obere Schranke +3 s (2 s Differenz + 1 s Quantisierung); die
+    #     untere −38 s ist reine Übertragungsdauer und darf nicht als Messwert
+    #     erscheinen.
+    #   tr064:time — dieselbe Box-Zeit, Marken 10:00:01,900Z / 10:00:02,100Z. Klammer
+    #     +0 s bis +1 s, beidseitig scharf.
+    #
     # Bewusst **ohne** SICHERUNG-Marker: Ein anderer Test prüft an diesem Fixture,
     # dass der Sicherungszeitraum aus den `extracted_at` abgeleitet wird.
     (d / session_log_filename(ts)).write_text(
         "2026-01-06 11:00:00,000 INFO UHRZEIT ANFRAGE supportdata:standard "
         "2026-01-06T10:00:00.000Z\n"
         "2026-01-06 11:00:40,000 INFO UHRZEIT ANTWORT supportdata:standard "
-        "2026-01-06T10:00:40.000Z\n",
+        "2026-01-06T10:00:40.000Z\n"
+        "2026-01-06 11:00:41,900 INFO UHRZEIT ANFRAGE tr064:time "
+        "2026-01-06T10:00:01.900Z\n"
+        "2026-01-06 11:00:42,100 INFO UHRZEIT ANTWORT tr064:time "
+        "2026-01-06T10:00:02.100Z\n",
         encoding="utf-8")
     return d
 

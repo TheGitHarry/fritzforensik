@@ -279,6 +279,33 @@ def test_parse_uhr_spans_letztes_paar_gewinnt() -> None:
         "supportdata:enhanced": ("2026-08-07T22:02:30Z", "2026-08-07T22:03:10Z")}
 
 
+def test_parse_uhr_spans_ohne_antwort_klammert_nicht_rueckwaerts() -> None:
+    """Fällt die Antwort des **letzten** Abrufs aus, darf die neue Anfrage nicht mit
+    der alten Antwort verklammert werden: Die Klammer liefe rückwärts, und der Report
+    machte daraus die schärfste denkbare Aussage über die Box-Uhr — aus einer
+    Messung, die nie zustande kam."""
+    text = (
+        f"{MARKER_UHR_ANFRAGE} supportdata:enhanced 2026-08-07T22:01:00Z\n"
+        f"{MARKER_UHR_ANTWORT} supportdata:enhanced 2026-08-07T22:01:02Z\n"
+        f"{MARKER_UHR_ANFRAGE} supportdata:enhanced 2026-08-07T22:02:30Z\n"
+    )
+    assert parse_uhr_spans(text) == {
+        "supportdata:enhanced": ("2026-08-07T22:02:30Z", "")}
+
+
+def test_parse_uhr_spans_nur_antwort() -> None:
+    """Antwort ohne Anfrage (soll nicht vorkommen, kann aber im gekürzten Log stehen):
+    Die Anfrage bleibt leer, statt sich eine aus einer anderen Quelle zu borgen."""
+    text = (
+        f"{MARKER_UHR_ANFRAGE} tr064:time 2026-08-07T22:03:30Z\n"
+        f"{MARKER_UHR_ANTWORT} supportdata:standard 2026-08-07T22:03:29Z\n"
+    )
+    assert parse_uhr_spans(text) == {
+        "tr064:time": ("2026-08-07T22:03:30Z", ""),
+        "supportdata:standard": ("", "2026-08-07T22:03:29Z"),
+    }
+
+
 def test_uhr_marker_rundlauf() -> None:
     """Was fritzexport schreibt, liest der Report wörtlich zurück."""
     text = (

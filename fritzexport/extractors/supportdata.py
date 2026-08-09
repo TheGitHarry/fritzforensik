@@ -128,16 +128,21 @@ def _fetch_one(client: FritzClient, field_name: str, short_name: str) -> bytes |
     des übrigen Abzugs zu weit würde.
     """
     log.info(uhr_anfrage_line(f"supportdata:{short_name}", uhr_jetzt_iso()))
-    resp = client.session.post(
-        client.base_url + FIRMWARECFG_PATH,
-        files={
-            "sid": (None, client.sid),
-            field_name: (None, ""),
-        },
-        timeout=120,
-    )
-    # Vor raise_for_status, damit auch ein Fehlschlag seine Zeitmarke hinterlässt.
-    log.info(uhr_antwort_line(f"supportdata:{short_name}", uhr_jetzt_iso()))
+    try:
+        resp = client.session.post(
+            client.base_url + FIRMWARECFG_PATH,
+            files={
+                "sid": (None, client.sid),
+                field_name: (None, ""),
+            },
+            timeout=120,
+        )
+    finally:
+        # Im `finally` und vor `raise_for_status`, damit jeder Ausgang seine Marke
+        # hinterlässt — auch der Timeout des POST, den `cli.py` abfängt. Eine Anfrage
+        # ohne Partner bliebe sonst im Log des geschriebenen Bundles stehen. Ebenso
+        # in `boxtime.py` gelöst.
+        log.info(uhr_antwort_line(f"supportdata:{short_name}", uhr_jetzt_iso()))
     resp.raise_for_status()
     if _is_html(resp.content) or not resp.content.strip():
         return None

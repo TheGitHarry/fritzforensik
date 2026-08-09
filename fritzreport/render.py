@@ -439,6 +439,12 @@ def _clock_rows(bundle) -> list[tuple]:
       untere enthält die Übertragungsdauer. Sie wird deshalb **nicht** als Zahl
       ausgewiesen: „−189 s" läse sich wie ein gemessener Rückstand, obwohl nichts
       dergleichen gemessen wurde. Stattdessen die Aussage, die wirklich belegt ist.
+      Aus demselben Grund steht dort auch keine Klammerbreite: Sie bestünde
+      überwiegend aus der Übertragung und wäre keine Fehlerschranke der Aussage.
+
+    Beide Zweige verzweigen über `ClockOffset.enthaelt_null` — schließt die Klammer die
+    Null ein, ist kein Versatz nachweisbar. Beidseitig wird dieser Befund benannt (H9);
+    einseitig *ist* er bereits die Aussage („geht nicht mehr als … vor").
     """
     offsets = getattr(bundle, "clock_offsets", None)
     if not offsets:
@@ -461,7 +467,12 @@ def _clock_rows(bundle) -> list[tuple]:
         if c.beidseitig:
             wert = (f"Abweichung zwischen {c.versatz_min_s:+d} s und "
                     f"{c.versatz_max_s:+d} s ({herkunft}, Klammer {_sek(c.klammer_s)})")
-        elif c.versatz_max_s >= 0:
+            if c.enthaelt_null:
+                # Der negative Befund ist selbst eine Aussage (H9) — sonst müsste der
+                # Leser das Intervall gegen die Null halten. Nicht „Uhr korrekt":
+                # belegt ist eine Schranke, keine Übereinstimmung.
+                wert += " — kein Versatz nachweisbar"
+        elif c.enthaelt_null:
             wert = (f"geht nicht mehr als {_sek(c.versatz_max_s)} vor "
                     f"({herkunft})")
         else:

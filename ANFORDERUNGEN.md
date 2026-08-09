@@ -144,7 +144,7 @@ Anforderungen, die erst durch den eigenständigen Feldeinsatz entstanden sind.
 | H4 | Mehrere Objekte am Stück abarbeiten, ohne Neustart je Objekt | offen | #1, #3 |
 | H5 | Nichts auf der Box verändern; wo Lesen den Status ändert, Originalzustand wiederherstellen und dokumentieren | erfüllt | — |
 | H8 | Der Report weist den **Sicherungszeitraum** aus (erster bis letzter Datenabruf), nicht einen einzelnen Zeitpunkt; ist er abgeleitet statt protokolliert, ist das erkennbar | erfüllt | `test_report_zeigt_gerechneten_zeitraum_mit_d1`, `test_report_zeigt_protokollierten_zeitraum_ohne_badge` |
-| H9 | Die **Uhr der Box** wird gegen eine Referenzzeit abgeglichen und der Versatz mit seiner Messunsicherheit ausgewiesen — auch der Befund „kein Versatz nachweisbar" wird benannt. Wo eine Schranke nur die Übertragungsdauer misst, wird sie nicht als Messwert gezeigt | erfüllt | `test_supportdata_zeigt_keine_untere_schranke`, `test_report_behauptet_keine_korrekte_box_uhr`, `test_box_uhr_wird_im_altbestand_geprueft` |
+| H9 | Die **Uhr der Box** wird gegen eine Referenzzeit abgeglichen und der Versatz mit seiner Messunsicherheit ausgewiesen — auch der Befund „kein Versatz nachweisbar" wird benannt. Wo eine Schranke nur die Übertragungsdauer misst, wird sie nicht als Messwert gezeigt | erfüllt | `test_supportdata_zeigt_keine_untere_schranke`, `test_zeitversatz_zeile_sagt_genau_das_gemessene`, `test_klammer_um_die_null_benennt_den_befund`, `test_rueckwaerts_laufende_klammer_wird_verworfen`, `test_box_uhr_wird_im_altbestand_geprueft` |
 
 ---
 

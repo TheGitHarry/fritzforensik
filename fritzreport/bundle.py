@@ -422,6 +422,11 @@ def _add_offset(b, quelle, box_lokal, von, bis, box, *, beidseitig, herkunft,
     dt_von, dt_bis = _iso_to_dt(von), _iso_to_dt(bis)
     if not (dt_von and dt_bis):
         return
+    if dt_von > dt_bis:
+        # Rückwärts laufende Klammer — im Log steht die Antwort vor ihrer Anfrage.
+        # Das ist keine Messung, sondern ein gekürztes oder manipuliertes Log; die
+        # Breite wäre negativ und die Aussage schärfer als jede echte Messung.
+        return
     b.clock_offsets.append(ClockOffset(
         quelle=quelle,
         box_lokal=box_lokal,

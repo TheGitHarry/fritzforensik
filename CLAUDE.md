@@ -68,6 +68,9 @@ Zusage darf nicht ohne Not aufgeweicht werden. Ausgenommen ist `webbrowser`
   Versatz rechnet **keiner der beiden** — das tut `fritzreport` einmal für beide
   Quellen. Wer hier eine Differenz `box − referenz` einbaut, baut einen Fehler ein:
   Beide Quellen sind sekundengenau, die Differenz ist deshalb systematisch verschoben.
+  Die Antwort-Marke gehört in beiden Extractoren ins **`finally`**: Ohne sie bliebe
+  nach einem Timeout eine Anfrage ohne Partner im Log — und das Bundle wird trotzdem
+  geschrieben, `cli.py` fängt die Ausnahme ab.
 
 ## Wie fritzreport arbeitet
 
@@ -86,6 +89,12 @@ gleich. Zwei Fallen, die dort im Docstring belegt sind:
   niemand gemessen hat. Bei TR-064 (Round-Trip) tragen beide Schranken.
 - Rückwirkend ist **nur `standard`** auswertbar. Bei `enhanced` liegt ohne eigene
   Marker die Wartezeit auf den Tastendruck mit in der Klammer (7490: 595 s).
+- Eine Klammer, deren Antwort **vor** ihrer Anfrage liegt, ist keine Messung, sondern
+  ein gekürztes Log — `_add_offset` verwirft sie. Erzeugt wurde sie früher von
+  `parse_uhr_spans` selbst: Zwei getrennte Schleifen („je die letzte Anfrage, je die
+  letzte Antwort") paaren über Kreuz. Dort wird deshalb **in Logreihenfolge** gepaart;
+  wer das zurückbaut, baut eine negative Klammerbreite ein — und damit die schärfste
+  denkbare Aussage über die Box-Uhr aus einer Messung, die nie zustande kam.
 
 **Belegtheits-Grade** (kombinierbar): **D1** plausibel innerhalb der Rohdaten · **D2** durch
 eigene forensische Tests verifiziert ([methode.md](methode.md)) ·

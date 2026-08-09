@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from fritzexport.extractors import supportdata as sd
+from fritzformat import parse_uhr_spans
 
 
 def _client(content: bytes = b"##### TITLE Datum Sat Aug  8 00:01:38 CEST 2026\n") -> MagicMock:
@@ -77,9 +80,15 @@ def test_extract_ohne_tastendruck_liefert_alle_drei(monkeypatch, tmp_path):
 
 # ─────────────────────────── Uhrzeit-Klammern ────────────────────────────────
 
-def test_fetch_one_klammert_den_abruf(caplog) -> None:
-    """Anfrage vor dem Abruf, Antwort danach — mit der Kurzform der Variante.
-    Der Report bildet aus dieser Klammer den Versatz der Box-Uhr."""
+def test_fetch_one_datiert_das_paar_mit_quellenkennung(caplog) -> None:
+    """Beide Marken tragen die Kurzform der Variante (`supportdata:standard`) — daran
+    ordnet der Report Marker und Messung einander zu, ohne raten zu müssen.
+
+    Bewusst **nicht** mehr: Dass die Marken den Abruf auch wirklich einklammern, prüft
+    `test_anfrage_steht_vor_dem_request` (Marker und POST in *einer* Liste). Dieser
+    Test hier sähe eine Anfrage-Marke, die hinter den POST rutscht, nicht — er sagte
+    das früher trotzdem im Docstring zu.
+    """
     caplog.set_level("INFO", logger="fritzexport.extractors.supportdata")
     sd._fetch_one(_client(), "SupportData", "standard")
 
@@ -112,9 +121,37 @@ def test_anfrage_steht_vor_dem_request(monkeypatch) -> None:
     assert ablauf == ["ANFRAGE", "POST", "ANTWORT"]
 
 
-def test_enhanced_schreibt_zwei_anfragen(caplog, monkeypatch) -> None:
-    """Der Tastendruck-Pfad ruft zweimal ab. Beide Paare stehen im Log; der
-    Report nimmt das letzte, weil nur dessen Antwort abgelegt wurde."""
+def test_fetch_one_datiert_auch_den_abgebrochenen_abruf(caplog) -> None:
+    """Wirft der POST selbst (Timeout, Verbindungsabbruch), muss die Antwort-Marke
+    trotzdem fallen — wie in `boxtime.py`.
+
+    Sonst bliebe eine Anfrage ohne Partner im Log stehen. `cli.py` fängt die Ausnahme
+    ab und schreibt das Bundle mit genau diesem Log; ein zweiter Abruf derselben
+    Quelle (erweiterte Supportdaten nach Tastendruck) verklammerte sich dann mit der
+    Marke des abgebrochenen Versuchs.
+    """
+    caplog.set_level("INFO", logger="fritzexport.extractors.supportdata")
+    client = _client()
+    client.session.post.side_effect = TimeoutError("read timeout")
+
+    with pytest.raises(TimeoutError):
+        sd._fetch_one(client, "SupportData", "standard")
+
+    marker = _uhr_marker(caplog)
+    assert marker[0].startswith("UHRZEIT ANFRAGE supportdata:standard ")
+    assert len(marker) == 2, "Abbruch bleibt undatiert — Anfrage ohne Partner im Log"
+    assert marker[1].startswith("UHRZEIT ANTWORT supportdata:standard ")
+
+
+def test_enhanced_klammert_beide_versuche_getrennt(caplog, monkeypatch) -> None:
+    """Der Tastendruck-Pfad ruft zweimal ab. Beide Versuche stehen als **eigenes,
+    vollständiges Paar** im Log, und die Leseseite greift daraus das zweite — nur
+    dessen Antwort wurde abgelegt.
+
+    Geprüft wird das hier mit `parse_uhr_spans` selbst, über das tatsächlich
+    geschriebene Log: Der Vorgänger dieses Tests zählte nur die ANFRAGE-Zeilen und
+    behauptete die Auswertung bloß im Docstring.
+    """
     caplog.set_level("INFO", logger="fritzexport.extractors.supportdata")
     antworten = iter([b"", b"DATA"])   # 1. HTML-Ersatz → None, 2. echte Daten
     client = _client()
@@ -130,6 +167,9 @@ def test_enhanced_schreibt_zwei_anfragen(caplog, monkeypatch) -> None:
     assert sd._fetch_enhanced(client) == b"DATA"
 
     marker = _uhr_marker(caplog)
-    anfragen = [m for m in marker if m.startswith("UHRZEIT ANFRAGE")]
-    assert len(anfragen) == 2, "beide Abrufversuche müssen datiert sein"
-    assert all("supportdata:enhanced" in m for m in anfragen)
+    assert [m.split()[1] for m in marker] == ["ANFRAGE", "ANTWORT", "ANFRAGE", "ANTWORT"]
+    assert all("supportdata:enhanced" in m for m in marker)
+
+    zweites_paar = (marker[2].split()[-1], marker[3].split()[-1])
+    assert parse_uhr_spans("\n".join(marker)) == {
+        "supportdata:enhanced": zweites_paar}

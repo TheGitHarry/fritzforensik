@@ -163,8 +163,12 @@ Zwei Quellen, unterschiedlich scharf:
   Erzeugung, danach folgt die Übertragung. Belegt ist damit „geht nicht mehr als *n* s
   vor"; ein Nachgehen bliebe unentdeckt.
 
-Der Report nennt stets die Quelle und die Breite der Klammer. Ein Versatz von null wird
-nicht als „Uhr korrekt" ausgegeben — gemessen ist eine Schranke, keine Übereinstimmung.
+Der Report nennt stets die Quelle. Die **Breite der Klammer** nennt er dort, wo sie die
+Fehlerschranke der Aussage ist — bei der beidseitigen Quelle; beim einseitigen
+Supportdaten-Kopf bestünde sie überwiegend aus der Übertragungsdauer und besagte nichts
+über die Uhr. Schließt eine beidseitige Klammer die Null ein, wird das als „kein Versatz
+nachweisbar" benannt, nicht als „Uhr korrekt" — gemessen ist eine Schranke, keine
+Übereinstimmung.
 Die Referenzuhr ist die Systemuhr der Abzugsmaschine und verbürgt sich nicht selbst;
 der Abgleich zeigt Übereinstimmung *zweier Uhren*, nicht mit UTC.
 

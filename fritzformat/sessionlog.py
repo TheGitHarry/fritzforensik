@@ -39,9 +39,11 @@ MARKER_UHR_ANTWORT = "UHRZEIT ANTWORT"
 _BEGIN_RE = re.compile(rf"{MARKER_BEGIN}\s+(\S+)")
 _END_RE = re.compile(rf"{MARKER_END}\s+(\S+)")
 
-#: Wie oben, aber mit Quellenkennung vor dem UTC-Wert: (quelle, iso).
-_UHR_ANFRAGE_RE = re.compile(rf"{MARKER_UHR_ANFRAGE}\s+(\S+)\s+(\S+)")
-_UHR_ANTWORT_RE = re.compile(rf"{MARKER_UHR_ANTWORT}\s+(\S+)\s+(\S+)")
+#: Wie oben, aber mit Quellenkennung vor dem UTC-Wert: (marker, quelle, iso).
+#: Beide Markerarten in **einem** Ausdruck, damit `parse_uhr_spans` sie in der
+#: Reihenfolge des Logs sieht — getrennt eingesammelt ließen sie sich nicht paaren.
+_UHR_ZEILE_RE = re.compile(
+    rf"({MARKER_UHR_ANFRAGE}|{MARKER_UHR_ANTWORT})\s+(\S+)\s+(\S+)")
 
 
 def begin_line(iso: str) -> str:
@@ -106,12 +108,23 @@ def parse_uhr_spans(text: str) -> dict[str, tuple[str, str]]:
     direkt, dann nach Tastendruck), und abgelegt wird die Datei des zweiten Abrufs.
     Das erste Paar gehört zu einer Antwort, die verworfen wurde — es zu nehmen
     verklammerte die Messung mit dem falschen Zeitraum.
+
+    Gepaart wird dabei **in der Reihenfolge des Logs**: Jede Anfrage öffnet eine
+    neue Klammer, die nächste Antwort derselben Quelle schließt sie. Zwei getrennte
+    Durchläufe („je die letzte Anfrage, je die letzte Antwort") wären kürzer, paarten
+    aber über Kreuz — fiele die Antwort des letzten Abrufs aus, verklammerten sie die
+    *spätere* Anfrage mit der *früheren* Antwort. Die Klammer liefe rückwärts, und der
+    Report läse daraus die schärfste denkbare Aussage über die Box-Uhr, gewonnen aus
+    einer Messung, die nie zustande kam.
     """
     if not text:
         return {}
     spans: dict[str, list[str]] = {}
-    for quelle, iso in _UHR_ANFRAGE_RE.findall(text):
-        spans.setdefault(quelle, ["", ""])[0] = iso
-    for quelle, iso in _UHR_ANTWORT_RE.findall(text):
-        spans.setdefault(quelle, ["", ""])[1] = iso
+    for marker, quelle, iso in _UHR_ZEILE_RE.findall(text):
+        if marker == MARKER_UHR_ANFRAGE:
+            spans[quelle] = [iso, ""]        # neue Klammer, verdrängt die vorige
+        elif quelle in spans and not spans[quelle][1]:
+            spans[quelle][1] = iso           # schließt die offene Klammer
+        else:
+            spans[quelle] = ["", iso]        # Antwort ohne offene Anfrage
     return {q: (v[0], v[1]) for q, v in spans.items()}

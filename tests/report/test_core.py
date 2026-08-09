@@ -366,6 +366,39 @@ def test_kein_irrefuehrender_report_hash_im_dokument(synth_bundle):
 
 # ───────────────────────── Versatz der Box-Uhr ───────────────────────────────
 
+def _zeilen(html: str, schluessel: str) -> list[str]:
+    """Alle Metadaten-Zeilen zu diesem Schlüssel — samt Badge-Spalte.
+
+    Bewusst über den Schlüssel geankert statt über das ganze Dokument: Ein Test, der
+    nur `in html` prüft, bleibt grün, wenn die Zeile ganz verschwindet oder der Text
+    zufällig anderswo steht.
+    """
+    marke = f"<th>{schluessel}</th>"
+    assert marke in html, f"Metadaten-Zeile fehlt: {schluessel}"
+    return [rest.split("</tr>", 1)[0] for rest in html.split(marke)[1:]]
+
+
+def _zeile(html: str, schluessel: str) -> str:
+    """Wie `_zeilen`, für Schlüssel, die genau einmal vorkommen."""
+    zeilen = _zeilen(html, schluessel)
+    assert len(zeilen) == 1, f"{len(zeilen)} Zeilen für {schluessel}, erwartet: 1"
+    return zeilen[0]
+
+
+def _versatz_zeile(html: str, herkunft: str) -> str:
+    """Die Zeitversatz-Zeile *einer* Quelle — der Report zeigt je Quelle eine."""
+    treffer = [z for z in _zeilen(html, "Zeitversatz Box ↔ Referenz") if herkunft in z]
+    assert len(treffer) == 1, f"keine eindeutige Zeitversatz-Zeile für {herkunft}"
+    return treffer[0]
+
+
+def _offset(b, quelle: str):
+    """Die Uhr-Messung einer Quelle aus dem geladenen Bundle."""
+    treffer = [c for c in b.clock_offsets if c.quelle == quelle]
+    assert len(treffer) == 1, f"genau eine Messung je Quelle erwartet: {quelle}"
+    return treffer[0]
+
+
 def _render(b):
     m = build_model(b)
     res = analyze(b, m.real_aps, m.master.get("name", ""))
@@ -376,10 +409,7 @@ def _render(b):
 def test_supportdata_klammer_wird_berechnet(synth_bundle):
     """Box meldet 11:00:02 CET (= 10:00:02Z), Marken 10:00:00Z / 10:00:40Z.
     Obere Schranke = 2 s Differenz + 1 s Quantisierung."""
-    b = load_bundle(synth_bundle)
-    assert len(b.clock_offsets) == 1
-    c = b.clock_offsets[0]
-    assert c.quelle == "supportdata:standard"
+    c = _offset(load_bundle(synth_bundle), "supportdata:standard")
     assert c.versatz_max_s == 3
     assert c.beidseitig is False
     assert c.herkunft == "marker"
@@ -393,16 +423,46 @@ def test_supportdata_zeigt_keine_untere_schranke(synth_bundle):
     Box-Uhr, die niemand gemessen hat.
     """
     b = load_bundle(synth_bundle)
-    assert b.clock_offsets[0].versatz_min_s == -38   # steht im Modell …
+    assert _offset(b, "supportdata:standard").versatz_min_s == -38   # im Modell …
     html = _render(b)
     assert "-38" not in html and "−38" not in html   # … aber nie im Bericht
     assert "geht nicht mehr als 3 s vor" in html
 
 
-def test_report_behauptet_keine_korrekte_box_uhr(synth_bundle):
-    """Gemessen ist eine Schranke, keine Übereinstimmung. Formulierungen wie
-    „Uhr ist korrekt" oder „synchron" behaupteten mehr als die Messung hergibt."""
+def test_rueckwaerts_laufende_klammer_wird_verworfen(synth_bundle):
+    """Steht die Antwort *vor* ihrer Anfrage — gekürztes oder manipuliertes Log —,
+    ist das keine Messung, sondern eine negative Klammerbreite.
+
+    `parse_uhr_spans` paart die Marken zwar in Logreihenfolge und erzeugt diesen Fall
+    nicht mehr selbst; die Leseseite darf sich darauf aber nicht verlassen. Ungeprüft
+    ergäbe die Klammer hier „geht nachweislich mindestens 37 s nach".
+    """
+    from fritzformat import session_log_filename
+    (synth_bundle / session_log_filename("20260106T100000Z")).write_text(
+        "2026-01-06 11:00:40,000 INFO UHRZEIT ANFRAGE supportdata:standard "
+        "2026-01-06T10:00:40.000Z\n"
+        "2026-01-06 11:00:00,000 INFO UHRZEIT ANTWORT supportdata:standard "
+        "2026-01-06T10:00:00.000Z\n",
+        encoding="utf-8")
+
+    b = load_bundle(synth_bundle)
+    assert b.clock_offsets == []
+    assert "nicht geprüft" in _render(b)
+
+
+def test_zeitversatz_zeile_sagt_genau_das_gemessene(synth_bundle):
+    """Die Zeile trägt die belegte Aussage samt Quelle und Belegtheitsgrad — und
+    nichts Stärkeres: Gemessen ist eine Schranke, keine Übereinstimmung.
+
+    Der Vorgänger dieses Tests verbot nur vier Wendungen („Uhr ist korrekt",
+    „synchron" …). Keine davon kam je im Produktionscode vor; entfernte man die
+    gesamte Uhr-Darstellung aus dem Report, blieb er grün. Er ankert deshalb jetzt
+    auf der Zeile selbst statt auf dem ganzen Dokument.
+    """
     html = _render(load_bundle(synth_bundle))
+    zeile = _versatz_zeile(html, "Supportdaten-Kopf, standard")
+    assert "geht nicht mehr als 3 s vor" in zeile
+    assert 'class="grade gD3"' in zeile, "gerechneter Versatz ohne D3-Badge"
     for verboten in ("Uhr ist korrekt", "korrekte Uhr", "synchron", "Uhr stimmt"):
         assert verboten not in html, f"zu starke Aussage im Report: {verboten}"
 
@@ -433,15 +493,66 @@ def test_ohne_quelle_steht_nicht_geprueft(tmp_path):
     assert ">None<" not in html
 
 
-def test_tr064_zeigt_beide_grenzen(synth_bundle):
-    """Gegenstück zur einseitigen Quelle: Bei TR-064 ist die Klammer die
-    Round-Trip-Zeit, dort tragen beide Schranken — es wird ein Intervall gezeigt."""
-    from fritzreport.bundle import ClockOffset
+def test_tr064_klammer_wird_aus_boxtime_gebildet(synth_bundle):
+    """Die ganze Strecke des TR-064-Zweigs: `boxtime.json` → `load_bundle` →
+    `ClockOffset` → gerenderte Zeile.
+
+    Der frühere Test dieses Zweigs setzte `clock_offsets` von Hand und übersprang
+    damit genau diese Strecke. Sie war deshalb von keinem Test abgedeckt: Ließ man
+    `_parse_box_iso` immer `None` liefern, blieben beide Suiten grün — auch die
+    Golden-Tests, denn alle Abzüge des Korpus stammen aus der Zeit vor `boxtime`.
+    """
     b = load_bundle(synth_bundle)
-    b.clock_offsets = [ClockOffset(
-        quelle="tr064:time", box_lokal="2026-01-06T11:00:02+01:00",
-        ref_von="2026-01-06T10:00:01.900Z", ref_bis="2026-01-06T10:00:02.100Z",
-        versatz_min_s=0, versatz_max_s=1, beidseitig=True, herkunft="marker")]
-    html = _render(b)
-    assert "Abweichung zwischen +0 s und +1 s" in html
-    assert "geht nicht mehr als" not in html
+    c = _offset(b, "tr064:time")
+    assert c.beidseitig is True
+    assert c.herkunft == "marker"
+    assert c.box_lokal == "2026-01-06T11:00:02+01:00", "Box-Zeit nicht wörtlich"
+    assert (c.versatz_min_s, c.versatz_max_s) == (0, 1)
+    assert c.fundstelle["file"].endswith(".json"), "Messung ohne Fundstelle"
+
+    zeile = _versatz_zeile(_render(b), "TR-064 Time:1")
+    assert "Abweichung zwischen +0 s und +1 s" in zeile
+    assert "Klammer 1 s" in zeile, "beidseitige Quelle ohne Fehlerschranke"
+    assert "geht nicht mehr als" not in zeile, "einseitige Formulierung bei TR-064"
+
+
+def test_beide_quellen_stehen_nebeneinander(synth_bundle):
+    """Liegen TR-064 **und** Supportdaten vor, beantwortet der Report das mit zwei
+    Zeilen — die schärfere zuerst. Dieser Fall trat in keinem Test je auf."""
+    zeilen = _zeilen(_render(load_bundle(synth_bundle)), "Zeitversatz Box ↔ Referenz")
+    assert len(zeilen) == 2
+    assert "TR-064 Time:1" in zeilen[0]
+    assert "Supportdaten-Kopf" in zeilen[1]
+
+
+def _mit_offset(b, **kw):
+    """Ersetzt die Uhr-Messungen des Bundles durch eine beidseitige (TR-064)."""
+    from fritzreport.bundle import ClockOffset
+    felder = dict(quelle="tr064:time", box_lokal="2026-01-06T11:00:02+01:00",
+                  ref_von="2026-01-06T10:00:01.900Z",
+                  ref_bis="2026-01-06T10:00:02.100Z",
+                  beidseitig=True, herkunft="marker")
+    b.clock_offsets = [ClockOffset(**{**felder, **kw})]
+    return b
+
+
+def test_klammer_um_die_null_benennt_den_befund(synth_bundle):
+    """H9 verlangt, dass auch der *negative* Befund benannt wird. Schließt die
+    beidseitige Klammer die Null ein, ist kein Versatz nachweisbar — das ist eine
+    Aussage und muss dastehen, statt dass der Leser das Intervall selbst gegen die
+    Null hält."""
+    html = _render(_mit_offset(load_bundle(synth_bundle),
+                               versatz_min_s=-1, versatz_max_s=1))
+    zeile = _zeile(html, "Zeitversatz Box ↔ Referenz")
+    assert "Abweichung zwischen -1 s und +1 s" in zeile
+    assert "kein Versatz nachweisbar" in zeile
+
+
+def test_nachgewiesener_versatz_wird_nicht_wegerklaert(synth_bundle):
+    """Kehrseite: Liegt die Null außerhalb der Klammer, *ist* ein Versatz belegt.
+    Der Befund darf dann nicht danebenstehen."""
+    html = _render(_mit_offset(load_bundle(synth_bundle),
+                               versatz_min_s=4, versatz_max_s=6))
+    zeile = _zeile(html, "Zeitversatz Box ↔ Referenz")
+    assert "Abweichung zwischen +4 s und +6 s" in zeile
+    assert "nachweisbar" not in zeile
