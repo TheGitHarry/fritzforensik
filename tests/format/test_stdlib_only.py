@@ -19,6 +19,24 @@ STDLIB_ONLY_PACKAGES = ["fritzformat", "fritzreport"]
 #: Eigene Pakete, die diese Module importieren dürfen.
 OWN_PACKAGES = {"fritzformat", "fritzreport"}
 
+#: Netzfähige Module der **Standardbibliothek**.
+#:
+#: Der Fremdpaket-Wächter oben greift hier nicht: ``sys.stdlib_module_names``
+#: enthält ``socket``, ``urllib`` und Verwandte, ein Netzzugriff über die
+#: stdlib liefe also unbemerkt durch. Für fritzreport ist das die
+#: entscheidende Zusicherung — das Werkzeug wertet Beweismittel aus und darf
+#: dabei nichts senden, weder an einen Update-Dienst noch sonstwohin.
+#: fritzformat steht mit auf der Liste, weil fritzreport es importiert.
+#: Nicht enthalten ist ``webbrowser``: ``fritzreport --open`` öffnet damit den
+#: fertigen Report als ``file://``-URI im lokalen Browser. Das startet ein
+#: lokales Programm und sendet nichts — die Zusicherung bleibt gewahrt.
+NETZ_MODULE = {
+    "socket", "ssl", "urllib", "http", "ftplib", "smtplib", "poplib",
+    "imaplib", "telnetlib", "nntplib", "socketserver", "xmlrpc",
+    "asyncio", "selectors", "asyncore", "asynchat",
+    "requests", "httpx", "aiohttp", "urllib3",
+}
+
 
 def _toplevel_imports(path: Path) -> set[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -53,3 +71,64 @@ def test_requests_ist_im_export_erlaubt() -> None:
     for py in sorted((REPO_ROOT / "fritzexport").rglob("*.py")):
         imports |= _toplevel_imports(py)
     assert "requests" in imports, "fritzexport sollte requests verwenden — Test greift ins Leere"
+
+
+def _dynamische_imports(tree: ast.AST) -> set[str]:
+    """Modulnamen aus ``importlib.import_module("x")`` und ``__import__("x")``.
+
+    Ein reiner AST-Import-Check ließe sich damit umgehen; erfasst werden
+    deshalb auch diese beiden Formen — jedenfalls, solange der Name als
+    Zeichenkette dasteht.
+    """
+    gefunden: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not node.args:
+            continue
+        ziel = node.func
+        name = (
+            ziel.attr if isinstance(ziel, ast.Attribute)
+            else ziel.id if isinstance(ziel, ast.Name)
+            else ""
+        )
+        if name in {"import_module", "__import__"}:
+            arg = node.args[0]
+            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                gefunden.add(arg.value.split(".")[0])
+    return gefunden
+
+
+@pytest.mark.parametrize("package", STDLIB_ONLY_PACKAGES)
+def test_kein_netzzugriff(package: str) -> None:
+    """fritzreport darf nichts senden — auch nicht über die Standardbibliothek.
+
+    Das ist die Zusicherung, die README und ABDECKUNG.md nach außen geben
+    („spricht nicht mit einem Dienst"). Eine Zusage, die kein Test bewacht,
+    ist bei einem Werkzeug zur Beweismittelauswertung wertlos.
+    """
+    treffer: dict[str, set[str]] = {}
+    for py in sorted((REPO_ROOT / package).rglob("*.py")):
+        tree = ast.parse(py.read_text(encoding="utf-8"), filename=str(py))
+        module = _toplevel_imports(py) | _dynamische_imports(tree)
+        netz = module & NETZ_MODULE
+        if netz:
+            treffer[str(py.relative_to(REPO_ROOT))] = netz
+    assert not treffer, (
+        f"{package} darf keine netzfähigen Module verwenden, tut es aber: {treffer}. "
+        "README und ABDECKUNG.md sagen zu, dass das Werkzeug nichts sendet."
+    )
+
+
+def test_netzwaechter_ist_scharf() -> None:
+    """Gegenprobe: der Wächter oben erkennt Netzmodule wirklich.
+
+    fritzexport MUSS mit der Box sprechen — dort müssen also Treffer
+    entstehen. Bleibt das aus, prüft der Wächter ins Leere.
+    """
+    module: set[str] = set()
+    for py in sorted((REPO_ROOT / "fritzexport").rglob("*.py")):
+        tree = ast.parse(py.read_text(encoding="utf-8"), filename=str(py))
+        module |= _toplevel_imports(py) | _dynamische_imports(tree)
+    assert module & NETZ_MODULE, (
+        "fritzexport verwendet laut Wächter keine netzfähigen Module — "
+        "dann greift die Erkennung nicht."
+    )

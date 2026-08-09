@@ -21,7 +21,9 @@ ohne installiertes Python.
 
 > **Die Werkzeuge selbst enthalten keine KI.** fritzexport spricht ausschließlich mit
 > der Box im eigenen Netz, fritzreport liest nur das Bundle auf der Platte — kein
-> Modell, kein Dienstaufruf, nichts verlässt das Gerät.
+> Modell, kein Dienstaufruf, nichts verlässt das Gerät. Dass fritzreport **kein
+> netzfähiges Modul** verwendet, auch keines aus der Standardbibliothek, hält
+> `tests/format/test_stdlib_only.py` statisch fest.
 >
 > **KI-gestützt ist die Entwicklung dieses Projekts.** Das betrifft Sie nur, wenn Sie
 > uns ein Bundle *bereitstellen*: Dessen Inhalte werden dann von einem KI-Assistenten

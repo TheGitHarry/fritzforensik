@@ -33,6 +33,14 @@ in `fritzformat` vornehmen**, nie in den Werkzeugen nachbauen.
 seine Abhängigkeitsfreiheit behalten soll (schlankes, netzwerkfreies Report-Binary).
 `tests/format/test_stdlib_only.py` wacht statisch darüber.
 
+Dieselbe Datei hält eine zweite, schärfere Zusage fest: `fritzreport` und `fritzformat`
+dürfen **kein netzfähiges Modul** verwenden — auch keines aus der Standardbibliothek.
+Der Fremdpaket-Wächter allein genügt dafür nicht, denn `sys.stdlib_module_names`
+enthält `socket`, `urllib` und Verwandte; ein Netzzugriff darüber liefe unbemerkt durch.
+README und ABDECKUNG.md sagen nach außen zu, dass das Werkzeug nichts sendet — diese
+Zusage darf nicht ohne Not aufgeweicht werden. Ausgenommen ist `webbrowser`
+(`--open` öffnet den fertigen Report lokal als `file://`, das sendet nichts).
+
 ## Wie fritzexport arbeitet
 
 - **Auth**: AVM Web-UI-SID-Verfahren (PBKDF2-Challenge-Response, MD5-Fallback für ältere

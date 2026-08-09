@@ -106,8 +106,10 @@ Zwei Dinge, die auseinanderzuhalten sind:
 - **Die Werkzeuge selbst enthalten keine KI.** `fritzexport` und `fritzreport`
   sind gewöhnliche Programme ohne Modell, ohne Dienstaufruf. `fritzexport`
   spricht ausschließlich mit der Box im eigenen Netz, `fritzreport` liest nur
-  das Bündel auf der Platte. Wer sie herunterlädt und auf eigenen Geräten
-  einsetzt, gibt keine Daten heraus.
+  das Bündel auf der Platte — dass es **kein netzfähiges Modul** verwendet,
+  auch keines aus der Standardbibliothek, ist durch einen Test festgehalten
+  (`tests/format/test_stdlib_only.py`). Wer die Werkzeuge herunterlädt und auf
+  eigenen Geräten einsetzt, gibt keine Daten heraus.
 - **Die Weiterentwicklung dieses Projekts läuft KI-gestützt.** Wird ein Abzug
   bereitgestellt, um eine Lücke zu schließen, werden seine Inhalte dabei von
   einem KI-Assistenten verarbeitet — und damit an dessen Anbieter übermittelt.
