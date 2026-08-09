@@ -370,6 +370,18 @@ Extractor-Registry und die Datenart-Liste synchron, prüfen den Rundlauf
 
 ---
 
+# Abdeckung
+
+Welche Modelle und FRITZ!OS-Stände bereits ausgelesen wurden und welche Datenarten
+dabei Daten lieferten, steht in [ABDECKUNG.md](ABDECKUNG.md) — samt der Lücken, bei
+denen ein weiterer Abzug dem Projekt am meisten hilft. Die Datei wird erzeugt:
+
+```bash
+python3 scripts/abdeckung.py <verzeichnis-mit-bundles> > ABDECKUNG.md
+```
+
+---
+
 # Lizenz
 
 Apache-2.0 — siehe [LICENSE](LICENSE). Nutzung, Änderung und Weitergabe sind erlaubt,

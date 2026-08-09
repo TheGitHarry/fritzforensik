@@ -116,6 +116,7 @@ Jede Aussage hat **genau einen** Ort — dasselbe Prinzip wie bei `fritzformat`:
 | [README.md](README.md) | Bedienung, Flags, Bundle-Format, Distribution |
 | CLAUDE.md | Orientierung, Fallen, Konventionen (diese Datei) |
 | [ressourcen/methode.md](ressourcen/methode.md) | Forensische Methodik + empirische Parser-Begründung |
+| [ABDECKUNG.md](ABDECKUNG.md) | Welche Modelle/Firmware getestet sind — **erzeugt**, nie von Hand ändern |
 | GitHub-Issues | Backlog — **ausschließlich** |
 
 Drei Regeln, die verhindern, dass es wieder auseinanderläuft:
@@ -127,6 +128,13 @@ Drei Regeln, die verhindern, dass es wieder auseinanderläuft:
   nie wiederverwendet; Weggefallenes bleibt mit Status `entfällt` und Begründung stehen.
 - **Kein Status in Prosa.** Testanzahlen, Versionen, „alles grün" veralten ab dem
   nächsten Commit. Was nirgends steht, kann nicht falsch werden.
+
+`ABDECKUNG.md` ist die eine Ausnahme von „kein Status": Sie *ist* Status, wird deshalb
+aber **erzeugt** (`scripts/abdeckung.py`) statt gepflegt. Nur mit dem vollständigen
+Korpus neu erzeugen — läuft das Skript über ein Teilverzeichnis, schrumpft die Matrix
+stillschweigend. Sie ist zur Veröffentlichung bestimmt und darf keine Seriennummern,
+Aktenzeichen, Hostnamen oder Datensatzzahlen enthalten; `tests/format/test_abdeckung.py`
+prüft beides mechanisch.
 
 `tests/format/test_docs.py` erzwingt die gefährlichsten Punkte mechanisch: Die
 Grade-Tabellen in README und ANFORDERUNGEN müssen `fritzreport.model.GRADE_LABEL`
