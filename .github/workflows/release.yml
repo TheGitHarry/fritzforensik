@@ -23,6 +23,7 @@ jobs:
     outputs:
       tool: ${{ steps.pick.outputs.tool }}
     steps:
+      - uses: actions/checkout@v4
       - id: pick
         shell: bash
         run: |
@@ -37,6 +38,29 @@ jobs:
           fi
           echo "Baue: $TOOL"
           echo "tool=$TOOL" >> "$GITHUB_OUTPUT"
+      # Der Release-Name kommt aus dem Tag, die Version im Binary-Dateinamen aber
+      # aus __init__.py (scripts/build.py). Ohne diesen Abgleich entstünde bei
+      # vergessenem Hochzählen ein Release "export-v0.4.1", das ein Binary
+      # "fritzexport-0.4.0-…" enthält — grüner Build, falsches Artefakt.
+      # Nur bei Tag-Läufen prüfbar; workflow_dispatch hat keine Version zu vergleichen.
+      - name: Tag und Paketversion abgleichen
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          case "${{ steps.pick.outputs.tool }}" in
+            export) PKG=fritzexport ;;
+            report) PKG=fritzreport ;;
+            *) echo "::error::Tag-Lauf ohne eindeutiges Werkzeug"; exit 1 ;;
+          esac
+          TAG_VERSION="${GITHUB_REF_NAME#*-v}"
+          # sys.path explizit setzen statt aufs Arbeitsverzeichnis zu vertrauen —
+          # dieselbe Quelle wie scripts/build.py, damit beide nie auseinanderlaufen.
+          PKG_VERSION="$(python3 -c "import sys; sys.path.insert(0, '$GITHUB_WORKSPACE'); import $PKG; print($PKG.__version__)")"
+          echo "Tag: $GITHUB_REF_NAME → $TAG_VERSION | $PKG/__init__.py: $PKG_VERSION"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' erwartet Version $TAG_VERSION, aber $PKG/__init__.py steht auf $PKG_VERSION. Entweder Version hochzählen und committen, oder Tag löschen und passend neu setzen. (Auch Suffixe wie -rc1 müssen in __version__ stehen.)"
+            exit 1
+          fi
 
   build-export:
     needs: setup
