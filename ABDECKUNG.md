@@ -91,5 +91,43 @@ Modelle schließen die Lücke:
 Ebenso wertvoll: **jedes Modell, das oben noch gar nicht steht**, und jeder
 deutlich abweichende FRITZ!OS-Stand eines schon gelisteten Modells.
 
-Ein Abzug enthält personenbezogene Daten und gehört **nicht** in ein öffentliches
-Issue. Der Weg für eine Kontaktaufnahme steht in [SECURITY.md](SECURITY.md).
+
+## Bevor Sie einen Abzug bereitstellen
+
+Ein Abzug enthält **personenbezogene Daten** — Anrufe, Telefonbuch, Gerätenamen,
+MAC-Adressen. Nicht nur Ihre eigenen: auch die aller Personen, die mit dieser Box
+telefoniert haben oder in ihrem WLAN waren. Diese Menschen können nicht selbst
+einwilligen. Bitte prüfen Sie vor dem Bereitstellen, wessen Daten Sie weitergeben.
+
+### Auswertung erfolgt KI-gestützt
+
+Zwei Dinge, die auseinanderzuhalten sind:
+
+- **Die Werkzeuge selbst enthalten keine KI.** `fritzexport` und `fritzreport`
+  sind gewöhnliche Programme ohne Modell, ohne Dienstaufruf. `fritzexport`
+  spricht ausschließlich mit der Box im eigenen Netz, `fritzreport` liest nur
+  das Bündel auf der Platte. Wer sie herunterlädt und auf eigenen Geräten
+  einsetzt, gibt keine Daten heraus.
+- **Die Weiterentwicklung dieses Projekts läuft KI-gestützt.** Wird ein Abzug
+  bereitgestellt, um eine Lücke zu schließen, werden seine Inhalte dabei von
+  einem KI-Assistenten verarbeitet — und damit an dessen Anbieter übermittelt.
+
+**Wer einen Abzug bereitstellt, muss damit einverstanden sein.** Sind Sie es
+nicht, stellen Sie bitte keinen bereit — es gibt einen Weg ohne Daten, siehe
+unten.
+
+### Der einfachere Weg: nur die Abdeckungsinformation
+
+Für diese Matrix genügt in aller Regel schon, **was ohne personenbezogene Daten**
+auskommt:
+
+- Modell, HWRevision und FRITZ!OS-Stand (aus der Box-Oberfläche ablesbar)
+- welche Datenarten Daten enthielten — also die Zeile, die in dieser Tabelle
+  entstünde
+
+Damit lässt sich eine Lücke oft schon schließen, ohne dass ein einziger Datensatz
+das Haus verlässt. Ein vollständiger Abzug ist nur nötig, wenn ein Fehler
+nachvollzogen werden muss.
+
+Ein Abzug gehört in **keinem** Fall in ein öffentliches Issue. Der Weg für eine
+Kontaktaufnahme steht in [SECURITY.md](SECURITY.md).

@@ -179,6 +179,28 @@ def test_hinweis_nennt_keine_serial() -> None:
     assert "0000000000000000" not in text
 
 
+def test_hinweis_auf_ki_auswertung_ist_vorhanden() -> None:
+    """Die Aufklärung vor dem Einsenden darf nie stillschweigend wegfallen.
+
+    Sie ist die Grundlage dafür, dass jemand informiert entscheidet, ob er
+    personenbezogene Daten bereitstellt — auch die Dritter.
+    """
+    text = abdeckung.erzeuge([_befund(False)])
+
+    assert "## Bevor Sie einen Abzug bereitstellen" in text
+    assert "personenbezogene Daten" in text
+    # Die Unterscheidung Werkzeug/Weiterentwicklung — ohne sie liest sich
+    # "KI" so, als telefoniere das Werkzeug selbst nach Hause.
+    assert "enthalten keine KI" in text
+    assert "KI-gestützt" in text
+    assert "einverstanden" in text
+    # Der datenarme Weg muss angeboten werden, sonst ist die Einwilligung
+    # eine Scheinwahl.
+    assert "ohne personenbezogene Daten" in text
+    # Dritte, die nicht selbst einwilligen können.
+    assert "nicht selbst" in text and "einwilligen" in text
+
+
 def test_firmware_ohne_slot_angaben() -> None:
     """Slot-Angaben würden gleiche FRITZ!OS-Stände als verschiedene Zeilen zeigen."""
     assert abdeckung.firmware_kurz("285.08.25,slot0=08.22-1,slot1=08.25-2") == "08.25"
