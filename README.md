@@ -131,7 +131,7 @@ mitsamt vollständiger Logdatei, die ab der ersten Zeile geschrieben wird.
 |---|---|---|
 | `--calls` | Web-UI | Anrufliste (CSV-Export) |
 | `--phonebook` | Web-UI | Alle Telefonbücher (XML-Export) |
-| `--wifi` | Web-UI | WLAN-Geräteliste inkl. inaktiver Geräte |
+| `--wifi` | Web-UI + TR-064 | WLAN-Geräteliste inkl. inaktiver Geräte. Der Web-UI-Weg schweigt, wenn die Box als **IP-Client hinter einem anderen Router** läuft — dann trägt `WLANConfiguration`. Zusammengeführt je MAC, `source` sagt woher |
 | `--events` | Web-UI | Ereignislog aller Kategorien (sys/net/wlan/fon/usb) |
 | `--tam` | TR-064 + Web-UI-Fallback | Anrufbeantworter-Metadaten + Audio-WAVs |
 | `--mesh` | TR-064 + Web-UI-Fallback | Mesh-Topologie |
