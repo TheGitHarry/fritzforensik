@@ -146,9 +146,21 @@ class FritzClient:
         except requests.RequestException:
             return False
 
-    #: Descriptor-Pfade, unter denen Boxen ihr Dienstverzeichnis anbieten.
-    #: Modellabhängig — deshalb der Reihe nach probieren.
-    DESCRIPTOR_PATHS = ("/tr64desc.xml", "/fboxdesc.xml", "/igddesc.xml")
+    #: Descriptor-Pfade, unter denen Boxen ihr TR-064-Dienstverzeichnis
+    #: anbieten. Modellabhängig — deshalb der Reihe nach probieren.
+    #:
+    #: Bewusst NICHT enthalten sind ``/fboxdesc.xml`` und ``/igddesc.xml``.
+    #: Beide antworten auf manchen Boxen mit HTTP 200, führen aber andere
+    #: Protokolle: fboxdesc kennt genau einen Dienst
+    #: (``urn:schemas-any-com:service:fritzbox:1``), igddesc listet UPnP-IGD
+    #: (``urn:schemas-upnp-org:``) statt TR-064 (``urn:dslforum-org:``).
+    #: Sie mitzunehmen ergäbe eine Liste, die aussieht wie ein Befund, aber
+    #: keiner ist — beobachtet an zwei Boxen ohne aktiven TR-064-Stack.
+    DESCRIPTOR_PATHS = ("/tr64desc.xml",)
+
+    #: Nur diese URN-Familie ist TR-064. Alles andere gehört nicht in den
+    #: Abgleich „welche Dienste holt ein Extractor ab".
+    TR064_URN_PREFIX = "urn:dslforum-org:service:"
 
     def tr064_services(self) -> list[dict]:
         """Welche TR-064-Dienste bietet diese Box an?
@@ -165,6 +177,12 @@ class FritzClient:
         Wie ``tr064_available`` bewusst tolerant: Ist nichts erreichbar oder
         unparsbar, gibt es eben keine Liste. Kein Abbruch — die Abwesenheit
         des Verzeichnisses ist kein Forensikfehler.
+
+        Eine **leere** Liste heißt nicht „Box bietet nichts an", sondern „kein
+        TR-064-Verzeichnis erreichbar". Im Feld beobachtet an Boxen, auf denen
+        *Zugriff für Anwendungen zulassen* deaktiviert ist: ``/tr64desc.xml``
+        liefert dort 404 und ein SOAP-Aufruf HTTP 500, während Boxen mit
+        aktivem Stack mit 401 antworten.
         """
         for pfad in self.DESCRIPTOR_PATHS:
             try:
@@ -173,7 +191,8 @@ class FritzClient:
                 continue
             if resp.status_code != 200 or not resp.content:
                 continue
-            dienste = _parse_service_list(resp.content)
+            dienste = [d for d in _parse_service_list(resp.content)
+                       if d["service_type"].startswith(self.TR064_URN_PREFIX)]
             if dienste:
                 return dienste
         return []

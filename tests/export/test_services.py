@@ -73,6 +73,35 @@ def test_parser_liefert_control_url() -> None:
     assert dienste["urn:dslforum-org:service:Hosts:1"]["control_url"] == "/upnp/control/hosts"
 
 
+def test_nur_tr064_urns_zaehlen(monkeypatch) -> None:
+    """Fremde Protokolle dürfen nicht als TR-064-Dienste durchgehen.
+
+    Im Feld beobachtet: Zwei Boxen ohne aktiven TR-064-Stack liefern unter
+    ``/tr64desc.xml`` eine 404. Ein Rückfall auf ``/fboxdesc.xml`` (HTTP 200)
+    ergab dort genau einen Dienst ``urn:schemas-any-com:...``, und
+    ``/igddesc.xml`` listet UPnP-IGD (``urn:schemas-upnp-org:``). Beides sah
+    aus wie ein Befund, war aber keiner — die Boxen bieten schlicht kein
+    TR-064 an.
+    """
+    from fritzexport.client import FritzClient
+
+    fremd = b"""<?xml version="1.0"?>
+    <root xmlns="urn:dslforum-org:device-1-0"><device><serviceList>
+     <service><serviceType>urn:schemas-any-com:service:fritzbox:1</serviceType>
+      <controlURL>/upnp/control/fritzbox</controlURL><SCPDURL>/x.xml</SCPDURL></service>
+     <service><serviceType>urn:schemas-upnp-org:service:WANIPConnection:1</serviceType>
+      <controlURL>/igdupnp/control/WANIPConn1</controlURL><SCPDURL>/y.xml</SCPDURL></service>
+    </serviceList></device></root>"""
+
+    client = FritzClient(base_url="http://box", sid="x", session=MagicMock())
+    antwort = MagicMock(status_code=200, content=fremd)
+    monkeypatch.setattr(client.session, "get", lambda *a, **k: antwort)
+
+    assert client.tr064_services() == [], (
+        "Nicht-TR-064-Dienste als Befund durchgelassen"
+    )
+
+
 def test_parser_vertraegt_unbrauchbares_xml() -> None:
     """Kein Abbruch: ein fehlendes Verzeichnis ist kein Forensikfehler."""
     assert _parse_service_list(b"kein xml") == []
