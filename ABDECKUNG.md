@@ -130,22 +130,31 @@ Art beizutragen — und für dieses Projekt zugleich die nützlichste.
 sondern darauf, dass eine Datenart **überhaupt** Datensätze liefert. Ein paar
 Testanrufe, ein Telefonbucheintrag, ein verbundenes Endgerät genügen bereits, um
 ein ○ in dieser Matrix zu einem ✓ zu machen — und damit zu belegen, dass der
-Codepfad auf dieser Modell-/Firmware-Kombination funktioniert. Gerade bei
-`portforward`, das bisher in keinem einzigen Abzug gefüllt war, reicht eine
-einzige eingerichtete Portfreigabe.
+Codepfad auf dieser Modell-/Firmware-Kombination funktioniert.
 
-### Ganz ohne Daten: nur die Abdeckungsinformation
+Am dringendsten ist `portforward` — bisher in **keinem** Abzug gefüllt. Dafür genügt eine einzige eingerichtete Portfreigabe.
 
-Kommt auch das nicht in Frage, genügt für diese Matrix oft schon, **was ohne
-personenbezogene Daten** auskommt:
+### Ganz ohne Daten: der Auszug
 
-- Modell, HWRevision und FRITZ!OS-Stand (aus der Box-Oberfläche ablesbar)
-- welche Datenarten Daten enthielten — also die Zeile, die in dieser Tabelle
-  entstünde
+**Sie müssen kein Bündel herausgeben.** Werten Sie es zu Hause aus und schicken
+Sie nur das Ergebnis:
 
-Damit lässt sich eine Lücke oft schon schließen, ohne dass ein einziger Datensatz
-das Haus verlässt. Ein vollständiger Abzug ist nur nötig, wenn ein Fehler
-nachvollzogen werden muss.
+```bash
+git clone https://github.com/TheGitHarry/fritzforensik && cd fritzforensik
+python3 scripts/abdeckung.py <ihr-bundle-verzeichnis> --json > auszug.json
+```
+
+`auszug.json` enthält je Abzug **nur** Modell, Hardware-Revision, FRITZ!OS-Stand
+und für jede Datenart, *ob* sie Datensätze lieferte — keine Seriennummern, keine
+Aktenzeichen, keine Hostnamen, keine Zählerstände, keinen einzigen Datensatz. Die
+Datei ist wenige Kilobyte groß und lässt sich vor dem Senden im Klartext lesen.
+
+Ohne `--json` erzeugt derselbe Aufruf Ihre eigene Matrix — nützlich, um vorher zu
+sehen, was Ihr Beitrag abdeckt. Auf dieser Seite werden Auszüge dann per
+`--beitrag=auszug.json` in die Gesamtmatrix aufgenommen.
+
+Ein vollständiges Bündel ist nur nötig, wenn ein **Fehler** nachvollzogen werden
+muss — für die reine Abdeckung nie.
 
 Ein Abzug gehört in **keinem** Fall in ein öffentliches Issue. Der Weg für eine
 Kontaktaufnahme steht in [SECURITY.md](SECURITY.md).

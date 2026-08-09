@@ -354,42 +354,119 @@ def erzeuge(befunde: list[dict]) -> str:
     a("sondern darauf, dass eine Datenart **überhaupt** Datensätze liefert. Ein paar")
     a("Testanrufe, ein Telefonbucheintrag, ein verbundenes Endgerät genügen bereits, um")
     a("ein ○ in dieser Matrix zu einem ✓ zu machen — und damit zu belegen, dass der")
-    a("Codepfad auf dieser Modell-/Firmware-Kombination funktioniert. Gerade bei")
-    a("`portforward`, das bisher in keinem einzigen Abzug gefüllt war, reicht eine")
-    a("einzige eingerichtete Portfreigabe.")
+    a("Codepfad auf dieser Modell-/Firmware-Kombination funktioniert.")
+    if nie:
+        a("")
+        a("Am dringendsten " + ("sind" if len(nie) > 1 else "ist") + " "
+          + ", ".join(f"`{a_}`" for a_ in nie) + " — bisher in **keinem** Abzug gefüllt."
+          + (" Dafür genügt eine einzige eingerichtete Portfreigabe."
+             if nie == ["portforward"] else ""))
     a("")
-    a("### Ganz ohne Daten: nur die Abdeckungsinformation")
+    a("### Ganz ohne Daten: der Auszug")
     a("")
-    a("Kommt auch das nicht in Frage, genügt für diese Matrix oft schon, **was ohne")
-    a("personenbezogene Daten** auskommt:")
+    a("**Sie müssen kein Bündel herausgeben.** Werten Sie es zu Hause aus und schicken")
+    a("Sie nur das Ergebnis:")
     a("")
-    a("- Modell, HWRevision und FRITZ!OS-Stand (aus der Box-Oberfläche ablesbar)")
-    a("- welche Datenarten Daten enthielten — also die Zeile, die in dieser Tabelle")
-    a("  entstünde")
+    a("```bash")
+    a("git clone https://github.com/TheGitHarry/fritzforensik && cd fritzforensik")
+    a("python3 scripts/abdeckung.py <ihr-bundle-verzeichnis> --json > auszug.json")
+    a("```")
     a("")
-    a("Damit lässt sich eine Lücke oft schon schließen, ohne dass ein einziger Datensatz")
-    a("das Haus verlässt. Ein vollständiger Abzug ist nur nötig, wenn ein Fehler")
-    a("nachvollzogen werden muss.")
+    a("`auszug.json` enthält je Abzug **nur** Modell, Hardware-Revision, FRITZ!OS-Stand")
+    a("und für jede Datenart, *ob* sie Datensätze lieferte — keine Seriennummern, keine")
+    a("Aktenzeichen, keine Hostnamen, keine Zählerstände, keinen einzigen Datensatz. Die")
+    a("Datei ist wenige Kilobyte groß und lässt sich vor dem Senden im Klartext lesen.")
+    a("")
+    a("Ohne `--json` erzeugt derselbe Aufruf Ihre eigene Matrix — nützlich, um vorher zu")
+    a("sehen, was Ihr Beitrag abdeckt. Auf dieser Seite werden Auszüge dann per")
+    a("`--beitrag=auszug.json` in die Gesamtmatrix aufgenommen.")
+    a("")
+    a("Ein vollständiges Bündel ist nur nötig, wenn ein **Fehler** nachvollzogen werden")
+    a("muss — für die reine Abdeckung nie.")
     a("")
     a("Ein Abzug gehört in **keinem** Fall in ein öffentliches Issue. Der Weg für eine")
     a("Kontaktaufnahme steht in [SECURITY.md](SECURITY.md).")
     return "\n".join(zeilen) + "\n"
 
 
+def als_beitrag(befunde: list[dict]) -> str:
+    """Maschinenlesbarer Auszug zum Einsenden — der Beitragsweg ohne Daten.
+
+    Wer das Projekt unterstützen will, muss keine Bündel herausgeben: Dieser
+    Auszug enthält nur, was die Matrix ohnehin zeigt — Modell, Revision,
+    FRITZ!OS und je Datenart, **ob** sie Datensätze lieferte. Keine Serials,
+    keine Aktenzeichen, keine Zählerstände, keine Hostnamen.
+
+    Die Gerätekennung ist der ohnehin nicht rückrechenbare Hash; sie erlaubt
+    nur, mehrere Abzüge desselben Geräts zusammenzuführen.
+    """
+    auszug = [
+        {
+            "modell": b["modell"],
+            "hwrev": b["hwrev"],
+            "firmware": b["firmware"],
+            "geraet": b["geraet"],
+            "serial_genullt": b["serial_genullt"],
+            "support": b["support"],
+            "datenarten": b["datenarten"],
+        }
+        for b in befunde
+    ]
+    return json.dumps(
+        {"format": "fritzforensik-abdeckung/1", "befunde": auszug},
+        ensure_ascii=False, indent=1, sort_keys=True,
+    ) + "\n"
+
+
+def lies_beitrag(pfad: Path) -> list[dict]:
+    """Eingesandten ``--json``-Auszug einlesen.
+
+    Bewusst streng: Ein Auszug kommt von außen, und eine unerwartete Struktur
+    soll hier auffallen und nicht erst als schiefe Zeile in der Matrix.
+    """
+    daten = json.loads(pfad.read_text(encoding="utf-8"))
+    if not isinstance(daten, dict) or daten.get("format") != "fritzforensik-abdeckung/1":
+        raise ValueError(f"{pfad}: kein Abdeckungs-Auszug (erwartet 'fritzforensik-abdeckung/1')")
+    befunde = daten.get("befunde")
+    if not isinstance(befunde, list) or not befunde:
+        raise ValueError(f"{pfad}: enthält keine Befunde")
+    pflicht = {"modell", "hwrev", "firmware", "geraet", "datenarten"}
+    for i, b in enumerate(befunde):
+        fehlend = pflicht - set(b or {})
+        if fehlend:
+            raise ValueError(f"{pfad}: Befund {i} fehlt {sorted(fehlend)}")
+        b.setdefault("support", [])
+        b.setdefault("serial_genullt", False)
+    return befunde
+
+
 def main(argv: list[str]) -> int:
-    if len(argv) != 2:
-        print(__doc__.strip().splitlines()[2].strip(), file=sys.stderr)
+    args = [a for a in argv[1:] if not a.startswith("--")]
+    flags = [a for a in argv[1:] if a.startswith("--")]
+    beitraege = [a.split("=", 1)[1] for a in flags if a.startswith("--beitrag=")]
+    rest = {a for a in flags if not a.startswith("--beitrag=")}
+    if len(args) != 1 or rest - {"--json"}:
+        print("Aufruf: abdeckung.py <verzeichnis-mit-bundles> [--json] "
+              "[--beitrag=<auszug.json> …]", file=sys.stderr)
+        if rest - {"--json"}:
+            print(f"Unbekannte Option: {', '.join(sorted(rest - {'--json'}))}", file=sys.stderr)
         return 2
-    wurzel = Path(argv[1]).expanduser()
+    wurzel = Path(args[0]).expanduser()
     if not wurzel.is_dir():
         print(f"Kein Verzeichnis: {wurzel}", file=sys.stderr)
         return 2
 
     befunde = [b for b in (lies_bundle(p) for p in sorted(wurzel.iterdir()) if p.is_dir()) if b]
+    try:
+        for p in beitraege:
+            befunde += lies_beitrag(Path(p).expanduser())
+    except (ValueError, OSError, json.JSONDecodeError) as e:
+        print(f"Eingesandter Auszug unbrauchbar: {e}", file=sys.stderr)
+        return 2
     if not befunde:
         print(f"Keine auswertbaren Bundles in {wurzel}", file=sys.stderr)
         return 1
-    print(erzeuge(befunde), end="")
+    print(als_beitrag(befunde) if "--json" in rest else erzeuge(befunde), end="")
     return 0
 
 

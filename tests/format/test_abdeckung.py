@@ -205,6 +205,70 @@ def test_hinweis_auf_ki_auswertung_ist_vorhanden() -> None:
     assert "nicht selbst" in text and "einwilligen" in text
 
 
+def test_auszug_verraet_nichts(praepariertes_bundle: Path) -> None:
+    """Der ``--json``-Auszug ist der Beitragsweg — er wird verschickt.
+
+    Ein Leck hier trägt personenbezogene Daten nach außen, und zwar bei jedem
+    Mitwirkenden, nicht nur einmal.
+    """
+    befunde = [
+        b for b in (abdeckung.lies_bundle(p)
+                    for p in praepariertes_bundle.iterdir() if p.is_dir()) if b
+    ]
+    roh = abdeckung.als_beitrag(befunde)
+
+    for was, wert in GEHEIM.items():
+        assert wert not in roh, f"{was} steht im Auszug"
+    assert "20260101T000000Z" not in roh, "Abzugszeitpunkt im Auszug"
+    assert "export_20260101T000000Z_test" not in roh
+
+    daten = json.loads(roh)
+    assert daten["format"] == "fritzforensik-abdeckung/1"
+    erlaubt = {"modell", "hwrev", "firmware", "geraet", "serial_genullt",
+               "support", "datenarten"}
+    for b in daten["befunde"]:
+        assert set(b) <= erlaubt, f"unerwartetes Feld im Auszug: {set(b) - erlaubt}"
+        # Nur ja/leer/fehlt — niemals eine Anzahl.
+        assert set(b["datenarten"].values()) <= {"ja", "leer", "fehlt"}
+
+
+def test_auszug_und_ruecklesen_sind_deckungsgleich(praepariertes_bundle: Path,
+                                                   tmp_path: Path) -> None:
+    """Rundlauf: schreiben → lesen → dieselbe Matrix.
+
+    Läuft das auseinander, zeigt die Gesamtmatrix etwas anderes als der
+    Mitwirkende bei sich sah.
+    """
+    befunde = [
+        b for b in (abdeckung.lies_bundle(p)
+                    for p in praepariertes_bundle.iterdir() if p.is_dir()) if b
+    ]
+    datei = tmp_path / "auszug.json"
+    datei.write_text(abdeckung.als_beitrag(befunde), encoding="utf-8")
+
+    zurueck = abdeckung.lies_beitrag(datei)
+    assert abdeckung.erzeuge(zurueck) == abdeckung.erzeuge(befunde)
+
+
+def test_beitrag_weist_fremdes_format_ab(tmp_path: Path) -> None:
+    """Ein Auszug kommt von außen — kaputte Struktur muss auffallen."""
+    fremd = tmp_path / "fremd.json"
+
+    fremd.write_text('{"befunde": []}', encoding="utf-8")
+    with pytest.raises(ValueError, match="kein Abdeckungs-Auszug"):
+        abdeckung.lies_beitrag(fremd)
+
+    fremd.write_text('{"format": "fritzforensik-abdeckung/1", "befunde": []}',
+                     encoding="utf-8")
+    with pytest.raises(ValueError, match="keine Befunde"):
+        abdeckung.lies_beitrag(fremd)
+
+    fremd.write_text('{"format": "fritzforensik-abdeckung/1",'
+                     ' "befunde": [{"modell": "X"}]}', encoding="utf-8")
+    with pytest.raises(ValueError, match="fehlt"):
+        abdeckung.lies_beitrag(fremd)
+
+
 def test_firmware_ohne_slot_angaben() -> None:
     """Slot-Angaben würden gleiche FRITZ!OS-Stände als verschiedene Zeilen zeigen."""
     assert abdeckung.firmware_kurz("285.08.25,slot0=08.22-1,slot1=08.25-2") == "08.25"

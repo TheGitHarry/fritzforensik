@@ -154,6 +154,13 @@ Für einen **neuen Abzug** gibt es den Skill `neuer-abzug` — er führt den gan
 (entpacken → Integrität → Report → Golden-Tests → Matrix → KORPUS.md → Bericht) samt
 der Fallen, die dabei schon aufgetreten sind.
 
+**Beiträge von außen** brauchen kein Bündel: Wer das Repo klont, erzeugt mit
+`scripts/abdeckung.py <verzeichnis> --json > auszug.json` einen datenfreien Auszug
+(nur Modell/Revision/Firmware und je Datenart ob gefüllt). Hier wird er per
+`--beitrag=auszug.json` in die Gesamtmatrix aufgenommen — beliebig oft wiederholbar.
+Der Auszug wird **verschickt**: `tests/format/test_abdeckung.py` prüft gegen ein
+präpariertes Bündel, dass er nichts Identifizierendes und keine Zählerstände enthält.
+
 Dass sie zum Korpus passt, bewacht `test_abdeckung_ist_aktuell` in `test_golden.py`:
 Kommt ein Abzug dazu, schlägt `pytest -m golden` fehl und nennt den Befehl zur
 Neuerzeugung. Der Wächter greift nur dort, wo der Korpus liegt — in fremden Klonen
