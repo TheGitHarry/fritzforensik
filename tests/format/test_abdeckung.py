@@ -98,6 +98,38 @@ def test_generator_gibt_keine_datensatzzahlen_aus(praepariertes_bundle: Path) ->
     assert befunde[0]["datenarten"]["calls"] == "ja"
 
 
+def _kopf(serial: str, hwrev: str = "285") -> list[str]:
+    return [f"SerialNumber\t{serial}\n", f"HWRevision\t{hwrev}\n"]
+
+
+def test_geraetekennung_verraet_die_serial_nicht() -> None:
+    """Die Kennung dient nur dem Zählen — sie darf die Serial nicht preisgeben."""
+    serial = "S49589630118571"
+    kennung = abdeckung._geraetekennung(_kopf(serial))
+    assert serial not in kennung
+    assert len(kennung) == 16
+    # gleiche Box → gleiche Kennung, andere Box → andere
+    assert kennung == abdeckung._geraetekennung(_kopf(serial))
+    assert kennung != abdeckung._geraetekennung(_kopf("K02562730245700"))
+
+
+def test_genullte_serial_zaehlt_als_eigenes_geraet() -> None:
+    """Zwei Boxen mit genullter Serial dürfen nicht zu einer verschmelzen."""
+    assert abdeckung._geraetekennung(_kopf("0000000000000000")) == ""
+    assert abdeckung._geraetekennung(_kopf("")) == ""
+    eintraege = [{"geraet": ""}, {"geraet": ""}]
+    assert abdeckung.geraetezahl(eintraege) == 2
+
+
+def test_geraetezahl_fuehrt_gleiche_box_zusammen() -> None:
+    gleiche = abdeckung._geraetekennung(_kopf("S49589630118571"))
+    andere = abdeckung._geraetekennung(_kopf("P40262732383692"))
+    assert abdeckung.geraetezahl([{"geraet": gleiche}] * 3) == 1
+    assert abdeckung.geraetezahl(
+        [{"geraet": gleiche}, {"geraet": gleiche}, {"geraet": andere}]
+    ) == 2
+
+
 def test_firmware_ohne_slot_angaben() -> None:
     """Slot-Angaben würden gleiche FRITZ!OS-Stände als verschiedene Zeilen zeigen."""
     assert abdeckung.firmware_kurz("285.08.25,slot0=08.22-1,slot1=08.25-2") == "08.25"
@@ -117,6 +149,9 @@ def test_eingecheckte_datei_ist_sauber() -> None:
         "IP-Adresse": r"\b(?:192\.168|10\.|172\.(?:1[6-9]|2\d|3[01]))\.\d+\.\d+\b",
         "Bundle-Zeitstempel": r"\b20\d{6}T\d{6}Z\b",
         "interner Hostname": r"\b[\w-]+\.(?:lan|local|intern)\b",
+        # Die Gerätekennung ist ein gekürzter SHA256 und dient nur dem Zählen;
+        # sie darf ebenso wenig in der Datei stehen wie die Serial selbst.
+        "Hash/Gerätekennung": r"\b[0-9a-f]{12,}\b",
     }
     for name, m in muster.items():
         treffer = re.findall(m, text)

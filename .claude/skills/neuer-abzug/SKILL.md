@@ -101,9 +101,11 @@ HWRevision identifiziert das Modell: **185**=7490, **226**=7590, **256**=7530 AX
 Drei Dinge, die schon aufgetreten sind und leicht übersehen werden:
 
 - **Dieselbe Box wie ein früherer Abzug?** Seriennummern über alle Bundles
-  vergleichen. Drei 7690-Abzüge im Korpus teilen sich `S49589630118571` — das
-  ist *eine* Box, dreimal gezogen, nicht drei Geräte. Für die Hardware-Abdeckung
-  zählt sie einfach.
+  vergleichen. Drei der 7690-Abzüge im Korpus teilen sich eine Seriennummer —
+  das ist *eine* Box, dreimal gezogen, nicht drei Geräte. Für die
+  Hardware-Abdeckung zählt sie einfach. `ABDECKUNG.md` weist das in der Spalte
+  „Geräte" aus (ohne die Serial zu zeigen); die Klartext-Serials stehen nur in
+  `KORPUS.md`.
 - **`calls` exakt 400?** Das ist die box-seitige Obergrenze, nicht die echte
   Listenlänge. Nie als Mengenaussage berichten.
 - **Leere Datenarten**: `records: []` heißt entweder „Box hat das nicht"

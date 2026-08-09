@@ -16,6 +16,7 @@ tests/format/test_abdeckung.py.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
@@ -57,6 +58,29 @@ def firmware_kurz(roh: str) -> str:
     return ".".join(teile[1:]) if len(teile) >= 3 else kern
 
 
+def _geraetekennung(zeilen: list[str]) -> str:
+    """Stabile, nicht rückrechenbare Kennung eines Geräts.
+
+    Dient allein dazu, mehrere Abzüge **derselben** Box als ein Gerät zu zählen.
+    Ohne das läse sich „3 Abzüge" wie „3 Geräte", und die Hardware-Abdeckung
+    erschiene besser als sie ist.
+
+    Es wird nur ein gekürzter SHA256 über Seriennummer und Hardware-Revision
+    gebildet; weder der Hash noch die Serial erscheinen in der Ausgabe. Ein
+    Rückschluss auf die Serial ist damit ausgeschlossen — der Wert verlässt
+    diese Funktion nur als Zählmerkmal.
+    """
+    serial = _feld(zeilen, "SerialNumber").strip()
+    # Manche Boxen liefern eine genullte oder leere Serial (im Korpus: ein
+    # 7490). Sie taugt dann nicht zum Unterscheiden — zwei solche Geräte
+    # würden zu einem verschmelzen. In dem Fall lieber kein Gerät zählen als
+    # eines zu wenig; der Aufrufer behandelt "" als "unbekannt".
+    if not serial or set(serial) <= {"0"}:
+        return ""
+    roh = serial + "|" + _feld(zeilen, "HWRevision")
+    return hashlib.sha256(roh.encode("utf-8")).hexdigest()[:16]
+
+
 def _feld(zeilen: list[str], name: str) -> str:
     """Tab-getrenntes Feld aus dem Kopf der Supportdaten ziehen."""
     muster = re.compile(rf"^{re.escape(name)}\t(.+)$")
@@ -77,6 +101,11 @@ def lies_bundle(verzeichnis: Path) -> dict | None:
     hwrev = _feld(kopf, "HWRevision")
     befund = {
         "hwrev": hwrev,
+        # Nur zum Unterscheiden von Geräten — der Hash selbst wird nie
+        # ausgegeben, die Klartext-Serial erst recht nicht. Ohne diese
+        # Unterscheidung läse sich "3 Abzüge" wie "3 Geräte", obwohl es
+        # dieselbe Box sein kann.
+        "geraet": _geraetekennung(kopf),
         "modell": HWREV_MODELL.get(hwrev, f"unbekannt (HWRevision {hwrev})"),
         "firmware": firmware_kurz(_feld(kopf, "firmware_info")),
         "datenarten": {},
@@ -108,6 +137,18 @@ def gruppiere(befunde: list[dict]) -> dict[tuple[str, str], list[dict]]:
     for b in befunde:
         gruppen[(b["modell"], b["firmware"])].append(b)
     return gruppen
+
+
+def geraetezahl(eintraege: list[dict]) -> int:
+    """Wie viele **verschiedene** Geräte hinter diesen Abzügen stecken.
+
+    Abzüge ohne brauchbare Seriennummer (Kennung ``""``) zählen einzeln — sie
+    lassen sich nicht zusammenführen, und lieber ein Gerät zu viel ausweisen
+    als zwei fälschlich verschmelzen.
+    """
+    bekannt = {e["geraet"] for e in eintraege if e["geraet"]}
+    unbekannt = sum(1 for e in eintraege if not e["geraet"])
+    return len(bekannt) + unbekannt
 
 
 SYMBOL = {"ja": "✓", "leer": "○", "fehlt": "—"}
@@ -149,14 +190,43 @@ def erzeuge(befunde: list[dict]) -> str:
     a("nie mit echten Daten gelaufen.")
     a("")
 
-    kopf = "| Modell | HWRev | FRITZ!OS | Abzüge | " + " | ".join(JSON_TYPES) + " |"
+    kopf = ("| Modell | HWRev | FRITZ!OS | Geräte | Abzüge | "
+            + " | ".join(JSON_TYPES) + " |")
     a(kopf)
-    a("|---" * (4 + len(JSON_TYPES)) + "|")
+    a("|---" * (5 + len(JSON_TYPES)) + "|")
     for (modell, firmware), eintraege in sorted(gruppen.items()):
         felder = [zusammenfassen(eintraege, art) for art in JSON_TYPES]
-        a(f"| {modell} | {eintraege[0]['hwrev']} | {firmware} | {len(eintraege)} | "
+        a(f"| {modell} | {eintraege[0]['hwrev']} | {firmware} | "
+          f"{geraetezahl(eintraege)} | {len(eintraege)} | "
           + " | ".join(felder) + " |")
     a("")
+
+    # Je Modell über alle Firmware-Zeilen hinweg zählen. Ohne das bliebe
+    # unsichtbar, dass dieselbe Box vor und nach einem Firmware-Update in zwei
+    # Zeilen steht — der Leser zählte Zeilen und käme auf zu viele Geräte.
+    je_modell: dict[str, list[dict]] = defaultdict(list)
+    for b in befunde:
+        je_modell[b["modell"]].append(b)
+
+    mehrfach = [
+        (modell, geraetezahl(eintraege), len(eintraege))
+        for modell, eintraege in sorted(je_modell.items())
+        if len(eintraege) > geraetezahl(eintraege)
+    ]
+    if mehrfach:
+        a("**Mehrere Abzüge derselben Box.** Die Spalte „Geräte\" zählt verschiedene")
+        a("Exemplare, „Abzüge\" die Sicherungen davon. Wo beide auseinandergehen,")
+        a("stammen mehrere Abzüge vom selben Gerät (erkannt an der Seriennummer, die")
+        a("hier bewusst nicht steht) — etwa dieselbe Box vor und nach einem")
+        a("Firmware-Update. Solche Abzüge erweitern die **Hardware**-Abdeckung nicht:")
+        a("")
+        for modell, geraete, abzuege in mehrfach:
+            a(f"- {modell}: {abzuege} Abzüge, aber nur {geraete} Gerät"
+              + ("e" if geraete != 1 else ""))
+        a("")
+        a("Ein Abzug eines **zweiten Exemplars** dieser Modelle ist deshalb weiterhin")
+        a("wertvoll — auch wenn Modell und FRITZ!OS-Stand schon in der Tabelle stehen.")
+        a("")
 
     a("## Supportdaten-Varianten")
     a("")
