@@ -20,7 +20,10 @@ Ziel: FRITZ!Box Supportdaten forensisch auswerten → gerätebezogene Verbindung
 > und diese Kennung ist **nicht** das Feld `HWRevision`: Sie fällt nur auf manchen
 > Modellen mit ihm zusammen (7530 AX 256, 7690 285), auf anderen nicht (7590: Kennung 154
 > bei `HWRevision` 226; 7490: 113 bei 185) — belegt in
-> `test_kennung_im_versionsstring_ist_nicht_die_hwrevision`. Welches Gerät hinter 259
+> `test_kennung_im_versionsstring_ist_nicht_die_hwrevision`. Die Box selbst trennt beide
+> Größen: In ihrem TR-064-Descriptor (`:49000/tr64desc.xml`) führt eine 7590
+> `<HW>226</HW>` neben `<Major>154</Major>` und `<Display>154.08.25</Display>`. Die
+> Kennung ist also AVMs **Firmware-Major**. Welches Gerät hinter 259
 > steht, ist von hier aus **nicht** bestimmbar: Keine geprüfte Box trägt die Zahl in einer
 > der beiden Größen, auch keine 7590. Die Gleichsetzung mit „unserer" 7590 war deshalb
 > unbelegt; sie bleibt offen, statt geraten zu werden.

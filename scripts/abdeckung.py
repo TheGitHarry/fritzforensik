@@ -52,10 +52,11 @@ def firmware_kurz(roh: str) -> str:
     Slot-Belegung verschiedene Werte und würden in der Matrix als
     unterschiedliche Zeilen erscheinen.
 
-    Vor dem Komma steht ``<Kennung>.<FRITZ!OS>``. Die Kennung ist **nicht** die
-    ``HWRevision``, auch wenn sie auf manchen Modellen mit ihr zusammenfällt
-    (7530 AX 256, 7690 285): Die 7590 führt hier 154 bei ``HWRevision`` 226, die
-    7490 113 bei 185. Sie wird deshalb abgeschnitten und nirgends ausgewertet —
+    Vor dem Komma steht ``<Kennung>.<FRITZ!OS>``. Die Kennung ist AVMs
+    **Firmware-Major**, **nicht** die ``HWRevision`` — die Box trennt beide selbst: Ihr
+    TR-064-Descriptor führt auf einer 7590 ``<HW>226</HW>`` neben ``<Major>154</Major>``.
+    Auf manchen Modellen fallen sie zusammen (7530 AX 256, 7690 285), auf anderen nicht
+    (7590: 154 gegen 226; 7490: 113 gegen 185). Sie wird deshalb abgeschnitten und nirgends ausgewertet —
     das Modell kommt allein aus ``HWRevision`` (`HWREV_MODELL`). Belegt in
     ``test_kennung_im_versionsstring_ist_nicht_die_hwrevision``; dieselbe
     Verwechslung stand in `methode.md` (Issue #17).
