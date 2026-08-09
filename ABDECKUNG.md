@@ -150,11 +150,18 @@ Aktenzeichen, keine Hostnamen, keine Zählerstände, keinen einzigen Datensatz. 
 Datei ist wenige Kilobyte groß und lässt sich vor dem Senden im Klartext lesen.
 
 Ohne `--json` erzeugt derselbe Aufruf Ihre eigene Matrix — nützlich, um vorher zu
-sehen, was Ihr Beitrag abdeckt. Auf dieser Seite werden Auszüge dann per
+sehen, was Ihr Beitrag abdeckt.
+
+**Einreichen** als Issue über die Vorlage *Abdeckung melden*
+([neues Issue anlegen](https://github.com/TheGitHarry/fritzforensik/issues/new?template=abdeckung.yml)).
+Den Inhalt von `auszug.json` einfach einfügen. Das Issue ist öffentlich — deshalb
+ist der Auszug so gebaut, dass daran nichts Schützenswertes ist; lesen Sie ihn
+vorher trotzdem durch. Auf dieser Seite werden eingegangene Auszüge per
 `--beitrag=auszug.json` in die Gesamtmatrix aufgenommen.
 
 Ein vollständiges Bündel ist nur nötig, wenn ein **Fehler** nachvollzogen werden
-muss — für die reine Abdeckung nie.
+muss — für die reine Abdeckung nie. Es gehört dann aber nicht in ein Issue,
+sondern auf den Weg aus [SECURITY.md](SECURITY.md).
 
 Ein Abzug gehört in **keinem** Fall in ein öffentliches Issue. Der Weg für eine
 Kontaktaufnahme steht in [SECURITY.md](SECURITY.md).

@@ -1,0 +1,70 @@
+name: Abdeckung melden
+description: Eine FRITZ!Box zur Abdeckungsmatrix beitragen — ohne Daten weiterzugeben
+title: "Abdeckung: FRITZ!Box <Modell> (FRITZ!OS <Stand>)"
+labels: ["abdeckung"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke fürs Beitragen. **Bitte hier kein Bündel und keinen Report anhängen** —
+        beide enthalten personenbezogene Daten, auch die unbeteiligter Dritter.
+
+        Gebraucht wird nur der datenfreie Auszug:
+
+        ```bash
+        git clone https://github.com/TheGitHarry/fritzforensik && cd fritzforensik
+        python3 scripts/abdeckung.py <ihr-bundle-verzeichnis> --json > auszug.json
+        ```
+
+        `auszug.json` enthält je Abzug ausschließlich Modell, Hardware-Revision,
+        FRITZ!OS-Stand und für jede Datenart, *ob* sie Datensätze lieferte. Keine
+        Seriennummern, keine Rufnummern, keine Gerätenamen, keine Zählerstände.
+        Die Datei ist wenige Kilobyte groß — **bitte vor dem Einfügen kurz
+        durchlesen**, dann sehen Sie selbst, was Sie weitergeben.
+
+  - type: textarea
+    id: auszug
+    attributes:
+      label: Auszug
+      description: Inhalt von `auszug.json` hier einfügen.
+      render: json
+    validations:
+      required: true
+
+  - type: dropdown
+    id: herkunft
+    attributes:
+      label: Woher stammt der Abzug?
+      description: >-
+        Für die Einordnung wichtig: Bei einer Testbox gibt es keine unbeteiligten
+        Dritten, deren Daten betroffen sein könnten.
+      options:
+        - Testbox / Laborgerät
+        - eigene Box im Privatgebrauch
+        - anderes (bitte unten erläutern)
+    validations:
+      required: true
+
+  - type: textarea
+    id: anmerkungen
+    attributes:
+      label: Anmerkungen
+      description: >-
+        Optional. Etwa: Besonderheiten der Box, warum eine Datenart leer blieb,
+        oder ob etwas beim Abzug nicht funktioniert hat.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: bestaetigung
+    attributes:
+      label: Bestätigung
+      options:
+        - label: >-
+            Der eingefügte Auszug enthält keine personenbezogenen Daten — ich habe
+            ihn durchgesehen.
+          required: true
+        - label: >-
+            Mir ist bekannt, dass die Weiterentwicklung dieses Projekts KI-gestützt
+            erfolgt und der Inhalt dieses Issues dabei verarbeitet wird.
+          required: true

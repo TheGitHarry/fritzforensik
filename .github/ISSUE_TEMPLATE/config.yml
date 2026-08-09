@@ -1,0 +1,10 @@
+# Das freie Formular bleibt erhalten: Der Backlog wird formlos in Issues geführt
+# (siehe CLAUDE.md) und soll nicht in die Abdeckungs-Vorlage gezwungen werden.
+blank_issues_enabled: true
+
+contact_links:
+  - name: Sicherheitslücke melden
+    url: https://github.com/TheGitHarry/fritzforensik/security/advisories/new
+    about: >-
+      Nicht als öffentliches Issue — Sicherheitsmeldungen laufen privat über
+      Security Advisories. Siehe SECURITY.md.

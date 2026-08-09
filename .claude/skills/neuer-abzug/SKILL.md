@@ -151,6 +151,15 @@ Schritt 2.
 python3 scripts/abdeckung.py ~/testdata/_work > ABDECKUNG.md
 ```
 
+Liegen **eingegangene Auszüge** von außen vor (Issues mit Label `abdeckung`),
+müssen sie mit angegeben werden — sonst verschwinden fremde Geräte aus der
+Matrix:
+
+```bash
+python3 scripts/abdeckung.py ~/testdata/_work \
+  --beitrag=<auszug1.json> --beitrag=<auszug2.json> > ABDECKUNG.md
+```
+
 **Immer über den vollständigen Korpus**, nie über ein Teilverzeichnis — sonst
 schrumpft die Matrix stillschweigend.
 

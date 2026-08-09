@@ -137,7 +137,10 @@ Drei Regeln, die verhindern, dass es wieder auseinanderläuft:
 
 - **Backlog nur in Issues.** Keine „Offen / später"-Liste in einer Markdown-Datei; die
   hat keinen Zustand und wird nie geschlossen. Genau daran ist das frühere `CONCEPT.md`
-  gescheitert.
+  gescheitert. Umgekehrt gilt *nicht*, dass jedes Issue Backlog wäre: Meldungen mit dem
+  Label **`abdeckung`** sind eingegangene Beiträge zur Matrix, keine offenen Aufgaben.
+  Wer den Backlog liest, filtert sie heraus:
+  `gh issue list --state open --search "-label:abdeckung"`.
 - **Anforderungen nur in ANFORDERUNGEN.md**, mit stabilen IDs (A1, B7, E2 …). IDs werden
   nie wiederverwendet; Weggefallenes bleibt mit Status `entfällt` und Begründung stehen.
 - **Kein Status in Prosa.** Testanzahlen, Versionen, „alles grün" veralten ab dem
@@ -158,6 +161,9 @@ der Fallen, die dabei schon aufgetreten sind.
 `scripts/abdeckung.py <verzeichnis> --json > auszug.json` einen datenfreien Auszug
 (nur Modell/Revision/Firmware und je Datenart ob gefüllt). Hier wird er per
 `--beitrag=auszug.json` in die Gesamtmatrix aufgenommen — beliebig oft wiederholbar.
+**Achtung:** Der Generator kennt nur, was er beim Aufruf bekommt. Wird er ohne die
+eingegangenen Auszüge gestartet, fallen fremde Geräte wieder aus der Matrix. Die
+Auszüge deshalb aufbewahren (die Issues mit Label `abdeckung` sind das Archiv).
 Der Auszug wird **verschickt**: `tests/format/test_abdeckung.py` prüft gegen ein
 präpariertes Bündel, dass er nichts Identifizierendes und keine Zählerstände enthält.
 
