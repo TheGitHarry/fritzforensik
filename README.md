@@ -144,6 +144,7 @@ mitsamt vollständiger Logdatei, die ab der ersten Zeile geschrieben wird.
 | `--tr069` | TR-064 | TR-069-Konfiguration (ACS-URL, Fernwartungsstatus) |
 | `--services` | TR-064 | Dienstverzeichnis der Box — welche TR-064-Dienste sie anbietet und welche davon ein Extractor abholt |
 | `--boxtime` | TR-064 | Uhrzeit, Zeitzone und NTP-Server der Box — Grundlage für den Zeitabgleich |
+| `--deviceinfo` | TR-064 | Selbstauskunft der Box: Modellname im Klartext, Seriennummer, Firmware, Laufzeit in Sekunden, Ereignislog |
 
 Ohne explizite Auswahl laufen alle Extractoren (`--all`).
 

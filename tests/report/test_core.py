@@ -446,6 +446,31 @@ def test_unbekannte_uptime_form_behauptet_kein_boot_datum():
     assert "nicht ableitbar" in _uptime_block(up)
 
 
+# ─────────────────── Selbstauskunft der Box (TR-064) ─────────────────────────
+
+def test_deviceinfo_erscheint_im_bericht(synth_bundle):
+    """Modellname und Laufzeit stehen roh im Bericht — beide unabhängig von den
+    Supportdaten und damit eine zweite Quelle neben deren `uptime:`-Zeile."""
+    html = _render(load_bundle(synth_bundle))
+    assert "FRITZ!Box 7590" in _zeile(html, "Modell laut TR-064")
+    assert "441000" in _zeile(html, "Uptime laut TR-064 (DeviceInfo), roh")
+
+
+def test_ohne_deviceinfo_keine_leeren_zeilen(tmp_path):
+    """Boxen ohne TR-064 liefern die Datenart nicht. Dann fehlen die Zeilen ganz,
+    statt mit leerem Wert dazustehen."""
+    from fritzformat import build_envelope, dataset_filename, sha256_bytes, write_sidecar
+    import json
+    body = json.dumps(build_envelope(tool="fritzexport", version="0.1", host="h",
+                                     type_name="hosts", records=[])).encode("utf-8")
+    p = tmp_path / dataset_filename("h", "20260106T100000Z", "hosts")
+    p.write_bytes(body)
+    write_sidecar(p, sha256_bytes(body))
+
+    html = _render(load_bundle(tmp_path))
+    assert "Modell laut TR-064" not in html
+
+
 # ──────────────────── Speichergrenze der Anrufliste ──────────────────────────
 
 def _mit_anrufen(d, anzahl: int):

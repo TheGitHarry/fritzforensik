@@ -96,6 +96,19 @@ def build_bundle(d: Path) -> Path:
     _write_json(d, ts, "events", [
         {"date": "01.01.26", "time": "10:00:10", "category": "wlan", "id": 1,
          "message": f"WLAN-Gerät TestPhone angemeldet, MAC {MAC}"}])
+    # Selbstauskunft der Box über TR-064 — Modellname im Klartext und die Laufzeit
+    # in Sekunden, beide unabhängig von den Supportdaten.
+    _write_json(d, ts, "deviceinfo", [
+        {"record_type": "device_info", "model_name": "FRITZ!Box 7590",
+         "description": "FRITZ!Box 7590 Release 154.08.25",
+         "product_class": "FRITZ!Box", "manufacturer": "AVM",
+         "manufacturer_oui": "00040E", "serial_number": "AABBCCDDEEFF",
+         "software_version": "154.08.25", "hardware_version": "FRITZ!Box 7590",
+         "spec_version": "1.0", "provisioning_code": "",
+         "uptime_s": 441000,
+         "device_log": "06.01.26 09:00:00 Anmeldung an der Benutzeroberfläche\n",
+         "raw": {"NewModelName": "FRITZ!Box 7590"}}])
+
     # Zweite Uhr-Quelle: TR-064 Time:1. Die Box meldet 11:00:02+01:00 (= 10:00:02Z),
     # geklammert von 10:00:01,900Z / 10:00:02,100Z — eine Round-Trip-Klammer, bei der
     # **beide** Schranken tragen. Ohne diese Datenart im Fixture ließ sich der ganze

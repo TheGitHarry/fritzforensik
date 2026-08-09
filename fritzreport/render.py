@@ -483,6 +483,32 @@ def _system_kpi_block(kpi: dict) -> str:
               f" — Zeile {kpi.get('line')}</td></tr></table>")
 
 
+def _deviceinfo_rows(bundle) -> list[tuple]:
+    """Selbstauskunft der Box über TR-064 — Metadaten-Zeilen, alle roh.
+
+    Zwei Angaben, die es sonst nicht gibt: der **Modellname im Klartext** (aus den
+    Supportdaten ist sicher nur die ``HWRevision`` ablesbar) und die **Laufzeit in
+    Sekunden**, unabhängig vom Textformat der ``uptime:``-Zeile und auf allen
+    geprüften Firmware-Ständen vorhanden.
+
+    Fehlt die Datenart — Box ohne TR-064, oder Abzug von vor ihrer Einführung —,
+    entstehen **keine** Zeilen. Eine leere Zeile mit Label läse sich wie ein
+    fehlgeschlagener Abruf.
+    """
+    records = getattr(bundle.ds("deviceinfo"), "records", None) or []
+    rec = next((r for r in records if r.get("record_type") == "device_info"), None)
+    if not rec:
+        return []
+    rows: list[tuple] = []
+    if rec.get("model_name"):
+        rows.append(("Modell laut TR-064", rec["model_name"]))
+    if rec.get("software_version"):
+        rows.append(("Firmware laut TR-064", rec["software_version"]))
+    if rec.get("uptime_s") != "" and rec.get("uptime_s") is not None:
+        rows.append(("Uptime laut TR-064 (DeviceInfo), roh", f"{rec['uptime_s']} s"))
+    return rows
+
+
 def _clock_rows(bundle) -> list[tuple]:
     """Metadaten-Zeilen zum Versatz der Box-Uhr — je Quelle eine.
 
@@ -795,6 +821,7 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
         ("Geräte-MAC", device.get("mac", "")),
         ("Host-URL", m.meta.get("host", "")),
         ("Extraktionswerkzeug", f'{m.meta.get("tool","?")} {m.meta.get("version","?")}'),
+        *_deviceinfo_rows(bundle),
         *_secured_rows(bundle, m),
         *_clock_rows(bundle),
         ("Report erzeugt am", header.get("generated_at", "")),
