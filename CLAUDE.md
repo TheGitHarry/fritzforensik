@@ -215,14 +215,11 @@ wörtlich wiedergeben, Nachweise müssen auf existierende Tests zeigen.
 
 ## Konventionen
 
-- Sprache von Doku, Logmeldungen, Fehlermeldungen: **Deutsch**.
-- Code-Identifier, JSON-Feldnamen: **Englisch**.
+Sprachregel, Commit-Form und Bibliotheks-Recherche stehen eine Ebene höher in
+`~/projects/CLAUDE.md` und gelten hier mit. Dazu kommt:
+
 - Forensik-Prinzip: **nichts auf der Box verändern**. Wo Lesen den Status ändert (z.B.
   TAM-Read-Flag), wird der Originalzustand per Restore-Aufruf wiederhergestellt und im
   Record dokumentiert.
 - Abzüge und erzeugte Reports enthalten echte Forensikdaten und werden **nie** eingecheckt
   (siehe `.gitignore`).
-
-## Library-Recherche
-
-Erst **deepwiki** (nur public GitHub), Fallback **exa**.
