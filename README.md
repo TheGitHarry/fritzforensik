@@ -1,4 +1,4 @@
-# fritzforensik <sub><sup>(an AI vibecoding project)</sup></sub>
+# fritzforensik <sub><sup>(an AI agents vibecoding project)</sup></sub>
 
 Zwei zusammengehörige Werkzeuge für die forensische Auswertung einer AVM FRITZ!Box:
 
