@@ -6,6 +6,6 @@
     "test": "echo \"Filtertest läuft über pytest: python3 -m pytest tests/report/test_filter.py\" && exit 1"
   },
   "devDependencies": {
-    "jsdom": "^29.1.1"
+    "jsdom": "^30.0.1"
   }
 }
