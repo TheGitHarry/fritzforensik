@@ -1,9 +1,11 @@
 # fritz-supportdatas-processor — Entwicklungszusammenfassung
 
-Quellen: `Methode-1.txt` (v1, 18.12.2025), `Methode-2.txt` (formal, Jan 2026)  
-Maßgeblich: **„Methodenpapier zur forensischen Auswertung von Router-Supportdaten
-(Fritz FRITZ!Box)", v1.0, Januar 2026** — nicht öffentlicher Herausgeber;
-Verfasser hier nicht genannt. Bei Abweichungen gilt das Methodenpapier.  
+Quellen: zwei nicht öffentliche Vorfassungen (v1, Dezember 2025; formale Fassung,
+Januar 2026)  
+Maßgeblich: ein **nicht öffentliches Methodenpapier zur forensischen Auswertung von
+Router-Supportdaten**, v1.0, Januar 2026. Bei Abweichungen gilt das Methodenpapier.
+Herausgeber und Verfasser werden hier bewusst nicht genannt; wer wissen muss, worauf
+die Methodik beruht, fragt bitte über ein Issue nach.  
 Ziel: FRITZ!Box Supportdaten forensisch auswerten → gerätebezogene Verbindungsnachweise mit Zeitstempeln
 
 ---
