@@ -120,7 +120,10 @@ Rundlauf *schreiben → lesen* über beide Werkzeuge, stdlib-Wächter.
 
 ## Release / CI
 
-**Eine** Workflow-Datei: [.github/workflows/release.yml](.github/workflows/release.yml).
+Zwei Workflow-Dateien: [.github/workflows/tests.yml](.github/workflows/tests.yml)
+fährt auf jedem Push nach `main` und jedem Pull Request die Suite (ohne Binary-Build,
+Golden-Tests dort deselektiert). Alles andere steckt in
+[.github/workflows/release.yml](.github/workflows/release.yml).
 Beide Werkzeuge werden **unabhängig versioniert**, das Tag-Präfix entscheidet:
 
 | Tag | baut |
@@ -137,8 +140,10 @@ Release auslösen:
    nicht mitgezogen.
 2. Commit, dann `git tag export-v0.3.2 && git push --tags`.
 
-Kein CI-Lauf auf normalen Pushes/PRs — Tests laufen als Teil des Release-Builds; schlägt
-der Test-Step fehl, gibt es kein Artefakt.
+Der Release-Build fährt die Tests noch einmal selbst: Schlägt der Test-Step dort fehl,
+gibt es kein Artefakt. Der eigene Test-Workflow kam dazu, als das Repo für die
+Veröffentlichung vorbereitet wurde — ein fremder Pull Request käme sonst bis zum
+nächsten Tag ungeprüft an.
 
 ### Stolperfallen im Build
 

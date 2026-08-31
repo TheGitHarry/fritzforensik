@@ -107,7 +107,7 @@ Verbindungsnachweise: methode.md-Parser → **D1+D2**, 802.11-Log-Parser → **D
 
 | ID | Anforderung | Status | Nachweis |
 |---|---|---|---|
-| E1a | HTML-Report selbst SHA256-signiert | erfüllt | `test_report_sidecar_written_and_verifies`, `test_report_sidecar_detects_tampering` |
+| E1a | HTML-Report selbst mit SHA256-Prüfsumme versehen | erfüllt | `test_report_sidecar_written_and_verifies`, `test_report_sidecar_detects_tampering` |
 | E1b | Report in der Datenbank als Beweismittel registriert | entfällt | Eigenständiges Feldwerkzeug ohne Datenbank; die Sidecar tritt an diese Stelle |
 | E2 | Filter/Druck manipulieren nur die Anzeige — Ur-Report bleibt hash-stabil | erfüllt | `test_report_sidecar_written_and_verifies` |
 | E3 | Report-Kopf enthält: Erstellungs-Zeitstempel, Werkzeug-Versionen, Case-ID, Chain-of-Custody-Tabelle aller Quelldateien mit SHA256 | erfüllt, angepasst | siehe [Abweichungen](#abweichungen-vom-ursprungskatalog) |
@@ -175,7 +175,7 @@ Daraus folgen die Umformulierungen:
 - **D-b** — die Gradzuweisung erfolgt bei der Auswertung (`fritzreport/supportdata.py`)
   statt „im Worker". Entscheidend bleibt: nicht im Betrachter-UI.
 - **D-d** — „einheitlich für alle Worker" ist gegenstandslos, es gibt nur ein Werkzeug.
-- **E1** — aufgeteilt: Die SHA256-Signatur des Reports (E1a) ist erfüllt, die
+- **E1** — aufgeteilt: Die SHA256-Prüfsumme des Reports (E1a) ist erfüllt, die
   Datenbank-Registrierung (E1b) entfällt mangels Datenbank. Die Sidecar neben dem
   Report übernimmt deren Funktion: Sie ist mit `sha256sum -c` prüfbar, auch ohne
   unsere Werkzeuge.

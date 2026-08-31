@@ -1,0 +1,42 @@
+name: Tests
+
+# Die Suite läuft auf jedem Push nach main und auf jedem Pull Request — ohne
+# Binary-Build, der bleibt dem Release-Workflow vorbehalten. Grund für den
+# eigenen Lauf: Ein fremder Pull Request käme sonst ungeprüft an, weil bis zum
+# nächsten Tag kein einziger Test liefe.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# Ein zweiter Push auf denselben Branch macht den laufenden Test überflüssig.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Node nur fürs Testen: ohne jsdom skippt tests/report/test_filter.py still,
+      # der Lauf wäre grün ohne geprüfte Filterlogik.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install test deps (jsdom)
+        run: npm ci
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "requests>=2.31" pytest
+      # Ohne -m golden: Die Golden-Tests brauchen echte Abzüge, die bewusst nicht
+      # im Repo liegen. Auf dem Runner sind sie deselektiert.
+      - name: Run tests
+        run: python -m pytest
