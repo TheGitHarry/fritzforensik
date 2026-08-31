@@ -186,7 +186,7 @@ jobs:
       # Ohne name: werden ALLE Artefakte des Runs gezogen. Da bei einem
       # export-v* / report-v* Tag nur die Jobs des jeweiligen Werkzeugs laufen,
       # enthält das automatisch nur dessen Binaries.
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
       - name: Binaries sammeln und SHA256SUMS bilden
