@@ -111,7 +111,7 @@ jobs:
       # Beim Tag-Lauf sind sie reine Durchreiche an den release-Job und Minuten später
       # überflüssig → 1 Tag. Bei workflow_dispatch entsteht kein Release, dort sind sie
       # das einzige Ergebnis → 7 Tage. Der Default wären 90 Tage für beides.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: fritzexport-${{ matrix.tag }}
           path: dist/fritzexport-*
@@ -162,7 +162,7 @@ jobs:
         run: python -m pytest
       - name: Build binary
         run: python scripts/build.py --tool report
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: fritzreport-${{ matrix.tag }}
           path: dist/fritzreport-*
