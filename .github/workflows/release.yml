@@ -17,6 +17,14 @@ on:
         options: [all, export, report]
         default: all
 
+# Grundrecht für alle Jobs: nur lesen. In den Build-Jobs läuft `npm ci`, das die
+# Install-Skripte der gesamten transitiven Abhängigkeitskette ausführt — jsdom ist
+# reines Testwerkzeug und geht in kein Binary ein, ein kompromittiertes Paket darin
+# soll aber unter keinen Umständen ins Repository schreiben können. Der release-Job
+# hebt sich sein `contents: write` selbst.
+permissions:
+  contents: read
+
 jobs:
   setup:
     runs-on: ubuntu-22.04
