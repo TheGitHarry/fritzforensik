@@ -40,7 +40,9 @@ Das gemeinsame Bundle-Format liegt in **`fritzformat/`** — Dateinamen, Hüllfo
 SHA256-Sidecars stehen dort *einmal* und werden von beiden Seiten benutzt.
 
 Was die Werkzeuge fachlich leisten müssen, steht in [ANFORDERUNGEN.md](ANFORDERUNGEN.md);
-offene Punkte ausschließlich in den [GitHub-Issues](https://github.com/TheGitHarry/fritzforensik/issues).
+offene Punkte ausschließlich in den [GitHub-Issues](https://github.com/TheGitHarry/fritzforensik/issues). Wie man beiträgt — und wie man
+die Abdeckungsmatrix erweitert, ohne Daten weiterzugeben — steht in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 

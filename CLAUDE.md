@@ -162,6 +162,7 @@ Jede Aussage hat **genau einen** Ort — dasselbe Prinzip wie bei `fritzformat`:
 | [methode.md](methode.md) | Forensische Methodik + empirische Parser-Begründung |
 | [ABDECKUNG.md](ABDECKUNG.md) | Welche Modelle/Firmware getestet sind — **erzeugt**, nie von Hand ändern |
 | [SECURITY.md](SECURITY.md) | Meldeweg für Sicherheitslücken, und was ausdrücklich keine ist |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Beitragswege nach außen — verweist auf die Eigentümer, statt sie zu wiederholen |
 | [LICENSE](LICENSE) | Apache-2.0 |
 | GitHub-Issues | Backlog — **ausschließlich** |
 
