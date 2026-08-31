@@ -17,8 +17,10 @@ from fritzformat import (
     collect_case,
     end_line,
     run_slug,
+    sha256_file,
     utc_now_iso,
     write_case,
+    write_sidecar,
 )
 
 from . import __version__, discover, output
@@ -330,19 +332,35 @@ def _configure_logging(verbose: bool, log_file: Path | None) -> None:
 
 
 def _close_log_file() -> None:
-    """Logdatei schließen und abhängen — Voraussetzung fürs Umbenennen.
+    """Logdatei schließen, abhängen und ihre Sidecar schreiben.
 
     Windows sperrt ein Verzeichnis, solange darin eine Datei offen ist, und der
     FileHandler bleibt sonst bis Prozessende offen (``rename`` scheiterte dort mit
     WinError 32). Der StreamHandler bleibt bestehen, damit die Abschlussmeldung
     weiterhin auf stderr geht.
+
+    Die Sidecar entsteht **hier** und nirgends sonst: Erst wenn der Handler zu ist,
+    steht der Inhalt fest. Sie ist nötig, weil das Log Beweislast trägt — der
+    Sicherungszeitraum und der Versatz der Box-Uhr stammen allein aus seinen
+    Markerzeilen. Ohne Prüfsumme fiele es nicht nur aus der Chain-of-Custody-Tabelle
+    des Reports (die entsteht aus den vorhandenen Sidecars), sondern eine Umdatierung
+    der Marker bliebe unbemerkt, während der Report weiter alles als verifiziert
+    meldet.
+
+    Das spätere Umbenennen des Verzeichnisses ist unschädlich: :func:`verify`
+    vergleicht allein den Digest, nicht den in der Sidecar genannten Dateinamen.
     """
     root = logging.getLogger()
     for h in list(root.handlers):
         if isinstance(h, logging.FileHandler):
+            path = Path(h.baseFilename)
             h.flush()
             h.close()
             root.removeHandler(h)
+            try:
+                write_sidecar(path, sha256_file(path))
+            except OSError as e:
+                sys.stderr.write(f"WARN: Sidecar für {path.name} nicht schreibbar: {e}\n")
 
 
 def _finalize_output_dir(output_dir: Path, case: dict, run_stamp: str) -> Path:
@@ -352,7 +370,12 @@ def _finalize_output_dir(output_dir: Path, case: dict, run_stamp: str) -> Path:
     wird. Ohne Fallkopf bleibt der Zeitstempelname bestehen. Scheitert das
     Umbenennen, behält der Abzug seinen bisherigen Namen — er ist vollständig, und
     ein fertiger Abzug darf nicht an der Benennung scheitern.
+
+    Das Log wird **vor** jeder Rückgabe geschlossen, nicht erst kurz vorm
+    ``rename``: Es bekommt dabei seine Sidecar, und die braucht auch ein Abzug, der
+    gar nicht umbenannt wird.
     """
+    _close_log_file()
     slug = run_slug(case.get("case_id", ""), case.get("item_id", ""), run_stamp)
     ziel = output_dir.parent / slug
     if ziel == output_dir:
@@ -362,7 +385,6 @@ def _finalize_output_dir(output_dir: Path, case: dict, run_stamp: str) -> Path:
                          f"{output_dir.name}.\n")
         return output_dir
 
-    _close_log_file()
     try:
         output_dir.rename(ziel)
     except OSError as e:

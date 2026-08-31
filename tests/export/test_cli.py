@@ -222,3 +222,51 @@ def test_umbenennen_scheitert_lautlos_nicht(monkeypatch, tmp_path):
 
     assert rc == cli.EXIT_OK, "Exit-Code darf sich durch das Benennungsproblem nicht ändern"
     assert (tmp_path / "export_20260713T101530Z").is_dir()
+
+
+# ───────────────────────── Sidecar des Sitzungslogs ──────────────────────────
+
+def test_sitzungslog_bekommt_sidecar(monkeypatch, tmp_path):
+    """Das Log trägt Beweislast (Sicherungszeitraum, Uhrenversatz) und braucht
+    deshalb dieselbe Prüfsumme wie jede andere Rohquelle."""
+    from fritzformat.digest import STATUS_OK, verify
+
+    _lauf(monkeypatch, tmp_path, ["--case-id", "C-1"])
+    log = tmp_path / "C-1_20260713T101530Z" / "fritzexport_20260713T101530Z.log"
+
+    assert log.with_suffix(".log.sha256").exists(), "Sitzungslog ohne Sidecar"
+    status, _ = verify(log)
+    assert status == STATUS_OK, "Sidecar des Logs verifiziert nicht"
+
+
+def test_sitzungslog_sidecar_auch_ohne_fallkopf(monkeypatch, tmp_path):
+    """Ohne Fallkopf wird nicht umbenannt — die Sidecar muss trotzdem entstehen."""
+    _lauf(monkeypatch, tmp_path, [])
+    log = tmp_path / "export_20260713T101530Z" / "fritzexport_20260713T101530Z.log"
+    assert log.with_suffix(".log.sha256").exists()
+
+
+def test_sitzungslog_steht_in_der_chain_of_custody(monkeypatch, tmp_path):
+    """Was keine Sidecar hat, wird nicht bemängelt, sondern ist unsichtbar."""
+    from fritzreport.bundle import load_bundle
+
+    _lauf(monkeypatch, tmp_path, ["--case-id", "C-1"])
+    b = load_bundle(tmp_path / "C-1_20260713T101530Z")
+
+    assert any(e.file.endswith(".log") for e in b.coc), \
+        f"Sitzungslog fehlt in der CoC-Tabelle: {[e.file for e in b.coc]}"
+    assert b.integrity_ok
+
+
+def test_manipulierter_sicherungszeitraum_faellt_auf(monkeypatch, tmp_path):
+    """Der Befund aus #33: Wer die Marker im Log umdatiert, verschiebt den
+    ausgewiesenen Sicherungszeitraum — der Report meldete trotzdem alles grün."""
+    from fritzreport.bundle import load_bundle
+
+    _lauf(monkeypatch, tmp_path, ["--case-id", "C-1"])
+    dir_ = tmp_path / "C-1_20260713T101530Z"
+    log = dir_ / "fritzexport_20260713T101530Z.log"
+    log.write_text(log.read_text(encoding="utf-8").replace("T10", "T07"), encoding="utf-8")
+
+    b = load_bundle(dir_)
+    assert not b.integrity_ok, "umdatiertes Sitzungslog bleibt unbemerkt"
