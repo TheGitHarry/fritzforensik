@@ -27,7 +27,7 @@ jobs:
           python-version: "3.12"
       # Node nur fürs Testen: ohne jsdom skippt tests/report/test_filter.py still,
       # der Lauf wäre grün ohne geprüfte Filterlogik.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
       - name: Install test deps (jsdom)
