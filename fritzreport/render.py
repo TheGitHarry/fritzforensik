@@ -762,15 +762,43 @@ def build_timeline(model: Model, proofs: list) -> list:
 
 # ───────────────────────── Gesamt-Report ─────────────────────────────────────
 
+def _hostname(host: str) -> str:
+    """Hostname aus einer Host-URL — Schema, Port, Pfad und Anmeldeteil weg.
+
+    Von Hand statt mit ``urllib.parse.urlsplit``: ``urllib`` steht auf der
+    Netz-Sperrliste von ``tests/format/test_stdlib_only.py``. Der Wächter kennt nur
+    Modulnamen der obersten Ebene, kann ``urllib.parse`` also nicht von
+    ``urllib.request`` unterscheiden — und die Zusage, dass fritzreport nichts
+    sendet, ist mehr wert als drei gesparte Zeilen.
+    """
+    rest = host.strip().split("://", 1)[-1].split("/", 1)[0].rsplit("@", 1)[-1]
+    if rest.startswith("["):                      # IPv6-Literal
+        return rest[1:].split("]", 1)[0].lower()
+    return rest.split(":", 1)[0].lower()
+
+
 def _pick_device(mesh_nodes: list, host: str = "") -> dict:
     """Identität der **abgezogenen** Box robust wählen.
 
-    Beste Quelle ist der Mesh-Knoten, dessen Name im `host`-Feld steht (die Box,
+    Beste Quelle ist der Mesh-Knoten, dessen Name zum `host`-Feld passt (die Box,
     mit der fritzexport tatsächlich sprach). Ist der Host eine IP (kein
     Namenstreffer), wird ein Knoten *mit* Modell bevorzugt — der Master-Knoten
-    trägt je nach Firmware kein `device_model`."""
+    trägt je nach Firmware kein `device_model`.
+
+    Verglichen wird der **Hostname**, nicht die ganze URL, und zwar gegen den
+    vollen Namen oder sein erstes Label. Ein Substring-Test wie früher lässt
+    ``fb7590mc`` auf ``fb7590mc2.lan`` passen — beide Namen stehen real in
+    derselben Mesh-Liste des Korpus, und der erste Treffer in Listenreihenfolge
+    gewann. Ausgewiesen wird hier die **Geräte-MAC des Asservats**; ein Fehlgriff
+    setzt die MAC einer fremden Box in den Reportkopf. Die Liste enthält zudem alle
+    Mesh-Knoten samt Clientnamen, und kurze Namen wie ``nc`` stecken in fast jeder
+    URL (#41).
+    """
     if host:
-        hit = next((n for n in mesh_nodes if n.get("name") and n["name"] in host), None)
+        hostname = _hostname(host)
+        label = hostname.split(".")[0]
+        hit = next((n for n in mesh_nodes
+                    if n.get("name") and n["name"].lower() in (hostname, label)), None)
         if hit:
             return hit
     for pred in (lambda n: n["role"] == "master" and n.get("model"),
