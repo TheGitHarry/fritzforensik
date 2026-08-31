@@ -45,7 +45,12 @@ class FritzClient:
         password: str,
         verify_tls: bool = True,
     ) -> "FritzClient":
-        base_url = host if host.startswith(("http://", "https://")) else f"http://{host}"
+        # HTTPS als Default — dieselbe Antwort wie ``cli._normalize_host``. Ohne
+        # Schema greift weder die TLS-Prüfung noch der Benutzer-Auto-Detect; wer den
+        # Client ohne die CLI benutzt, bekam hier vorher still Klartext (#39). Ein
+        # ausdrückliches http:// bleibt unangetastet, und der automatische Rückfall
+        # bei selbstsignierten Box-Zertifikaten (``cli._probe_tls``) ist unberührt.
+        base_url = host if host.startswith(("http://", "https://")) else f"https://{host}"
         base_url = base_url.rstrip("/")
         session = requests.Session()
         session.verify = verify_tls
