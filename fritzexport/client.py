@@ -5,6 +5,7 @@ import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
+from xml.sax.saxutils import escape
 
 import requests
 from requests.auth import HTTPDigestAuth
@@ -96,7 +97,13 @@ class FritzClient:
         `Tr064Error` bei allen anderen UPnPError-Codes oder Transport-Fehlern.
         """
         args = args or {}
-        body_args = "".join(f"<{k}>{v}</{k}>" for k, v in args.items())
+        # Werte escapen: Ein Argument mit & < > erzeugte sonst kaputtes oder
+        # fremdbestimmtes XML. Heute reichen alle Extractoren nur Ziffern durch —
+        # scharf wird die Stelle beim ersten Aufruf, der einen Wert aus einer
+        # Box-Antwort zurückgibt (MAC, Gerätename, Telefonbucheintrag), und dort
+        # fiele nichts auf (#40). Die Elementnamen stammen aus unseren eigenen
+        # Modulkonstanten und sind keine Fremdeingabe.
+        body_args = "".join(f"<{k}>{escape(str(v))}</{k}>" for k, v in args.items())
         body = (
             '<?xml version="1.0" encoding="utf-8"?>'
             '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"'

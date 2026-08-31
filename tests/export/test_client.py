@@ -49,3 +49,64 @@ def test_client_und_cli_geben_dieselbe_antwort(gesehen):
 
     FritzClient.login("fritz.box", "admin", "geheim", verify_tls=False)
     assert gesehen[0] == _normalize_host("fritz.box")
+
+
+# ─────────────────── SOAP-Body: Argumentwerte escapen (#40) ───────────────────
+
+def _client_mit_aufzeichnung(monkeypatch):
+    """FritzClient, der den gesendeten SOAP-Body festhält statt ihn zu schicken."""
+    gesendet: dict = {}
+
+    class _Resp:
+        status_code = 200
+        text = ('<?xml version="1.0"?><s:Envelope '
+                'xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body>'
+                '<u:XResponse xmlns:u="urn:x"><NewX>ok</NewX>'
+                '</u:XResponse></s:Body></s:Envelope>')
+
+    class _Session:
+        def post(self, url, data=None, **kw):
+            gesendet["body"] = data
+            return _Resp()
+
+    c = FritzClient(base_url="https://fritz.box", sid="0" * 16, session=_Session(),
+                    username="admin", password="geheim")
+    return c, gesendet
+
+
+def test_sonderzeichen_im_argument_werden_escaped(monkeypatch):
+    """Ein Wert mit & < > erzeugte bisher kaputtes oder fremdbestimmtes XML.
+
+    Heute übergeben alle Extractoren nur Ziffern — es ist keine Lücke, sondern eine
+    gestellte Falle: Der erste Extractor, der einen Wert aus einer Box-Antwort
+    zurück in einen Aufruf gibt (MAC, Gerätename, Telefonbucheintrag), macht sie
+    scharf, ohne dass an dieser Stelle etwas auffällt.
+    """
+    c, gesendet = _client_mit_aufzeichnung(monkeypatch)
+    c.tr064_call("urn:x", "/upnp/control/x", "X", {"NewName": 'A&B<C>"D"'})
+
+    body = gesendet["body"]
+    assert "<NewName>A&amp;B&lt;C&gt;" in body
+    # Der Wert darf keine neuen Elemente aufmachen können
+    assert "<C>" not in body
+
+
+def test_eingeschleustes_element_bleibt_text(monkeypatch):
+    """Gegenprobe an der schärfsten Form: ein kompletter Element-Schnipsel."""
+    import xml.etree.ElementTree as ET
+
+    c, gesendet = _client_mit_aufzeichnung(monkeypatch)
+    c.tr064_call("urn:x", "/upnp/control/x", "X",
+                 {"NewIndex": "0</NewIndex><NewEvil>1</NewEvil><NewIndex>"})
+
+    root = ET.fromstring(gesendet["body"])
+    assert root.find(".//NewEvil") is None, "Argumentwert hat ein Element erzeugt"
+    werte = [e.text for e in root.iter("NewIndex")]
+    assert werte == ["0</NewIndex><NewEvil>1</NewEvil><NewIndex>"]
+
+
+def test_ziffern_bleiben_unveraendert(monkeypatch):
+    """Keine Verhaltensänderung für die bestehenden Aufrufe."""
+    c, gesendet = _client_mit_aufzeichnung(monkeypatch)
+    c.tr064_call("urn:x", "/upnp/control/x", "X", {"NewIndex": "3"})
+    assert "<NewIndex>3</NewIndex>" in gesendet["body"]
