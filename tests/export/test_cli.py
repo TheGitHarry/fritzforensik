@@ -17,7 +17,7 @@ from fritzexport import cli
     ],
 )
 def test_normalize_host(raw, expected):
-    assert cli._normalize_host(raw) == expected
+    assert cli.normalize_host(raw) == expected
 
 
 def test_probe_tls_schaltet_bei_selbstsigniertem_cert_auf_insecure(monkeypatch):
@@ -41,7 +41,7 @@ def test_probe_tls_greift_auch_bei_host_ohne_schema(monkeypatch):
 
     monkeypatch.setattr(cli.requests, "get", boom)
     args = argparse.Namespace(insecure=False)
-    cli._probe_tls(cli._normalize_host("192.168.2.1"), args)
+    cli._probe_tls(cli.normalize_host("192.168.2.1"), args)
     assert seen == ["https://192.168.2.1/login_sid.lua?version=2"]
     assert args.insecure is True
 

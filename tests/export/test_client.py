@@ -1,9 +1,10 @@
 """FritzClient — Schema-Default beim Login (#39).
 
 Welches Schema gilt, wenn der Host ohne eines angegeben wird, ist **eine** Frage.
-Sie wurde an zwei Stellen verschieden beantwortet: ``cli._normalize_host`` ergänzte
-``https://``, ``FritzClient.login`` ``http://``. Über die CLI gewann HTTPS, weil die
-Normalisierung vorher läuft — wer den Client direkt benutzt, bekam still Klartext.
+Sie wurde an zwei Stellen verschieden beantwortet: die CLI ergänzte ``https://``,
+``FritzClient.login`` ``http://``. Über die CLI gewann HTTPS, weil die Normalisierung
+vorher läuft — wer den Client direkt benutzt, bekam still Klartext. Seit #43 gibt es
+nur noch ``client.normalize_host``; beide Wege rufen dieselbe Funktion.
 """
 from __future__ import annotations
 
@@ -43,12 +44,16 @@ def test_schema_default_ist_https(gesehen, host, erwartet):
     assert c.base_url == erwartet
 
 
-def test_client_und_cli_geben_dieselbe_antwort(gesehen):
-    """Die eigentliche Zusage aus #39: beide Wege enden bei derselben base_url."""
-    from fritzexport.cli import _normalize_host
+def test_client_und_cli_teilen_sich_die_antwort(gesehen):
+    """#39 hat die beiden Antworten in Deckung gebracht, #43 die Frage auf einen Ort
+    gezogen. Geprüft wird deshalb nicht mehr, dass zwei Ergebnisse übereinstimmen,
+    sondern dass es nur noch **eine** Funktion gibt, die sie liefert."""
+    from fritzexport import cli, client
+
+    assert cli.normalize_host is client.normalize_host
 
     FritzClient.login("fritz.box", "admin", "geheim", verify_tls=False)
-    assert gesehen[0] == _normalize_host("fritz.box")
+    assert gesehen[0] == client.normalize_host("fritz.box")
 
 
 # ─────────────────── SOAP-Body: Argumentwerte escapen (#40) ───────────────────

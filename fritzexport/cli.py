@@ -25,7 +25,7 @@ from fritzformat import (
 
 from . import __version__, discover, output
 from .auth import AuthError, fetch_users
-from .client import FritzClient
+from .client import FritzClient, normalize_host
 from .extractors import EXTRACTORS, EXTRACTORS_WITH_AUDIO, EXTRACTORS_WITH_DIR
 from .extractors.services import genutzte_services
 
@@ -46,18 +46,6 @@ def _default_output() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent / "export"
     return Path.cwd() / "export"
-
-
-def _normalize_host(host: str) -> str:
-    """Ergänzt fehlendes Schema (Default https) und entfernt Trailing-Slash.
-
-    Ohne Schema greift weder die TLS-Prüfung noch der Benutzer-Auto-Detect,
-    weil requests dann mit MissingSchema abbricht.
-    """
-    host = host.strip().rstrip("/")
-    if "://" not in host:
-        host = "https://" + host
-    return host
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -450,7 +438,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
 
     if args.host:
-        args.host = _normalize_host(args.host)
+        args.host = normalize_host(args.host)
 
     run_stamp = output._utc_now_compact()
     base_dir = args.output or _default_output()

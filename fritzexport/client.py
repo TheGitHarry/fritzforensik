@@ -29,6 +29,24 @@ class Tr064Disabled(Tr064Error):
     """
 
 
+def normalize_host(host: str) -> str:
+    """Ergänzt fehlendes Schema (Default https) und entfernt Trailing-Slash.
+
+    **Die** Antwort auf die Frage, welches Schema gilt, wenn der Host ohne eines
+    angegeben wird — für die CLI wie für den direkten Gebrauch des Clients. Sie stand
+    lange zweimal da, mit verschiedenen Defaults (#39) und danach immer noch mit
+    verschiedener Erkennung (#43): Ohne Schema greift weder die TLS-Prüfung noch der
+    Benutzer-Auto-Detect, weil requests mit MissingSchema abbricht.
+
+    Ein ausdrücklich angegebenes Schema bleibt unangetastet, auch ein ungewöhnliches —
+    wer ``http://`` schreibt, hat sich entschieden.
+    """
+    host = host.strip().rstrip("/")
+    if "://" not in host:
+        host = "https://" + host
+    return host
+
+
 @dataclass
 class FritzClient:
     base_url: str
@@ -46,13 +64,9 @@ class FritzClient:
         password: str,
         verify_tls: bool = True,
     ) -> "FritzClient":
-        # HTTPS als Default — dieselbe Antwort wie ``cli._normalize_host``. Ohne
-        # Schema greift weder die TLS-Prüfung noch der Benutzer-Auto-Detect; wer den
-        # Client ohne die CLI benutzt, bekam hier vorher still Klartext (#39). Ein
-        # ausdrückliches http:// bleibt unangetastet, und der automatische Rückfall
-        # bei selbstsignierten Box-Zertifikaten (``cli._probe_tls``) ist unberührt.
-        base_url = host if host.startswith(("http://", "https://")) else f"https://{host}"
-        base_url = base_url.rstrip("/")
+        # Der automatische Rückfall bei selbstsignierten Box-Zertifikaten
+        # (``cli._probe_tls``) ist davon unberührt.
+        base_url = normalize_host(host)
         session = requests.Session()
         session.verify = verify_tls
         if not verify_tls:
