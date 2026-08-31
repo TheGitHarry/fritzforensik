@@ -394,7 +394,7 @@ def _secured_rows(bundle, m) -> list[tuple]:
     - **protokolliert** — das Log nennt Beginn und Ende wörtlich → reine
       Rohdaten-Wiedergabe, kein Badge
     - **abgeleitet** — Minimum und Maximum der ``extracted_at``. Die beiden Werte
-      stehen so in den signierten Hüllen; abgeleitet ist allein der Schluss, dass
+      stehen so in den Hüllen der Rohdateien; abgeleitet ist allein der Schluss, dass
       sie den Sicherungszeitraum begrenzen → **D1** („plausibel innerhalb Rohdaten")
     - **Dauer** — eine Subtraktion, in den Rohdaten steht sie nirgends → immer
       **D3**, genau wie „hochgefahren am, berechnet"
@@ -864,8 +864,11 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
         return '<span class="unknown">— keine Sidecar</span>'
     mism = sum(1 for e in bundle.coc if e.status == "mismatch")
     s2 = (
-        "<p>Rohquellen dieses Reports. Jede Datei ist per SHA256-Sidecar signiert; "
-        "fritzreport hat jede Datei gegen ihre Sidecar <strong>verifiziert</strong>.</p>"
+        "<p>Rohquellen dieses Reports. Zu jeder hier gelisteten Datei liegt eine "
+        "SHA256-Prüfsumme als Sidecar vor; fritzreport hat jede gelistete Datei dagegen "
+        "<strong>verifiziert</strong>. Die Prüfsumme belegt, dass die Datei seit dem Abzug "
+        "unverändert ist, solange die Sidecar selbst vertrauenswürdig ist — sie ist "
+        "<strong>keine kryptografische Signatur</strong> und weist keinen Urheber aus.</p>"
         "<table><thead><tr><th>Datei</th><th>SHA256</th><th class='num'>Größe (Byte)</th>"
         "<th>Integrität</th></tr></thead><tbody>"
         + "".join(f'<tr><td class="mono">{esc(c.file)}</td>'

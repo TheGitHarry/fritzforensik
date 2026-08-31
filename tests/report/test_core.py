@@ -130,6 +130,28 @@ def test_render_structure(synth_bundle):
 
 # ───────────────────────── Report-Sidecar ───────────────────────────────────
 
+def test_coc_nennt_die_sidecar_keine_signatur(synth_bundle, tmp_path, monkeypatch):
+    """#34: Ein Hash ist keine Signatur — es gibt keinen Schlüssel und keinen
+    Signierenden. Das größere Wort im Report liefert einem Gegengutachter die
+    Angriffsfläche selbst; dieser Test hält die Vokabel draußen."""
+    from fritzreport.cli import main
+
+    out = tmp_path / "report.html"
+    monkeypatch.setattr("sys.argv", [
+        "fritzreport", str(synth_bundle), "-o", str(out),
+        "--case-id", "C-1", "--item-id", "A-1", "--sb", "Test", "--date", "2026-01-01",
+    ])
+    assert main() == 0
+    html = out.read_text(encoding="utf-8")
+
+    assert "signiert" not in html, \
+        "Report nennt seine SHA256-Prüfsumme wieder eine Signatur"
+    # „Signatur" darf genau einmal vorkommen — in der Absage an das Wort.
+    assert html.count("Signatur") == 1
+    assert "keine kryptografische Signatur" in html.replace("<strong>", ""), \
+        "Reichweite der Prüfsumme wird im Report nicht mehr benannt"
+
+
 def test_report_sidecar_written_and_verifies(synth_bundle, tmp_path, monkeypatch):
     """Der Report bekommt eine eigene .sha256-Sidecar, die zur Datei passt."""
     from fritzformat.digest import STATUS_OK, verify
@@ -281,7 +303,7 @@ def test_report_zeigt_gerechneten_zeitraum_mit_d1(synth_bundle):
     """Ohne Marker-Log wird der Zeitraum abgeleitet — und muss als solcher
     gekennzeichnet sein, sonst sieht Gerechnetes aus wie Protokolliertes.
 
-    D1, nicht D3: Die beiden Werte stehen wörtlich in den signierten Hüllen
+    D1, nicht D3: Die beiden Werte stehen wörtlich in den Hüllen der Rohdateien
     (min/max der extracted_at). Abgeleitet ist allein der Schluss, dass sie den
     Sicherungszeitraum begrenzen — das ist „plausibel innerhalb Rohdaten".
     Nur die Dauer ist ein errechneter Wert und trägt deshalb D3."""
