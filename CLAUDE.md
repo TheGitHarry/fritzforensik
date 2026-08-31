@@ -210,6 +210,20 @@ Drei Regeln, die verhindern, dass es wieder auseinanderläuft:
   nie wiederverwendet; Weggefallenes bleibt mit Status `entfällt` und Begründung stehen.
 - **Kein Status in Prosa.** Testanzahlen, Versionen, „alles grün" veralten ab dem
   nächsten Commit. Was nirgends steht, kann nicht falsch werden.
+- **Issues sind öffentlich zu denken — schon beim Anlegen.** Wer einen Befund am echten
+  Asservat nachstellt, anonymisiert **in der ersten Fassung**: Aktenzeichen als
+  `VG-XX-000000`, MAC-Adressen als `aa:bb:cc:dd:ee:NN`, keine Hostnamen, keine
+  Verfasser oder Herausgeber nicht öffentlicher Papiere. Der Beleg trägt dadurch
+  nichts weniger — die Beweisführung braucht das Namenspaar, nicht die echte MAC.
+
+  Nachträglich ist es teurer, als es aussieht: Ein Issue zu bearbeiten entfernt nichts,
+  es legt eine Schicht darüber. GitHub führt zu jedem Body und jedem Kommentar einen
+  Bearbeitungsverlauf, den **jeder mit Lesezugriff** einsehen kann und der über die
+  GraphQL-API (`userContentEdits`) im Volltext abrufbar ist. Löschen lässt sich eine
+  Revision nur von Hand in der Weboberfläche (`edited` → Revision → *Options* →
+  *Delete revision from history*); eine API dafür gibt es nicht. Am 2026-09-01 waren
+  so vier Stellen nachzuräumen, die eine Woche zuvor mit zwei Zeichen Umsicht gar nicht
+  erst entstanden wären.
 
 `ABDECKUNG.md` ist die eine Ausnahme von „kein Status": Sie *ist* Status, wird deshalb
 aber **erzeugt** (`scripts/abdeckung.py`) statt gepflegt. Nur mit dem vollständigen
