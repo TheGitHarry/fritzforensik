@@ -163,8 +163,8 @@ Der Skill nennt die Eigentumstabelle: jede Aussage hat genau einen Ort. Prüfe:
 - Steht dieselbe Aussage an zwei Orten — und weichen die Fassungen ab?
 - Widerspricht eine Datei einer anderen?
 - Steht etwas an einem Ort, dem es nicht gehört? **Besonders methode.md**: Sie fasst ein
-  externes nicht öffentliches Methodenpapier zusammen und trägt D2 — eigene Messreihen gehören dort
-  nicht hinein.
+  externes, nicht öffentliches Methodenpapier zusammen und trägt D2 — eigene Messreihen
+  gehören dort nicht hinein.
 - Passt der **Titel** einer Datei noch zu ihrer Rolle?
 - Stimmt die **Grade-Definition in CLAUDE.md** (steht dort in Prosa, nicht in einer
   Tabelle) mit \`fritzreport/model.py\` \`GRADE_LABEL\` überein? Kein Test erfasst das.
