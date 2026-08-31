@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from fritzreport.bundle import load_bundle
+from fritzreport.bundle import STATUS_MISSING, load_bundle
 from fritzreport.cli import is_bundle
 from fritzreport.model import build_model
 from fritzreport.render import build_html
@@ -47,7 +47,8 @@ def test_korpus_ist_vorhanden() -> None:
 
 def test_integritaet_vollstaendig_ok(echtes_bundle: Path) -> None:
     b = load_bundle(echtes_bundle)
-    schlecht = [e.file for e in b.coc if e.status == "mismatch"]
+    schlecht = [f"{e.file} ({e.status})" for e in b.coc
+                if e.status in ("mismatch", STATUS_MISSING)]
     assert not schlecht, f"Integritätsprüfung fehlgeschlagen für: {schlecht}"
     assert b.coc, "keine einzige Datei mit Sidecar gefunden"
 

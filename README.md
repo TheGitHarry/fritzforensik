@@ -197,6 +197,11 @@ implizit als "gelesen", wird der Status über `MarkMessage(MarkedAsRead=0)` wied
 (`tam_state_preserved: true`). Im Web-UI-Fallback ist das nicht möglich
 (`tam_state_preserved: false`).
 
+Die WAV-Dateien haben **keine eigene Sidecar**: Ihr SHA256 steht im jeweiligen Datensatz
+(`audio_sha256`), und die `tam`-JSON hat ihrerseits eine Sidecar. Der Hash liegt damit
+eine Ebene über der Datei, die er schützt. fritzreport löst das ein und führt jede
+Sprachnachricht mit dieser Herkunft in der Chain-of-Custody-Tabelle.
+
 ### Ereignislog (`--events`)
 
 Ruft alle Filterkategorien ab (`all`, `sys`, `net`, `wlan`, `fon`, `usb`) und dedupliziert

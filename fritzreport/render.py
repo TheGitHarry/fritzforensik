@@ -14,6 +14,7 @@ import datetime as _dt
 import html
 
 from . import __version__
+from .bundle import QUELLE_RECORD, STATUS_MISSING
 from .model import GRADE_LABEL, GRADE_SCHEMA, NO_AP, Model
 
 # ───────────────────────── CSS (aus PoC, 3 Grade) ────────────────────────────
@@ -861,19 +862,32 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
             return '<span class="ok">✔ verifiziert</span>'
         if st == "mismatch":
             return '<span class="err">✘ MISMATCH</span>'
+        if st == STATUS_MISSING:
+            return '<span class="err">✘ Datei fehlt</span>'
         return '<span class="unknown">— keine Sidecar</span>'
+
+    # Woher die Erwartung stammt. Eine Sidecar liegt neben ihrer Datei; der Hash
+    # einer Sprachnachricht steht im Datensatz der tam-JSON und damit eine Ebene
+    # höher — wer die WAV austauscht, müsste auch die JSON nachziehen und brächte
+    # deren Sidecar zu Fall. Der Unterschied gehört in die Tabelle, sonst liest
+    # sich beides gleich stark.
+    def coc_quelle(q):
+        return "Datensatz (tam)" if q == QUELLE_RECORD else "Sidecar"
     mism = sum(1 for e in bundle.coc if e.status == "mismatch")
     s2 = (
         "<p>Rohquellen dieses Reports. Zu jeder hier gelisteten Datei liegt eine "
-        "SHA256-Prüfsumme als Sidecar vor; fritzreport hat jede gelistete Datei dagegen "
+        "SHA256-Prüfsumme vor — neben der Datei als Sidecar, bei Sprachnachrichten im "
+        "Datensatz der tam-Datei, die ihrerseits eine Sidecar hat. fritzreport hat jede "
+        "gelistete Datei dagegen "
         "<strong>verifiziert</strong>. Die Prüfsumme belegt, dass die Datei seit dem Abzug "
         "unverändert ist, solange die Sidecar selbst vertrauenswürdig ist — sie ist "
         "<strong>keine kryptografische Signatur</strong> und weist keinen Urheber aus.</p>"
         "<table><thead><tr><th>Datei</th><th>SHA256</th><th class='num'>Größe (Byte)</th>"
-        "<th>Integrität</th></tr></thead><tbody>"
+        "<th>Prüfsumme laut</th><th>Integrität</th></tr></thead><tbody>"
         + "".join(f'<tr><td class="mono">{esc(c.file)}</td>'
                   f'<td class="mono hash">{esc(c.sha256)}</td>'
                   f'<td class="num mono">{c.size if c.size is not None else ""}</td>'
+                  f'<td>{esc(coc_quelle(c.quelle))}</td>'
                   f'<td>{coc_badge(c.status)}</td></tr>' for c in bundle.coc)
         + "</tbody></table>"
     )

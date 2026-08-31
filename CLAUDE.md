@@ -76,7 +76,24 @@ Zusage darf nicht ohne Not aufgeweicht werden. Ausgenommen ist `webbrowser`
 
 `{bundle,model,supportdata,render}.py`. `bundle.py` lädt und **verifiziert** jede Datei
 gegen ihre Sidecar und stellt je Datensatz die Fundstelle bereit (Zeilennummer + wörtlicher
-Auszug). `supportdata.py` parst die Roh-Supportdaten (Sektionen, 802.11-Logs) — der Export
+Auszug).
+
+Zwei Dateiarten fallen aus dem Sidecar-Schema, aus **verschiedenen** Gründen — wer das
+angleicht, macht eine davon schwächer:
+
+- Die **Sprachnachrichten** unter `tam_audio/` bekommen bewusst keine Sidecar. Ihr
+  `audio_sha256` steht im Datensatz der `tam`-JSON, die ihrerseits eine Sidecar hat —
+  der Hash liegt damit eine Ebene über der Datei, die er schützt. Wer die WAV
+  austauscht, müsste die JSON nachziehen und brächte deren Sidecar zu Fall. Eingelöst
+  wird die Kette in `_verify_tam_audio`; die Tabelle im Report weist die Herkunft der
+  Erwartung deshalb aus („Sidecar" vs. „Datensatz (tam)"). Statt einer Sidecar neben
+  der WAV — das wäre das schwächere Verfahren.
+- Der **Fallkopf** `case.json` bekommt aus dem umgekehrten Grund keine: Er ist eine
+  Bearbeiterangabe und muss nachträglich korrigierbar bleiben
+  (`fritzformat/casefile.py`).
+
+Das **Sitzungslog** war lange ein dritter Fall, aber ohne Grund: Es trägt Beweislast und
+hat niemanden über sich, der für es bürgt — seit #33 bekommt es eine eigene Sidecar. `supportdata.py` parst die Roh-Supportdaten (Sektionen, 802.11-Logs) — der Export
 *holt* diese Dateien nur, er parst sie nicht; hier gibt es keine doppelte Logik.
 
 `_resolve_clock_offset` (in `bundle.py`, neben `_resolve_secured_span`) bildet den

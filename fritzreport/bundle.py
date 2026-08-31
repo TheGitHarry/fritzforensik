@@ -39,8 +39,18 @@ from .supportdata import parse_box_header_time
 __all__ = [
     "JSON_TYPES", "SUPPORT_VARIANTS", "sha256_file", "read_sidecar", "verify",
     "record_slices", "Dataset", "SupportFile", "CoCEntry", "Bundle", "ClockOffset",
-    "load_bundle",
+    "load_bundle", "STATUS_MISSING", "QUELLE_SIDECAR", "QUELLE_RECORD",
 ]
+
+#: Datei ist im Bundle angekündigt, liegt aber nicht dort. Kein MISMATCH — es gibt
+#: nichts zu vergleichen; und kein stiller Durchlauf, denn angekündigt war sie.
+STATUS_MISSING = "missing"
+
+#: Woher die Erwartung stammt, gegen die geprüft wurde. Der Unterschied gehört in
+#: den Report: Eine Sidecar liegt neben ihrer Datei, ein Hash im Datensatz liegt
+#: eine Ebene höher und ist dadurch schwerer nachzuziehen.
+QUELLE_SIDECAR = "sidecar"
+QUELLE_RECORD = "datensatz"
 
 
 # ----------------------------------------------------- Herkunfts-Slices
@@ -135,8 +145,9 @@ class SupportFile:
 class CoCEntry:
     file: str
     sha256: str          # erwarteter Hash laut Sidecar (bzw. berechneter)
-    status: str          # ok | mismatch | no_sidecar
+    status: str          # ok | mismatch | no_sidecar | missing
     size: int | None = None
+    quelle: str = QUELLE_SIDECAR   # sidecar | datensatz
 
 
 @dataclass
@@ -202,7 +213,7 @@ class Bundle:
 
     @property
     def integrity_ok(self) -> bool:
-        return all(e.status != "mismatch" for e in self.coc)
+        return all(e.status not in ("mismatch", STATUS_MISSING) for e in self.coc)
 
 
 # ------------------------------------------------------------- Laden
@@ -268,6 +279,8 @@ def load_bundle(dir_: Path) -> Bundle:
             status, shown, size = "mismatch", expected, None
         b.coc.append(CoCEntry(file=target.name, sha256=shown, status=status, size=size))
 
+    _verify_tam_audio(b, dir_)
+
     # --- Sitzungs-Log + TAM-Audio
     log = _first(dir_, session_log_glob())
     if log:
@@ -279,6 +292,53 @@ def load_bundle(dir_: Path) -> Bundle:
     _resolve_secured_span(b)
     _resolve_clock_offset(b)
     return b
+
+
+def _verify_tam_audio(b: Bundle, dir_: Path) -> None:
+    """Sprachnachrichten gegen den Hash in ihrem Datensatz prüfen.
+
+    Die WAV-Dateien unter ``tam_audio/`` haben bewusst **keine** Sidecar: Ihr
+    ``audio_sha256`` steht im Datensatz der ``tam``-JSON, und die hat ihrerseits
+    eine. Der Hash liegt damit eine Ebene über der Datei, die er schützt — wer die
+    WAV austauscht, müsste die JSON nachziehen und brächte deren Sidecar zu Fall.
+    Eine eigene Sidecar neben der WAV wäre das schwächere Verfahren.
+
+    Eingelöst wurde diese Kette bis #35 nie. Die Tabelle unten entsteht aus den
+    vorhandenen Sidecars, und was keine hat, erschien dort nicht — also fehlte auch
+    keine Zeile. Ein Byte in einer Sprachnachricht ließ sich kippen, ohne dass der
+    Report etwas anderes meldete als „alle verifiziert".
+
+    ``audio_file`` stammt aus einer Datei, die dieses Werkzeug nicht geschrieben hat.
+    Ein Pfad, der aus dem Bundle herausführt, wird deshalb nicht gelesen, sondern
+    gilt als fehlend.
+    """
+    d = b.datasets.get("tam")
+    if not (d and d.present and isinstance(d.data, dict)):
+        return
+    wurzel = dir_.resolve()
+    for rec in d.data.get("records") or []:
+        if not isinstance(rec, dict):
+            continue
+        rel = rec.get("audio_file")
+        erwartet = (rec.get("audio_sha256") or "").strip().lower()
+        if not rel or not erwartet:
+            continue
+
+        pfad = (dir_ / rel).resolve()
+        drin = pfad.is_file() and wurzel in pfad.parents
+        if not drin:
+            b.coc.append(CoCEntry(file=rel, sha256=erwartet, status=STATUS_MISSING,
+                                  quelle=QUELLE_RECORD))
+            continue
+
+        ist = sha256_file(pfad)
+        b.coc.append(CoCEntry(
+            file=rel,
+            sha256=ist,
+            status="ok" if ist == erwartet else "mismatch",
+            size=pfad.stat().st_size,
+            quelle=QUELLE_RECORD,
+        ))
 
 
 def _resolve_secured_span(b: Bundle) -> None:
