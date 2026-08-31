@@ -150,8 +150,9 @@ def _fake_urlopen_factory(url_to_xml):
     class _Resp:
         def __init__(self, body):
             self._body = body
-        def read(self):
-            return self._body
+        def read(self, n=-1):
+            # wie http.client.HTTPResponse.read(amt) — der Aufrufer begrenzt (#38)
+            return self._body if n is None or n < 0 else self._body[:n]
         def __enter__(self):
             return self
         def __exit__(self, *a):
@@ -265,3 +266,52 @@ def test_discover_with_explicit_iface_swallows_oserror():
     with patch("fritzexport.discover.socket.socket", return_value=bad):
         boxes = discover(timeout=0.1, iface="192.168.178.20")
     assert boxes == []
+
+
+# ───────────── LOCATION ist unauthentifizierte Fremdeingabe (#38) ─────────────
+
+def test_fetch_device_xml_nimmt_nur_http_und_https(tmp_path):
+    """Jedes Gerät im LAN kann mit einem SERVER-Header antworten, der 'AVM'
+    enthält, und damit bestimmen, welche URL abgerufen wird. `urlopen` nimmt
+    auch `file://` — dann läse die Discovery eine lokale Datei statt einer Box."""
+    import pytest
+
+    from fritzexport.discover import _fetch_device_xml
+
+    beute = tmp_path / "beute.txt"
+    beute.write_text("root:x:0:0:test\n", encoding="utf-8")
+
+    for ort in (f"file://{beute}", "ftp://192.168.178.1/x.xml", "gopher://x/1"):
+        with pytest.raises(ValueError, match="Schema"):
+            _fetch_device_xml(ort, 1.0)
+
+
+def test_fetch_device_xml_liest_nicht_unbegrenzt():
+    """`resp.read()` ohne Grenze liest, was das Gegenüber schickt — der
+    Socket-Timeout greift je Lesevorgang, nicht auf die Gesamtmenge."""
+    from unittest.mock import patch
+
+    from fritzexport.discover import MAX_DESC_BYTES, _fetch_device_xml
+
+    class _Endlos:
+        def read(self, n=-1):
+            return b"<x/>" * (n // 4 if n and n > 0 else 10_000_000)
+
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    with patch("fritzexport.discover.urllib.request.urlopen", return_value=_Endlos()):
+        daten = _fetch_device_xml("http://192.168.178.1:49000/igddesc.xml", 1.0)
+    assert len(daten) <= MAX_DESC_BYTES
+
+
+def test_discover_uebersteht_eine_boesartige_location():
+    """Gegenprobe im Zusammenspiel: Der Fund darf an einer unbrauchbaren
+    LOCATION nicht verlorengehen — nur die XML-Metadaten fehlen dann."""
+    fake = _FakeSocket([(AVM_BOX_RESPONSE.replace(
+        b"LOCATION: http://192.168.178.1:49000/igddesc.xml",
+        b"LOCATION: file:///etc/passwd"), ("192.168.178.1", 1900))])
+    with patch("fritzexport.discover.socket.socket", return_value=fake):
+        boxes = discover(timeout=0.1)
+    assert len(boxes) == 1 and boxes[0].ip == "192.168.178.1"
+    assert boxes[0].model_name == ""

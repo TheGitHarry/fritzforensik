@@ -46,7 +46,11 @@ Zusage darf nicht ohne Not aufgeweicht werden. Ausgenommen ist `webbrowser`
 - **Auth**: AVM Web-UI-SID-Verfahren (PBKDF2-Challenge-Response, MD5-Fallback für ältere
   Firmware) — [auth.py](fritzexport/auth.py).
 - **Discovery**: SSDP-Multicast im LAN; bei genau einer Box automatischer Login, sonst
-  Auswahlmenü oder `--host` — [discover.py](fritzexport/discover.py).
+  Auswahlmenü oder `--host` — [discover.py](fritzexport/discover.py). Die `LOCATION`
+  aus der SSDP-Antwort ist **unauthentifizierte Fremdeingabe** und wird vor jeder
+  Anmeldung verarbeitet: `_fetch_device_xml` lässt deshalb nur `http`/`https` zu und
+  liest höchstens `MAX_DESC_BYTES` (#38). Wer die Grenzen entfernt, öffnet einen Pfad,
+  den jedes Gerät im Netz des Betroffenen bespielen kann.
 - **Protokolle**: primär TR-064 (SOAP über UPnP), Web-UI-Fallback wo möglich; reine
   Web-UI-Pfade für Daten ohne TR-064-Pendant (Anrufliste, Telefonbuch, Events, Supportdaten).
 - **Extractoren**: ein Modul je Datenart in [fritzexport/extractors/](fritzexport/extractors/),

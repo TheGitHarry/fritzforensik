@@ -12,6 +12,7 @@ import socket
 import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
+from urllib.parse import urlsplit
 
 SSDP_MULTICAST = "239.255.255.250"
 SSDP_PORT = 1900
@@ -19,6 +20,17 @@ SSDP_ST_IGD = "urn:schemas-upnp-org:device:InternetGatewayDevice:1"
 SSDP_ST_ALL = "ssdp:all"
 DEFAULT_TIMEOUT = 3.0
 DEFAULT_XML_TIMEOUT = 2.0
+
+#: Schemata, die eine LOCATION tragen darf. Jedes Gerät im LAN, das mit einem
+#: SERVER-Header voller "AVM" antwortet, bestimmt diese URL — und ``urlopen``
+#: nähme auch ``file://``.
+ERLAUBTE_SCHEMATA = ("http", "https")
+
+#: Obergrenze für die Device-Description. Eine IGD-Beschreibung einer FRITZ!Box
+#: liegt im niedrigen zweistelligen KB-Bereich; 2 MB lassen jeden echten Fall
+#: durch und beenden einen endlosen Datenstrom. Der Socket-Timeout allein
+#: genügt nicht: Er greift je Lesevorgang, nicht auf die Gesamtmenge.
+MAX_DESC_BYTES = 2_000_000
 
 log = logging.getLogger(__name__)
 
@@ -105,8 +117,21 @@ def parse_device_xml(xml_bytes: bytes) -> dict:
 
 
 def _fetch_device_xml(location: str, timeout: float) -> bytes:
+    """Device-Description unter ``location`` holen — begrenzt und nur über HTTP(S).
+
+    ``location`` ist **unauthentifizierte Fremdeingabe**: Sie stammt aus einer
+    UDP-Antwort, die jedes Gerät im eigenen Netz schicken kann, und wird
+    verarbeitet, bevor irgendeine Anmeldung stattgefunden hat.
+
+    Beides bleibt folgenlos für den Fund selbst: ``discover()`` fängt die Ausnahme
+    ab und übernimmt die Box dann ohne XML-Metadaten — ``_is_fritzbox`` behandelt
+    genau diesen Fall bereits.
+    """
+    schema = urlsplit(location).scheme.lower()
+    if schema not in ERLAUBTE_SCHEMATA:
+        raise ValueError(f"Unerwartetes Schema in LOCATION: {location!r}")
     with urllib.request.urlopen(location, timeout=timeout) as resp:
-        return resp.read()
+        return resp.read(MAX_DESC_BYTES)
 
 
 def _is_fritzbox(box: DiscoveredBox) -> bool:
