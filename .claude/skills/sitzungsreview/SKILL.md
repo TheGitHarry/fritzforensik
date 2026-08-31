@@ -63,7 +63,7 @@ abgedeckt. Sie zu melden ist doppelte Arbeit und verwässert den Bericht:
 | `ANFORDERUNGEN.md` | Was die Werkzeuge leisten müssen, mit stabilen IDs (A1, B7 …), inkl. entfallener Anforderungen |
 | `README.md` | Bedienung, Flags, Bundle-Format, Distribution |
 | `CLAUDE.md` | Orientierung, Fallen, Konventionen |
-| `methode.md` | **Externes Methodenpapier** — Zusammenfassung des nicht öffentlichen Methodenpapiers v1.0. Es trägt den Belegtheitsgrad **D2** |
+| `methode.md` | **Externes Methodenpapier** —  Es trägt den Belegtheitsgrad **D2** |
 | `ABDECKUNG.md` | **Erzeugt** (`scripts/abdeckung.py`), nie von Hand geändert |
 | `SECURITY.md` | Meldeweg für Sicherheitslücken |
 | GitHub-Issues | Backlog — **ausschließlich** |
