@@ -97,7 +97,9 @@ angleicht, macht eine davon schwächer:
   (`fritzformat/casefile.py`).
 
 Das **Sitzungslog** war lange ein dritter Fall, aber ohne Grund: Es trägt Beweislast und
-hat niemanden über sich, der für es bürgt — seit #33 bekommt es eine eigene Sidecar. `supportdata.py` parst die Roh-Supportdaten (Sektionen, 802.11-Logs) — der Export
+hat niemanden über sich, der für es bürgt — seit #33 bekommt es eine eigene Sidecar.
+
+`supportdata.py` parst die Roh-Supportdaten (Sektionen, 802.11-Logs) — der Export
 *holt* diese Dateien nur, er parst sie nicht; hier gibt es keine doppelte Logik.
 
 `_resolve_clock_offset` (in `bundle.py`, neben `_resolve_secured_span`) bildet den
