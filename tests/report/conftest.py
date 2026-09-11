@@ -163,7 +163,7 @@ def synth_bundle(tmp_path):
 
 @pytest.fixture
 def real_boxes():
-    base = Path(os.path.expanduser("~/testdata/export"))
+    base = Path(os.path.expanduser("~/testdata/eingang"))
     if not base.is_dir():
-        pytest.skip("Echte Testdaten (~/testdata/export) nicht vorhanden")
+        pytest.skip("Echte Testdaten (~/testdata/eingang) nicht vorhanden")
     return sorted(p for p in base.glob("export_*") if p.is_dir())

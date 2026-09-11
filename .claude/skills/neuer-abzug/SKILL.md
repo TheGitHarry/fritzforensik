@@ -15,18 +15,18 @@ Gepusht wird nie ohne ausdrückliches Wort.
 
 | Ort | Rolle |
 |---|---|
-| `~/testdata/export/` | **Eingang** — hierhin lädt der Nutzer ZIPs und Verzeichnisse |
+| `~/testdata/eingang/` | **Eingang** — hierhin lädt der Nutzer ZIPs und Verzeichnisse |
 | `~/testdata/_work/` | **Korpus** — nur was hier liegt, läuft in `pytest -m golden` |
 | `~/testdata/KORPUS.md` | private Inventarliste, **außerhalb des Repos** (Serials, Aktenzeichen) |
 | `ABDECKUNG.md` (im Repo) | öffentliche Matrix, **erzeugt**, ohne identifizierende Daten |
 
-Der Eingang ist nicht der Korpus. Ein Abzug, der nur in `export/` liegt, wird
+Der Eingang ist nicht der Korpus. Ein Abzug, der nur in `eingang/` liegt, wird
 von keinem Test gesehen — das ist der häufigste stille Fehler.
 
 ## 1. Finden, was neu ist
 
 ```bash
-ls -lt ~/testdata/export/ | head -20
+ls -lt ~/testdata/eingang/ | head -20
 ls -d ~/testdata/_work/*/
 ```
 
@@ -36,7 +36,7 @@ gemeint ist.
 ## 2. Entpacken nach `_work`
 
 ```bash
-cd ~/testdata/_work && unzip -oq ~/testdata/export/<datei>.zip
+cd ~/testdata/_work && unzip -oq ~/testdata/eingang/<datei>.zip
 ```
 
 Liegt der Abzug als Verzeichnis vor: `cp -r` statt `mv` — der Eingang bleibt

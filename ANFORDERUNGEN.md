@@ -12,7 +12,7 @@ Zeile mit Status `offen` nennt die Issue-Nummer.
 
 Die IDs A1–G4 stammen aus dem ursprünglichen **ANFORDERUNGSKATALOG.md**, geschrieben
 für den serverseitigen `it-forensic-automat` (Worker-Pipeline, Datenbank, ODT/PDF).
-Er liegt außerhalb dieses Repos im archivierten `legacy_report`-Klon unter
+Er liegt nicht im Repo, sondern im lokalen Referenzmaterial unter
 `_material/poc/` und ist **nicht mehr maßgeblich** — maßgeblich ist diese Datei.
 
 Die Werkzeuge hier sind **eigenständige Feldwerkzeuge** ohne Server, Datenbank und

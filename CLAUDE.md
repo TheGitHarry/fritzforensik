@@ -13,9 +13,6 @@ Formatmodul:
 | `fritzreport/` | Bundle → **self-contained HTML-Report** (kein Box-Zugriff) | **stdlib-only** |
 | `fritzformat/` | gemeinsamer **Formatvertrag** beider Seiten | **stdlib-only** |
 
-Hervorgegangen aus den vormals getrennten Repos `legacy_export` (→ fritzexport) und
-`legacy_report` (→ fritzreport); beide Historien stecken in diesem Repo.
-
 ## fritzformat — bitte hier zuerst schauen
 
 `fritzformat` ist die **einzige Wahrheit** über das Bundle-Format: Dateinamen

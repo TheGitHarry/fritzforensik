@@ -47,8 +47,8 @@ def test_probe_tls_greift_auch_bei_host_ohne_schema(monkeypatch):
 
 
 def test_autodetect_user_bei_genau_einem_benutzer(monkeypatch):
-    monkeypatch.setattr(cli, "fetch_users", lambda base_url, session: ["export"])
-    assert cli._autodetect_user("https://192.168.2.1", verify_tls=False) == "export"
+    monkeypatch.setattr(cli, "fetch_users", lambda base_url, session: ["boxuser"])
+    assert cli._autodetect_user("https://192.168.2.1", verify_tls=False) == "boxuser"
 
 
 def test_autodetect_user_none_bei_mehreren(monkeypatch):
@@ -66,25 +66,25 @@ def test_resolve_user_nimmt_cli_arg_ohne_box_anfrage(monkeypatch):
 
 
 def test_resolve_user_auto_bei_genau_einem(monkeypatch):
-    monkeypatch.setattr(cli, "_list_users", lambda b, verify_tls: ["export"])
+    monkeypatch.setattr(cli, "_list_users", lambda b, verify_tls: ["boxuser"])
     args = argparse.Namespace(user=None, insecure=False)
-    assert cli._resolve_user("https://192.168.2.1", args) == "export"
+    assert cli._resolve_user("https://192.168.2.1", args) == "boxuser"
 
 
 def test_resolve_user_prompt_bei_mehreren(monkeypatch):
     """Regression: mit --host und mehreren Benutzern muss nachgefragt werden,
     statt hart mit '--user ist erforderlich' abzubrechen."""
-    monkeypatch.setattr(cli, "_list_users", lambda b, verify_tls: ["fritz1310", "export"])
+    monkeypatch.setattr(cli, "_list_users", lambda b, verify_tls: ["fritz1310", "boxuser"])
     seen = {}
 
     def fake_select(users):
         seen["users"] = users
-        return "export"
+        return "boxuser"
 
     monkeypatch.setattr(cli, "_select_user", fake_select)
     args = argparse.Namespace(user=None, insecure=False)
-    assert cli._resolve_user("https://192.168.2.1", args) == "export"
-    assert seen["users"] == ["fritz1310", "export"]
+    assert cli._resolve_user("https://192.168.2.1", args) == "boxuser"
+    assert seen["users"] == ["fritz1310", "boxuser"]
 
 
 def test_resolve_user_mehrere_ohne_tty_ergibt_none(monkeypatch):
@@ -104,11 +104,11 @@ def test_resolve_user_retry_insecure_bei_sslerror(monkeypatch):
         calls.append(verify_tls)
         if verify_tls:
             raise requests.exceptions.SSLError("self-signed certificate")
-        return ["export"]
+        return ["boxuser"]
 
     monkeypatch.setattr(cli, "_list_users", fake_list_users)
     args = argparse.Namespace(user=None, insecure=False)
-    assert cli._resolve_user("https://192.168.2.1", args) == "export"
+    assert cli._resolve_user("https://192.168.2.1", args) == "boxuser"
     assert args.insecure is True
     assert calls == [True, False]  # erst verify, dann insecure-Retry
 
