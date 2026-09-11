@@ -9,8 +9,14 @@ Warum beide: Der Web-UI-Weg **schweigt vollständig**, sobald die Box als IP-Cli
 hinter einem anderen Router läuft — sie antwortet dann mit einem Rumpf ohne
 ``active``/``passive`` (``nolist: true``). Gemessen an vier Boxen: Die eine, die
 Router ist, liefert 64 Einträge; die drei im IP-Client-Modus null, während TR-064 dort
-3, 5 und 7 assoziierte Geräte meldet. Forensisch ist der IP-Client-Modus der
-**Normalfall**, denn am Auswerteplatz hängt die Box hinter dem Router des Prüfers.
+3, 5 und 7 assoziierte Geräte meldet. TR-064 fragt den WLAN-Stack direkt und antwortet
+deshalb **unabhängig von der Betriebsart** — das ist der Grund für die zweite Quelle.
+
+Hier stand einmal, der IP-Client-Modus sei der forensische Normalfall, weil die Box am
+Auswerteplatz hinter dem Router des Prüfers hänge. Der Schluss trägt nicht: Diese
+Betriebsart muss **eingerichtet** werden, und ein Asservat wird nicht umkonfiguriert —
+das wäre eine Veränderung an der Box. Der Modus ist ein Zustand des Labors, in dem
+gemessen wurde, keine Eigenschaft des Einsatzes.
 
 Zusammengeführt wird **je MAC-Adresse**, nicht aneinandergehängt: Auf einer Box, die
 Router ist, kennen beide Wege dieselben Geräte, und zwei Datensätze zählten sie im

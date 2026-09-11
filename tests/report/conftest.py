@@ -74,8 +74,13 @@ ip4_uptime=432000
 def build_bundle(d: Path) -> Path:
     ts = "20260106T100000Z"
     _write_json(d, ts, "hosts", [
+        # Erster Host mit den Zeitangaben aus query.lua, zweiter ohne — die Box
+        # führt sie nicht auf jedem Gerät (Issue #38).
         {"MACAddress": MAC, "IPAddress": "192.168.1.20", "HostName": "TestPhone",
-         "InterfaceType": "802.11", "Active": "1", "X_AVM-DE_Guest": "0"},
+         "InterfaceType": "802.11", "Active": "1", "X_AVM-DE_Guest": "0",
+         "landevice_uid": "landevice7",
+         "first_seen": "2025-08-22T22:00:00Z", "last_seen": "2026-01-06T09:00:00Z",
+         "first_seen_epoch": 1755900000, "last_seen_epoch": 1767690000},
         {"MACAddress": "AA:BB:CC:DD:EE:02", "IPAddress": "", "HostName": "NoDetail",
          "InterfaceType": "", "Active": "0", "X_AVM-DE_Guest": "0"},
     ])

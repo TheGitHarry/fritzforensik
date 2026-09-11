@@ -112,6 +112,10 @@ def build_model(b: Bundle) -> Model:
             "mac": mac, "ip": r.get("IPAddress") or "", "name": name,
             "iface": r.get("InterfaceType") or "",
             "active": r.get("Active") == "1", "guest": r.get("X_AVM-DE_Guest") == "1",
+            # Aus query.lua, nur wo die Box sie führt (Issue #38). Leer heißt „nicht
+            # gesetzt", nicht „nie gesehen" — der Report sagt das in Sektion 3.
+            "first_seen": r.get("first_seen") or "",
+            "last_seen": r.get("last_seen") or "",
             "f_name": name, "f_phone": "", "f_ap": "", "f_iso": "",
             "grades": (["D1"] if has_detail else []),   # alt D2 → D1
             "origin": origin(ds, i, len(ds.records)),

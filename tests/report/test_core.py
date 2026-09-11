@@ -1013,3 +1013,69 @@ def test_ereignis_auf_der_fenstergrenze_zaehlt_dazu(synth_bundle):
     b = load_bundle(synth_bundle)
     m = build_model(b)
     assert [e["during_acquisition"] for e in m.events] == [True]
+
+
+# ─────────────────── Erst-/Letztkontakt je Gerät (Issue #38) ─────────────────
+
+def test_hosts_tragen_zeitangaben_aus_query_lua(synth_bundle):
+    m = build_model(load_bundle(synth_bundle))
+    by_mac = {h["mac"]: h for h in m.hosts}
+    phone = by_mac["AA:BB:CC:DD:EE:01"]
+    assert phone["first_seen"] == "2025-08-22T22:00:00Z"
+    assert phone["last_seen"] == "2026-01-06T09:00:00Z"
+
+
+def test_host_ohne_zeitangabe_bleibt_leer_und_nicht_none(synth_bundle):
+    """Leer heißt „die Box führt den Wert nicht" — es darf kein Datum erfunden werden."""
+    m = build_model(load_bundle(synth_bundle))
+    by_mac = {h["mac"]: h for h in m.hosts}
+    ohne = by_mac["AA:BB:CC:DD:EE:02"]
+    assert ohne["first_seen"] == ""
+    assert ohne["last_seen"] == ""
+
+
+def test_hosts_sektion_zeigt_beide_zeitspalten(synth_bundle):
+    html = _render(load_bundle(synth_bundle))
+    tabelle = html[html.index('id="tbl-hosts"'):]
+    tabelle = tabelle[:tabelle.index("</table>")]
+    assert "Erstmals gesehen" in tabelle
+    assert "Zuletzt gesehen" in tabelle
+    assert "2025-08-22T22:00:00Z" in tabelle
+
+
+def test_hinweis_deutet_leere_zeitzellen_als_nicht_gefuehrt(synth_bundle):
+    """Eine leere Zelle darf nicht als „nie gesehen" gelesen werden."""
+    from fritzreport.render import _hosts_zeit_note
+    hosts = [{"first_seen": "2025-08-22T22:00:00Z", "last_seen": ""},
+             {"first_seen": "", "last_seen": ""}]
+    note = _hosts_zeit_note(hosts)
+    assert "nicht" in note and "nie gesehen" in note
+
+
+def test_hinweis_sagt_es_deutlich_wenn_die_box_gar_nichts_fuehrt():
+    from fritzreport.render import _hosts_zeit_note
+    note = _hosts_zeit_note([{"first_seen": "", "last_seen": ""}])
+    assert note, "auch der Fall ohne jede Zeitangabe braucht einen Satz"
+    assert "keine" in note.lower()
+
+
+def test_kein_hinweis_ohne_hosts():
+    from fritzreport.render import _hosts_zeit_note
+    assert _hosts_zeit_note([]) == ""
+
+
+def test_herkunftszeile_spannt_jede_tabelle_voll(synth_bundle):
+    """Die aufklappbare Herkunftszeile muss so breit sein wie ihre Tabelle.
+
+    Der ``colspan`` wird je Tabelle von Hand mitgegeben. Wer eine Spalte ergänzt und
+    ihn vergisst, bekommt eine Herkunftszeile, die zu kurz ist — sichtbar erst im
+    Browser, nicht in den Tests.
+    """
+    html = _render(load_bundle(synth_bundle))
+    tabellen = re.findall(r'<table id="(tbl-[^"]+)">(.*?)</table>', html, re.S)
+    assert tabellen, "es müssen Tabellen im Bericht stehen"
+    for tid, inhalt in tabellen:
+        kopf = inhalt[:inhalt.index("</thead>")]
+        spalten = len(re.findall(r"<th[ >]", kopf))
+        for colspan in re.findall(r'colspan="(\d+)"', inhalt):
+            assert int(colspan) == spalten, f"{tid}: colspan {colspan} gegen {spalten} Spalten"

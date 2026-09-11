@@ -139,3 +139,146 @@ def test_extract_falls_back_when_xml_fetch_raises():
     assert len(records) == 1
     assert records[0]["HostName"] == "fallback-host"
     assert records[0]["source"] == "tr064_generic"
+
+
+# ── query.lua-Zeitfelder (firstused/lastused) ───────────────────────────────
+
+LANDEVICE_ANSWER = {
+    "landevice": [
+        {
+            "UID": "landevice7", "name": "laptop", "mac": "aa:bb:cc:dd:ee:01",
+            "ip": "192.168.178.20", "active": "1", "guest": "0",
+            "interface": "lan", "speed": "1000",
+            "firstused": "1755900000", "lastused": "1756000000",
+        },
+        {
+            "UID": "landevice9", "name": "nur-in-query", "mac": "AA:BB:CC:DD:EE:07",
+            "ip": "192.168.178.77", "active": "0", "guest": "1",
+            "interface": "wlan", "speed": "0",
+            "firstused": "0", "lastused": "1740000000",
+        },
+    ]
+}
+
+
+def test_landevice_epochen_werden_nach_iso_utc_umgerechnet():
+    eintraege = hosts_mod._landevice_eintraege(LANDEVICE_ANSWER)
+    laptop = next(e for e in eintraege if e["landevice_uid"] == "landevice7")
+    assert laptop["first_seen"] == "2025-08-22T22:00:00Z"
+    assert laptop["last_seen"] == "2025-08-24T01:46:40Z"
+    assert laptop["first_seen_epoch"] == 1755900000
+
+
+def test_landevice_epoch_null_bleibt_leer_statt_1970():
+    eintraege = hosts_mod._landevice_eintraege(LANDEVICE_ANSWER)
+    fremd = next(e for e in eintraege if e["landevice_uid"] == "landevice9")
+    assert fremd["first_seen"] == ""
+    assert fremd["first_seen_epoch"] == 0
+    assert fremd["last_seen"] == "2025-02-19T21:20:00Z"
+
+
+def test_merge_landevice_ergaenzt_host_je_mac_unabhaengig_von_schreibweise():
+    records = hosts_mod._parse_hostlist_xml(HOSTLIST_XML)
+    merged = hosts_mod._merge_landevice(
+        records, hosts_mod._landevice_eintraege(LANDEVICE_ANSWER)
+    )
+    laptop = next(r for r in merged if r["MACAddress"] == "AA:BB:CC:DD:EE:01")
+    assert laptop["first_seen"] == "2025-08-22T22:00:00Z"
+    assert laptop["landevice_uid"] == "landevice7"
+    # Die TR-064-Herkunft des Datensatzes bleibt stehen
+    assert laptop["source"] == "tr064_path"
+
+
+def test_merge_landevice_haengt_nur_dort_bekanntes_geraet_an():
+    records = hosts_mod._parse_hostlist_xml(HOSTLIST_XML)
+    merged = hosts_mod._merge_landevice(
+        records, hosts_mod._landevice_eintraege(LANDEVICE_ANSWER)
+    )
+    assert len(merged) == 3
+    fremd = next(r for r in merged if r["MACAddress"] == "AA:BB:CC:DD:EE:07")
+    assert fremd["source"] == "query_lua"
+    assert fremd["HostName"] == "nur-in-query"
+    assert fremd["IPAddress"] == "192.168.178.77"
+    assert fremd["Active"] == "0"
+    assert fremd["X_AVM-DE_Guest"] == "1"
+
+
+def test_merge_landevice_ohne_treffer_laesst_host_unberuehrt():
+    records = hosts_mod._parse_hostlist_xml(HOSTLIST_XML)
+    merged = hosts_mod._merge_landevice(records, [])
+    iphone = next(r for r in merged if r["MACAddress"] == "AA:BB:CC:DD:EE:02")
+    assert "landevice_uid" not in iphone
+    assert "first_seen" not in iphone
+
+
+def test_extract_fragt_query_lua_per_get_mit_landevice_liste():
+    client = MagicMock()
+    client.tr064_call.return_value = {
+        "NewX_AVM-DE_HostListPath": "/hostlist.lua?sid=abc"
+    }
+    fake_xml = MagicMock()
+    fake_xml.content = HOSTLIST_XML
+    fake_xml.raise_for_status.return_value = None
+    client.session.get.return_value = fake_xml
+    fake_query = MagicMock()
+    fake_query.json.return_value = LANDEVICE_ANSWER
+    fake_query.raise_for_status.return_value = None
+    client.get.return_value = fake_query
+
+    records = hosts_mod.extract(client)
+
+    args, kwargs = client.get.call_args
+    assert args[0] == hosts_mod.QUERY_PATH
+    assert kwargs["params"]["landevice"] == hosts_mod.LANDEVICE_QUERY
+    laptop = next(r for r in records if r["MACAddress"] == "AA:BB:CC:DD:EE:01")
+    assert laptop["last_seen"] == "2025-08-24T01:46:40Z"
+
+
+def test_extract_liefert_hosts_unveraendert_wenn_query_lua_schweigt():
+    client = MagicMock()
+    client.tr064_call.return_value = {
+        "NewX_AVM-DE_HostListPath": "/hostlist.lua?sid=abc"
+    }
+    fake_xml = MagicMock()
+    fake_xml.content = HOSTLIST_XML
+    fake_xml.raise_for_status.return_value = None
+    client.session.get.return_value = fake_xml
+    client.get.side_effect = OSError("keine Antwort")
+
+    records = hosts_mod.extract(client)
+
+    assert len(records) == 2
+    assert all("first_seen" not in r for r in records)
+
+
+def test_fetch_landevice_ruft_den_echten_client_auf():
+    """Mit dem echten ``FritzClient.get`` statt einem MagicMock.
+
+    Ein MagicMock nimmt jedes Argument an — ein Aufruf, der gegen die tatsächliche
+    Signatur verstößt, fällt dort nie auf, sondern erst an der Box. Genau das ist
+    passiert: ``get()`` setzt ``timeout`` bereits selbst, ein zweites löst einen
+    ``TypeError`` aus, den der Auffang-Zweig als „nicht abrufbar" verbucht.
+    """
+    from fritzexport.client import FritzClient
+
+    class FakeSession:
+        def __init__(self):
+            self.calls = []
+
+        def get(self, url, **kwargs):
+            self.calls.append((url, kwargs))
+            resp = MagicMock()
+            resp.json.return_value = LANDEVICE_ANSWER
+            resp.raise_for_status.return_value = None
+            return resp
+
+    session = FakeSession()
+    client = FritzClient(base_url="http://box", sid="s1", session=session)
+
+    eintraege = hosts_mod._fetch_landevice(client)
+
+    assert len(eintraege) == 2, "die Antwort der Box muss ankommen"
+    url, kwargs = session.calls[0]
+    assert url == "http://box/query.lua"
+    assert kwargs["params"]["sid"] == "s1"
+    assert kwargs["params"]["landevice"] == hosts_mod.LANDEVICE_QUERY

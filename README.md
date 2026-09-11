@@ -137,7 +137,7 @@ mitsamt vollständiger Logdatei, die ab der ersten Zeile geschrieben wird.
 | `--events` | Web-UI | Ereignislog aller Kategorien (sys/net/wlan/fon/usb) |
 | `--tam` | TR-064 + Web-UI-Fallback | Anrufbeantworter-Metadaten + Audio-WAVs |
 | `--mesh` | TR-064 + Web-UI-Fallback | Mesh-Topologie |
-| `--hosts` | TR-064 + Index-Fallback | Alle bekannten Hosts |
+| `--hosts` | TR-064 + Index-Fallback + Web-UI | Alle bekannten Hosts. Dazu aus `query.lua` je Gerät **erstmals/zuletzt gesehen**, soweit die Box sie führt — `firstused` steht in keiner anderen Quelle, `lastused` sonst nur dort, wo die Box Router ist. Verbunden je MAC |
 | `--wan` | TR-064 | WAN-Status, externe IP, Traffic-Counter, DSL-Daten |
 | `--dhcp` | TR-064 | DHCP-Serverkonfiguration |
 | `--portforward` | TR-064 | Port-Forwarding-Regeln |

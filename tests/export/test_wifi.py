@@ -1,9 +1,9 @@
 """Offline-Tests für den WLAN-Extractor — zwei Quellen, ein Datensatz je Gerät.
 
 Der Web-UI-Weg (``data.lua page=netDev``) schweigt, sobald die Box als **IP-Client
-hinter einem anderen Router** läuft: Sie zeigt dann bewusst keine Geräteliste. Das ist
-forensisch der Normalfall, denn am Auswerteplatz hängt die Box hinter dem Router des
-Prüfers. TR-064 ``WLANConfiguration`` ist davon unberührt.
+hinter einem anderen Router** läuft: Sie zeigt dann bewusst keine Geräteliste. TR-064
+``WLANConfiguration`` ist davon unberührt und antwortet unabhängig von der Betriebsart —
+deshalb die zweite Quelle.
 """
 from __future__ import annotations
 

@@ -693,6 +693,31 @@ def _calls_note(anzahl: int) -> str:
     )
 
 
+def _hosts_zeit_note(hosts) -> str:
+    """Hinweis zu den Spalten „Erstmals/Zuletzt gesehen" (Issue #38).
+
+    Die Werte stammen aus ``query.lua``; die Box führt sie nicht für jedes Gerät und
+    auf manchen Boxen für keines. Eine leere Zelle liest sich sonst als „nie gesehen",
+    und das wäre eine Aussage, die niemand gemessen hat. Zwei Fälle, zwei Sätze —
+    steht gar nichts da, ist die Spalte selbst erklärungsbedürftig.
+    """
+    if not hosts:
+        return ""
+    if any(h.get("first_seen") or h.get("last_seen") for h in hosts):
+        return (
+            "Die Spalten <b>Erstmals/Zuletzt gesehen</b> stammen aus der "
+            "Geräteliste der Box. Eine <b>leere Zelle</b> heißt: Die Box führt den "
+            "Wert für dieses Gerät <b>nicht</b> — sie heißt nicht „nie gesehen“. "
+            "Aus einer leeren Zelle folgt nichts."
+        )
+    return (
+        "Die Box führt zu <b>keinem</b> Gerät einen Zeitpunkt des ersten oder "
+        "letzten Kontakts; die Spalten <b>Erstmals/Zuletzt gesehen</b> bleiben "
+        "deshalb durchgehend leer. Das ist eine Eigenschaft der Box, keine Aussage "
+        "über die Geräte."
+    )
+
+
 def table(tid, headers, rows_html) -> str:
     th = "".join(f"<th>{esc(h)}</th>" for h in headers)
     return (f'<table id="{tid}"><thead><tr><th class="exp"></th>{th}<th>Belegt</th></tr></thead>'
@@ -705,7 +730,9 @@ def c_hosts(h):
     return (f'<td class="mono">{esc(h["mac"])}</td><td class="mono">{esc(h["ip"])}</td>'
             f'<td>{esc(h["name"])}</td><td>{esc(h["iface"])}</td>'
             f'<td>{"aktiv" if h["active"] else "offline"}</td>'
-            f'<td>{"Gast" if h["guest"] else "regulär"}</td>')
+            f'<td>{"Gast" if h["guest"] else "regulär"}</td>'
+            f'<td class="mono">{esc(h["first_seen"])}</td>'
+            f'<td class="mono">{esc(h["last_seen"])}</td>')
 
 
 def c_mesh(n):
@@ -948,8 +975,10 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
         + "</tbody></table>"
     )
 
-    s3 = table("tbl-hosts", ["MAC", "IP", "Hostname", "Interface", "Status", "Gast"],
-               render_rows(m.hosts, c_hosts, 8))
+    s3 = table("tbl-hosts",
+               ["MAC", "IP", "Hostname", "Interface", "Status", "Gast",
+                "Erstmals gesehen", "Zuletzt gesehen"],
+               render_rows(m.hosts, c_hosts, 10))
     s4 = table("tbl-mesh", ["Name", "Modell", "MAC", "Rolle", "Access Point", "Firmware"],
                render_rows(m.mesh_nodes, c_mesh, 8))
     s5 = table("tbl-wifi", ["MAC", "Name", "IPv4", "Interface", "Access Point", "Status", "Zuletzt gesehen"],
@@ -1009,7 +1038,8 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
         section("s1", "1", "Übersicht & Metadaten", "meta", None, s1)
         + section("s2", "2", "Chain of Custody", "coc", len(bundle.coc), s2, noun="Dateien",
                   note=(f'<strong class="err">{mism} Datei(en) mit Hash-MISMATCH!</strong>' if mism else ""))
-        + section("s3", "3", "Hosts / registrierte Geräte", "hosts", len(m.hosts), s3, noun="Geräte")
+        + section("s3", "3", "Hosts / registrierte Geräte", "hosts", len(m.hosts), s3,
+                  noun="Geräte", note=_hosts_zeit_note(m.hosts))
         + section("s4", "4", "Mesh-Topologie", "mesh", len(m.mesh_nodes), s4, noun="Knoten", note=ap_note)
         + section("s5", "5", "Clients (wifi.json)", "wifi", len(m.wifi), s5, noun="Clients",
                   note=("" if m.wifi else "Keine WLAN-Clients in <span class='mono'>wifi.json</span> "
