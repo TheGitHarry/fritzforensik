@@ -135,7 +135,7 @@ Ist die Zone der Box unbestimmbar, wird **nicht** markiert und der Hinweis sagt 
 leere Spalte läse sich sonst als „keine eigenen Spuren".
 
 **Belegtheits-Grade** (kombinierbar): **D1** plausibel innerhalb der Rohdaten · **D2** durch
-eigene forensische Tests verifiziert ([methode.md](methode.md)) ·
+eigene forensische Tests verifiziert ([methode.md](docs/methode.md)) ·
 **D3** abgeleitet/Interpretation. Zeile ohne Badge = reine Rohdaten-Wiedergabe.
 Verbindungsnachweise: methode.md-Parser → D1+D2, 802.11-Log-Parser → D1+D3.
 
@@ -199,19 +199,31 @@ Jede Aussage hat **genau einen** Ort — dasselbe Prinzip wie bei `fritzformat`:
 
 | Datei | besitzt |
 |---|---|
-| [ANFORDERUNGEN.md](ANFORDERUNGEN.md) | Was die Werkzeuge leisten müssen, inkl. entfallener Anforderungen |
+| [ANFORDERUNGEN.md](docs/ANFORDERUNGEN.md) | Was die Werkzeuge leisten müssen, inkl. entfallener Anforderungen |
 | [README.md](README.md) | Bedienung, Flags, Bundle-Format, Distribution |
 | CLAUDE.md | Orientierung, Fallen, Konventionen (diese Datei) |
-| [methode.md](methode.md) | Forensische Methodik + empirische Parser-Begründung |
-| [ABDECKUNG.md](ABDECKUNG.md) | Welche Modelle/Firmware getestet sind — **erzeugt**, nie von Hand ändern |
-| [SECURITY.md](SECURITY.md) | Meldeweg für Sicherheitslücken, und was ausdrücklich keine ist |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Beitragswege nach außen — verweist auf die Eigentümer, statt sie zu wiederholen |
-| [LICENSE](LICENSE) | Apache-2.0 |
+| [methode.md](docs/methode.md) | Forensische Methodik + empirische Parser-Begründung |
+| [ABDECKUNG.md](docs/ABDECKUNG.md) | Welche Modelle/Firmware getestet sind — **erzeugt**, nie von Hand ändern |
+| [SECURITY.md](docs/SECURITY.md) | Meldeweg für Sicherheitslücken, und was ausdrücklich keine ist |
+| [CONTRIBUTING.md](docs/CONTRIBUTING.md) | Beitragswege nach außen — verweist auf die Eigentümer, statt sie zu wiederholen |
+| [LICENSE](docs/LICENSE) | Apache-2.0 |
 | GitHub-Issues | Backlog — **ausschließlich** |
 
-Alle Doku liegt im **Stammverzeichnis**, bewusst ohne `docs/`-Unterordner: Es sind
-wenige Dateien, und README/LICENSE/SECURITY/CLAUDE müssen ohnehin dort liegen, damit
-GitHub und Claude Code sie finden. Ein Unterordner hätte nur einzelne davon versteckt.
+Im **Stammverzeichnis** liegen nur `README.md` und diese Datei. Alles andere steht in
+**`docs/`** — ANFORDERUNGEN, methode, ABDECKUNG, CONTRIBUTING, SECURITY und LICENSE
+(seit 2026-09-11; vorher lag alles im Stamm).
+
+`CONTRIBUTING.md` und `SECURITY.md` findet GitHub auch dort — am 2026-09-11 an fremden
+Repos nachgemessen, die sie ausschließlich unter `docs/` führen: Das Community-Profil
+zeigt auf `docs/CONTRIBUTING.md`, und `/security/policy` gibt `docs/SECURITY.md` aus.
+Bei **LICENSE** war das Gegenteil zu erwarten: Kein geprüftes Repo wurde ohne Lizenzdatei
+im Stamm als lizenziert geführt, und die GitHub-Doku nennt nur die Wurzel. Verschoben
+wurde sie trotzdem — bewusst, um es am eigenen Repo zu sehen. Zeigt GitHub die Lizenz
+nicht mehr an, gehört sie zurück in den Stamm.
+
+Wer einen Pfad ändert, ändert mehr als einen Link: `scripts/abdeckung.py` schreibt nach
+`docs/ABDECKUNG.md`, und `tests/format/` liest ANFORDERUNGEN und ABDECKUNG über feste
+Pfade.
 
 Drei Regeln, die verhindern, dass es wieder auseinanderläuft:
 

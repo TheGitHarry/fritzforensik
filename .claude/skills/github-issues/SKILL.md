@@ -65,6 +65,6 @@ alten Unterhaltung noch ein Verweis darauf auf: nicht wiederbeleben, sondern als
 anlegen.
 
 Der fachliche Vertrag — was die Werkzeuge leisten müssen — steht in
-**[ANFORDERUNGEN.md](../../../ANFORDERUNGEN.md)**. Dort nennt jede Zeile mit Status
+**[ANFORDERUNGEN.md](../../../docs/ANFORDERUNGEN.md)**. Dort nennt jede Zeile mit Status
 `offen` ihre Issue-Nummer; die Verknüpfung läuft nur in diese Richtung (Issues
 verweisen nicht zurück, sonst wären bei jedem Statuswechsel zwei Orte zu pflegen).

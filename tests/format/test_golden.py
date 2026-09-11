@@ -78,9 +78,9 @@ def test_abdeckung_ist_aktuell() -> None:
     ohnehin deselektiert (Marker ``golden``).
     """
     repo_root = Path(__file__).resolve().parent.parent.parent
-    datei = repo_root / "ABDECKUNG.md"
+    datei = repo_root / "docs" / "ABDECKUNG.md"
     if not datei.exists():
-        pytest.skip("ABDECKUNG.md nicht vorhanden")
+        pytest.skip("docs/ABDECKUNG.md nicht vorhanden")
 
     spec = importlib.util.spec_from_file_location(
         "abdeckung_gen", repo_root / "scripts" / "abdeckung.py"
@@ -94,8 +94,8 @@ def test_abdeckung_ist_aktuell() -> None:
     erwartet = gen.erzeuge(befunde)
     if erwartet != datei.read_text(encoding="utf-8"):
         pytest.fail(
-            "ABDECKUNG.md passt nicht mehr zum Korpus — neu erzeugen mit:\n"
-            f"    python3 scripts/abdeckung.py {BASE} > ABDECKUNG.md"
+            "docs/ABDECKUNG.md passt nicht mehr zum Korpus — neu erzeugen mit:\n"
+            f"    python3 scripts/abdeckung.py {BASE} > docs/ABDECKUNG.md"
         )
 
 

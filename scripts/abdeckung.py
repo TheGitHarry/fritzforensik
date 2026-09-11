@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Erzeugt ABDECKUNG.md aus einem Verzeichnis mit Bundles.
+"""Erzeugt docs/ABDECKUNG.md aus einem Verzeichnis mit Bundles.
 
-    python3 scripts/abdeckung.py ~/testdata/_work > ABDECKUNG.md
+    python3 scripts/abdeckung.py ~/testdata/_work > docs/ABDECKUNG.md
 
 Die Matrix ist zur **Veröffentlichung** bestimmt: Sie zeigt, welche
 Modell-/Firmware-Kombinationen schon einmal ausgelesen wurden und welche
@@ -206,7 +206,7 @@ def erzeuge(befunde: list[dict]) -> str:
     a("**Diese Datei wird erzeugt, nicht von Hand gepflegt:**")
     a("")
     a("```bash")
-    a("python3 scripts/abdeckung.py <verzeichnis-mit-bundles> > ABDECKUNG.md")
+    a("python3 scripts/abdeckung.py <verzeichnis-mit-bundles> > docs/ABDECKUNG.md")
     a("```")
     a("")
     a("| Zeichen | Bedeutung |")

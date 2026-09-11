@@ -22,7 +22,7 @@ import pytest
 from fritzreport.model import GRADE_LABEL
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-ANFORDERUNGEN = REPO_ROOT / "ANFORDERUNGEN.md"
+ANFORDERUNGEN = REPO_ROOT / "docs" / "ANFORDERUNGEN.md"
 README = REPO_ROOT / "README.md"
 
 #: Zeile einer Markdown-Tabelle, deren erste Spalte ein Grad ist: | D1 | Text |
@@ -152,7 +152,7 @@ def test_readme_trennt_werkzeug_und_entwicklung_bei_ki() -> None:
     assert "test_stdlib_only.py" in text, "die Zusage muss ihren Nachweis nennen"
     # Der Verweis auf die ausführliche Fassung muss auf einen echten Anker zeigen.
     assert "ABDECKUNG.md#bevor-sie-einen-abzug-bereitstellen" in text
-    ueberschriften = (REPO_ROOT / "ABDECKUNG.md").read_text(encoding="utf-8")
+    ueberschriften = (REPO_ROOT / "docs" / "ABDECKUNG.md").read_text(encoding="utf-8")
     assert "## Bevor Sie einen Abzug bereitstellen" in ueberschriften, (
         "Anker in der README zeigt ins Leere — Überschrift in ABDECKUNG.md geändert?"
     )

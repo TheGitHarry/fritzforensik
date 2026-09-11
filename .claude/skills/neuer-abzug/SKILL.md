@@ -18,7 +18,7 @@ Gepusht wird nie ohne ausdrückliches Wort.
 | `~/testdata/eingang/` | **Eingang** — hierhin lädt der Nutzer ZIPs und Verzeichnisse |
 | `~/testdata/_work/` | **Korpus** — nur was hier liegt, läuft in `pytest -m golden` |
 | `~/testdata/KORPUS.md` | private Inventarliste, **außerhalb des Repos** (Serials, Aktenzeichen) |
-| `ABDECKUNG.md` (im Repo) | öffentliche Matrix, **erzeugt**, ohne identifizierende Daten |
+| `docs/ABDECKUNG.md` (im Repo) | öffentliche Matrix, **erzeugt**, ohne identifizierende Daten |
 
 Der Eingang ist nicht der Korpus. Ein Abzug, der nur in `eingang/` liegt, wird
 von keinem Test gesehen — das ist der häufigste stille Fehler.
@@ -154,7 +154,7 @@ Schritt 2.
 ## 8. ABDECKUNG.md neu erzeugen
 
 ```bash
-python3 scripts/abdeckung.py ~/testdata/_work > ABDECKUNG.md
+python3 scripts/abdeckung.py ~/testdata/_work > docs/ABDECKUNG.md
 ```
 
 Liegen **eingegangene Auszüge** von außen vor (Issues mit Label `abdeckung`),
@@ -163,13 +163,13 @@ Matrix:
 
 ```bash
 python3 scripts/abdeckung.py ~/testdata/_work \
-  --beitrag=<auszug1.json> --beitrag=<auszug2.json> > ABDECKUNG.md
+  --beitrag=<auszug1.json> --beitrag=<auszug2.json> > docs/ABDECKUNG.md
 ```
 
 **Immer über den vollständigen Korpus**, nie über ein Teilverzeichnis — sonst
 schrumpft die Matrix stillschweigend.
 
-Danach `git diff ABDECKUNG.md` ansehen: Was hat sich geändert? Genau das ist der
+Danach `git diff docs/ABDECKUNG.md` ansehen: Was hat sich geändert? Genau das ist der
 Beitrag des neuen Abzugs.
 
 ## 9. KORPUS.md fortschreiben
@@ -191,7 +191,7 @@ Beide grün, dann berichten:
 - Modell, Firmware, HW-Revision — und ob es eine neue Kombination ist
 - Integritätsergebnis mit Zahlen
 - **Welche Lücke der Abzug geschlossen hat**, welche offen bleiben (aus
-  `git diff ABDECKUNG.md` und dem Abschnitt „Wo Abzüge dem Projekt am meisten
+  `git diff docs/ABDECKUNG.md` und dem Abschnitt „Wo Abzüge dem Projekt am meisten
   helfen")
 - Auffälligkeiten aus Schritt 5
 - Was noch fehlt oder unklar ist
@@ -204,5 +204,5 @@ Dann **stoppen** und die Freigabe zum Commit abwarten.
   überschreibt Handarbeit beim nächsten Lauf.
 - Abzüge und Reports **nie ins Repo** (`.gitignore` deckt `export_*/` ab, aber
   nicht jeden Namen — der Blick auf `git status` vor dem Commit ist Pflicht).
-- Zu committen sind in aller Regel **nur** `ABDECKUNG.md` — `KORPUS.md` liegt
+- Zu committen sind in aller Regel **nur** `docs/ABDECKUNG.md` — `KORPUS.md` liegt
   außerhalb des Repos und wird nicht mitversioniert.

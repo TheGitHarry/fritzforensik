@@ -6,7 +6,7 @@ und welche Datenarten dabei tatsächlich Daten geliefert haben.
 **Diese Datei wird erzeugt, nicht von Hand gepflegt:**
 
 ```bash
-python3 scripts/abdeckung.py <verzeichnis-mit-bundles> > ABDECKUNG.md
+python3 scripts/abdeckung.py <verzeichnis-mit-bundles> > docs/ABDECKUNG.md
 ```
 
 | Zeichen | Bedeutung |

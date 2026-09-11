@@ -34,15 +34,15 @@ ohne installiertes Python.
 > uns ein Bundle *bereitstellen*: Dessen Inhalte werden dann von einem KI-Assistenten
 > verarbeitet und damit an dessen Anbieter übermittelt. Was das bedeutet und welchen
 > datenarmen Weg es stattdessen gibt, steht in
-> [ABDECKUNG.md](ABDECKUNG.md#bevor-sie-einen-abzug-bereitstellen).
+> [ABDECKUNG.md](docs/ABDECKUNG.md#bevor-sie-einen-abzug-bereitstellen).
 
 Das gemeinsame Bundle-Format liegt in **`fritzformat/`** — Dateinamen, Hüllformat und
 SHA256-Sidecars stehen dort *einmal* und werden von beiden Seiten benutzt.
 
-Was die Werkzeuge fachlich leisten müssen, steht in [ANFORDERUNGEN.md](ANFORDERUNGEN.md);
+Was die Werkzeuge fachlich leisten müssen, steht in [ANFORDERUNGEN.md](docs/ANFORDERUNGEN.md);
 offene Punkte ausschließlich in den [GitHub-Issues](https://github.com/TheGitHarry/fritzforensik/issues). Wie man beiträgt — und wie man
 die Abdeckungsmatrix erweitert, ohne Daten weiterzugeben — steht in
-[CONTRIBUTING.md](CONTRIBUTING.md).
+[CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
 ---
 
@@ -320,7 +320,7 @@ die besonderen Fälle, kombinierbar:
 
 Schema **v2** (3 Grade). Ältere Unterlagen können ein 4-Grade-Schema nennen, in dem `D3`
 „durch eigene forensische Versuche belegt" bedeutete — das entspricht hier `D2`. Die
-Umrechnung steht in [ANFORDERUNGEN.md](ANFORDERUNGEN.md), Abschnitt D.
+Umrechnung steht in [ANFORDERUNGEN.md](docs/ANFORDERUNGEN.md), Abschnitt D.
 
 | Grad | Bedeutung |
 |------|-----------|
@@ -328,7 +328,7 @@ Umrechnung steht in [ANFORDERUNGEN.md](ANFORDERUNGEN.md), Abschnitt D.
 | **D2** | Durch eigene forensische Tests verifiziert |
 | **D3** | Abgeleitet / Interpretation |
 
-Grundlage für **D2** ist die Methodik in [methode.md](methode.md).
+Grundlage für **D2** ist die Methodik in [methode.md](docs/methode.md).
 
 **Verbindungsnachweise** (Sektion 6): Treffer des Methoden-Parsers tragen **D1+D2**, die aus
 den 802.11-Logs **D1+D3**. Beide Parser laufen auf jeder Box, Ergebnisse werden vereint
@@ -434,7 +434,7 @@ Extractor-Registry und die Datenart-Liste synchron, prüfen den Rundlauf
 # Abdeckung
 
 Welche Modelle und FRITZ!OS-Stände bereits ausgelesen wurden und welche Datenarten
-dabei Daten lieferten, steht in [ABDECKUNG.md](ABDECKUNG.md) — samt der Lücken, bei
+dabei Daten lieferten, steht in [ABDECKUNG.md](docs/ABDECKUNG.md) — samt der Lücken, bei
 denen ein weiterer Abzug dem Projekt am meisten hilft. Die Datei wird erzeugt:
 
 ```bash
@@ -445,11 +445,11 @@ python3 scripts/abdeckung.py <verzeichnis-mit-bundles> > ABDECKUNG.md
 
 # Lizenz
 
-Apache-2.0 — siehe [LICENSE](LICENSE). Nutzung, Änderung und Weitergabe sind erlaubt,
+Apache-2.0 — siehe [LICENSE](docs/LICENSE). Nutzung, Änderung und Weitergabe sind erlaubt,
 **ohne jede Gewährleistung**: Die Werkzeuge werden „AS IS" bereitgestellt, es wird
 insbesondere nicht zugesichert, dass ein erzeugter Abzug oder Report einer gerichtlichen
 Prüfung standhält. Die Verantwortung für Methodik und Verwertbarkeit liegt bei dem, der
 sie einsetzt.
 
 Sicherheitslücken bitte **nicht** als öffentliches Issue melden — der Weg steht in
-[SECURITY.md](SECURITY.md).
+[SECURITY.md](docs/SECURITY.md).

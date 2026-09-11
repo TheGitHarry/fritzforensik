@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-ABDECKUNG = REPO_ROOT / "ABDECKUNG.md"
+ABDECKUNG = REPO_ROOT / "docs" / "ABDECKUNG.md"
 
 _spec = importlib.util.spec_from_file_location(
     "abdeckung", REPO_ROOT / "scripts" / "abdeckung.py"
