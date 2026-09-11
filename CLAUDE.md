@@ -110,11 +110,29 @@ gleich. Zwei Fallen, die dort im Docstring belegt sind:
 - Rückwirkend ist **nur `standard`** auswertbar. Bei `enhanced` liegt ohne eigene
   Marker die Wartezeit auf den Tastendruck mit in der Klammer (7490: 595 s).
 - Eine Klammer, deren Antwort **vor** ihrer Anfrage liegt, ist keine Messung, sondern
-  ein gekürztes Log — `_add_offset` verwirft sie. Erzeugt wurde sie früher von
-  `parse_uhr_spans` selbst: Zwei getrennte Schleifen („je die letzte Anfrage, je die
-  letzte Antwort") paaren über Kreuz. Dort wird deshalb **in Logreihenfolge** gepaart;
-  wer das zurückbaut, baut eine negative Klammerbreite ein — und damit die schärfste
-  denkbare Aussage über die Box-Uhr aus einer Messung, die nie zustande kam.
+  ein gekürztes Log — `_add_offset` verwirft sie.
+
+`_resolve_secured_box_span` (ebenfalls in `bundle.py`) bildet das **Fenster der eigenen
+Sicherung** in der Ortszeit der Box. Es beantwortet die Frage, welche Zeilen im
+Ereignisprotokoll vom Abzug stammen und nicht vom Asservat — der Report markiert sie in
+Sektion 9 und sagt den Satz ausdrücklich. Drei Punkte, die dabei je einen Fehlgriff
+gekostet haben und im Docstring belegt sind:
+
+- Die Ereigniszeiten der Box tragen **keine Zonenangabe**, sie sind Ortszeit; das Fenster
+  ist UTC. Ohne Umrechnung läge die Markierung bei CEST zwei Stunden falsch. Der Offset
+  kommt aus `boxtime` (`2026-01-06T11:00:02+01:00`) und, wo die Datenart fehlt, aus dem
+  Kopf der Supportdaten über `TZ_OFFSETS`. **Kein Bundle des Testkorpus hat `boxtime`** —
+  wer den Rückfall entfernt, verliert die Markierung auf allen echten Abzügen.
+- Das Fenster beginnt beim **Start des Sitzungslogs**, nicht beim ersten Datenabruf. Das
+  Werkzeug meldet sich vorher an, und die Box protokolliert das: Auf der 7530 AX liegt die
+  Anmeldung eine Sekunde vor `SICHERUNG BEGINN`. Ab dem ersten Abruf gezählt, markiert das
+  Fenster auf **keinem** Abzug des Korpus etwas.
+- Die Grenzen umfassen ihre **ganze Sekunde**. Der Sitzungsbeginn stammt aus einem Logkopf
+  mit Millisekunden; auf der 7530 AX lag die Grenze 39 ms hinter der Anmeldung und der
+  sekundengenaue Ereigniszeitstempel fiel heraus.
+
+Ist die Zone der Box unbestimmbar, wird **nicht** markiert und der Hinweis sagt das. Eine
+leere Spalte läse sich sonst als „keine eigenen Spuren".
 
 **Belegtheits-Grade** (kombinierbar): **D1** plausibel innerhalb der Rohdaten · **D2** durch
 eigene forensische Tests verifiziert ([methode.md](methode.md)) ·

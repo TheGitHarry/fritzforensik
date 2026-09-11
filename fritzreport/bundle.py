@@ -15,7 +15,7 @@ import bisect
 import json
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 # Formatvertrag mit fritzexport — Dateinamen, Datenarten, Sidecar-Prüfung.
@@ -34,7 +34,7 @@ from fritzformat import (
     verify,
 )
 
-from .supportdata import parse_box_header_time
+from .supportdata import TZ_OFFSETS, parse_box_header_time
 
 __all__ = [
     "JSON_TYPES", "SUPPORT_VARIANTS", "sha256_file", "read_sidecar", "verify",
@@ -208,6 +208,11 @@ class Bundle:
     #: Abgleiche der Box-Uhr gegen die Referenzuhr, je Quelle einer.
     clock_offsets: list = field(default_factory=list)   # ClockOffset
 
+    #: Sicherungszeitraum in der **Ortszeit der Box**, für den Vergleich mit den
+    #: Ereigniszeiten. Nur gesetzt, wenn der UTC-Offset der Box bekannt ist.
+    secured_box_from: datetime | None = None
+    secured_box_to: datetime | None = None
+
     def ds(self, type_: str) -> Dataset:
         return self.datasets.get(type_) or Dataset(type=type_, path=None)  # type: ignore[arg-type]
 
@@ -291,6 +296,7 @@ def load_bundle(dir_: Path) -> Bundle:
 
     _resolve_secured_span(b)
     _resolve_clock_offset(b)
+    _resolve_secured_box_span(b)
     return b
 
 
@@ -392,6 +398,82 @@ def _iso_to_dt(iso: str):
         except ValueError:
             continue
     return None
+
+
+def _box_utc_offset(b: Bundle):
+    """UTC-Offset der Box als ``timedelta``; ``None`` wenn nicht ermittelbar.
+
+    Die Box liefert ihre Zeit mit Zonenangabe (``2026-01-06T11:00:02+01:00``) —
+    daraus stammt der Offset, nicht aus der Zone der Abzugsmaschine.
+    """
+    for r in b.ds("boxtime").records:
+        if r.get("record_type") != "box_clock":
+            continue
+        try:
+            dt = datetime.fromisoformat(r.get("box_current_local_time") or "")
+        except ValueError:
+            return None
+        return dt.utcoffset()
+
+    # Kein ``boxtime`` (Altbestand): Die Kopfzeile der Supportdaten nennt die Zone
+    # als Kürzel. Kein Bundle des Testkorpus hat die Datenart, dieser Weg trägt
+    # dort allein.
+    for variante in ("standard", "enhanced", "mesh"):
+        sf = b.support.get(variante)
+        if not (sf and sf.present and sf.text):
+            continue
+        _, tz, _ = parse_box_header_time(sf.text)
+        sekunden = TZ_OFFSETS.get(tz)
+        if sekunden is not None:
+            return timedelta(seconds=sekunden)
+    return None
+
+
+def _session_start_utc(b: Bundle):
+    """Beginn des Abzugs als naives UTC — die **erste Zeile** des Sitzungslogs.
+
+    Nicht der erste Datenabruf: Das Werkzeug meldet sich davor an, und die Box
+    protokolliert die Anmeldung. Auf der 7530 AX des Korpus liegt sie eine Sekunde
+    vor ``SICHERUNG BEGINN``; ein Fenster ab dem ersten Abruf verfehlt sie.
+
+    Der Zeilenkopf steht in Lokalzeit — umgerechnet wird mit dem Versatz der
+    Abzugsmaschine, den `_maschinen_versatz` aus einer Zeile gewinnt, die beides
+    trägt.
+    """
+    m = re.match(r"^(\S+ \S+) ", b.session_log or "")
+    versatz = _maschinen_versatz(b)
+    if not m or versatz is None:
+        return None
+    lokal = _log_kopf_dt(m.group(1))
+    return (lokal - versatz) if lokal else None
+
+
+def _resolve_secured_box_span(b: Bundle) -> None:
+    """Fenster der Sicherung in der Ortszeit der Box.
+
+    Die Ereigniszeiten der Box tragen keine Zonenangabe, sie sind Ortszeit. Das
+    Fenster ist UTC. Ein Vergleich ohne Umrechnung wäre keine Messung, sondern ein
+    Griff daneben — bei CEST um zwei Stunden.
+
+    Der Beginn ist der frühere von Sitzungsbeginn und erstem Abruf, das Ende der
+    letzte Abruf. Damit deckt das Fenster auch die Anmeldung ab, die dem ersten
+    Abruf vorausgeht.
+    """
+    offset = _box_utc_offset(b)
+    von, bis = _iso_to_dt(b.secured_from), _iso_to_dt(b.secured_to)
+    if offset is None or not (von and bis):
+        return
+    start = _session_start_utc(b)
+    if start and start < von:
+        von = start
+
+    # Ereigniszeiten der Box sind sekundengenau, die Grenzen nicht: Der
+    # Sitzungsbeginn stammt aus einem Logkopf mit Millisekunden. Auf der 7530 AX
+    # des Korpus lag die Grenze 39 ms hinter der Anmeldung — sekundengenau
+    # verglichen fiel sie heraus. Die Grenzen umfassen deshalb ihre ganze Sekunde.
+    a, e = von + offset, bis + offset
+    b.secured_box_from = a.replace(microsecond=0)
+    b.secured_box_to = (e.replace(microsecond=0) + timedelta(seconds=1)) if e.microsecond else e
 
 
 def _resolve_clock_offset(b: Bundle) -> None:

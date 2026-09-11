@@ -805,3 +805,211 @@ def test_nachgewiesener_versatz_wird_nicht_wegerklaert(synth_bundle):
     zeile = _zeile(html, "Zeitversatz Box ↔ Referenz")
     assert "Abweichung zwischen +4 s und +6 s" in zeile
     assert "nachweisbar" not in zeile
+
+
+# ───────────────── Eigene Spuren im Ereignisprotokoll (Kontamination) ────────
+
+def _ersetze_events(bundle_dir: Path, records: list) -> None:
+    """Die events-Datenart des Fixtures durch eigene Datensätze ersetzen."""
+    import json
+
+    from fritzformat import TOOL_NAME, build_envelope, sha256_bytes, write_sidecar
+
+    p = next(bundle_dir.glob("*_events.json"))
+    body = json.dumps(
+        build_envelope(tool=TOOL_NAME, version="0.3.1", host="https://fritz.box",
+                       type_name="events", records=records,
+                       extracted_at="2026-01-06T10:00:00Z"),
+        indent=2, ensure_ascii=False).encode("utf-8")
+    p.write_bytes(body)
+    write_sidecar(p, sha256_bytes(body))
+
+
+def test_ereignisse_im_sicherungszeitraum_werden_markiert(synth_bundle):
+    """Die Anmeldung des Werkzeugs erzeugt selbst Einträge im Ereignisprotokoll
+    der Box — wer den Report liest, muss sie von den Spuren des Asservats
+    unterscheiden können.
+
+    Verglichen wird in **Boxzeit**: Das Fenster steht als UTC in den
+    SICHERUNG-Markern, die Ereigniszeiten sind Ortszeit der Box. Der Offset
+    (+01:00) steht im boxtime-Datensatz, 10:00–10:05Z sind auf der Box also
+    11:00–11:05. Ein Vergleich ohne diese Umrechnung träfe die falschen Zeilen.
+    """
+    (synth_bundle / "fritzexport_20260106T095500Z.log").write_text(
+        "2026-01-06 11:00:00,000 INFO SICHERUNG BEGINN 2026-01-06T10:00:00Z\n"
+        "2026-01-06 11:05:00,000 INFO SICHERUNG ENDE 2026-01-06T10:05:00Z\n",
+        encoding="utf-8")
+    _ersetze_events(synth_bundle, [
+        {"date": "06.01.26", "time": "10:59:00", "category": "sys", "id": 1,
+         "message": "vor der Sicherung"},
+        {"date": "06.01.26", "time": "11:02:00", "category": "sys", "id": 2,
+         "message": "Anmeldung an der FRITZ!Box-Benutzeroberfläche"},
+        {"date": "06.01.26", "time": "11:06:00", "category": "sys", "id": 3,
+         "message": "nach der Sicherung"},
+    ])
+
+    b = load_bundle(synth_bundle)
+    assert b.secured_source == "log"
+
+    m = build_model(b)
+    markiert = {e["message"]: e["during_acquisition"] for e in m.events}
+    assert markiert == {
+        "vor der Sicherung": False,
+        "Anmeldung an der FRITZ!Box-Benutzeroberfläche": True,
+        "nach der Sicherung": False,
+    }
+
+
+def test_sicherungsfenster_auch_ohne_boxtime_datenart(synth_bundle):
+    """Ohne ``boxtime`` trägt der Kopf der Supportdaten den Offset.
+
+    Kein Bundle des Testkorpus hat die Datenart ``boxtime`` — sie kam erst
+    später dazu. Käme der Offset nur von dort, blieben ausgerechnet die echten
+    Abzüge ohne Markierung.
+    """
+    for p in list(synth_bundle.glob("*_boxtime.json*")):
+        p.unlink()
+    (synth_bundle / "fritzexport_20260106T095500Z.log").write_text(
+        "2026-01-06 11:00:00,000 INFO SICHERUNG BEGINN 2026-01-06T10:00:00Z\n"
+        "2026-01-06 11:05:00,000 INFO SICHERUNG ENDE 2026-01-06T10:05:00Z\n",
+        encoding="utf-8")
+    _ersetze_events(synth_bundle, [
+        {"date": "06.01.26", "time": "11:02:00", "category": "sys", "id": 1,
+         "message": "Anmeldung an der FRITZ!Box-Benutzeroberfläche"},
+        {"date": "06.01.26", "time": "11:06:00", "category": "sys", "id": 2,
+         "message": "danach"},
+    ])
+
+    b = load_bundle(synth_bundle)
+    assert not b.ds("boxtime").present
+    # Kopfzeile der Supportdaten: 11:00:02 CET → Offset +01:00
+    assert b.secured_box_from is not None, "ohne boxtime keine Umrechnung"
+
+    m = build_model(b)
+    assert [e["during_acquisition"] for e in m.events] == [True, False]
+
+
+def _zeile_mit(html: str, text: str) -> str:
+    """Die Tabellenzeile, in der ``text`` steht."""
+    vor = html.split(text, 1)[0]
+    return vor[vor.rfind("<tr"):] + text + html.split(text, 1)[1].split("</tr>", 1)[0]
+
+
+def test_report_weist_die_eigenen_spuren_im_ereignisprotokoll_aus(synth_bundle):
+    """Der Report sagt ausdrücklich, dass der Abzug selbst Einträge erzeugt, und
+    markiert sie in der Tabelle.
+
+    Ohne den Satz muss der Leser aus Sicherungszeitraum und Zeitstempeln selbst
+    schließen, welche Zeilen vom Werkzeug stammen — bei zweitausend Ereignissen
+    tut das niemand.
+    """
+    (synth_bundle / "fritzexport_20260106T095500Z.log").write_text(
+        "2026-01-06 11:00:00,000 INFO SICHERUNG BEGINN 2026-01-06T10:00:00Z\n"
+        "2026-01-06 11:05:00,000 INFO SICHERUNG ENDE 2026-01-06T10:05:00Z\n",
+        encoding="utf-8")
+    _ersetze_events(synth_bundle, [
+        {"date": "06.01.26", "time": "11:02:00", "category": "sys", "id": 1,
+         "message": "Anmeldung waehrend des Abzugs"},
+        {"date": "06.01.26", "time": "11:06:00", "category": "sys", "id": 2,
+         "message": "Ereignis des Asservats"},
+    ])
+
+    b = load_bundle(synth_bundle)
+    m = build_model(b)
+    res = analyze(b, m.real_aps, m.master.get("name", ""))
+    html = build_html(b, m, res, {"case_id": "", "item_id": "", "sb": "",
+                                  "date": "2026-01-06", "generated_at": "x"})
+
+    assert "meldet sich für den Abzug selbst an der Box an" in html
+
+    assert 'class="acq"' in _zeile_mit(html, "Anmeldung waehrend des Abzugs")
+    assert 'class="acq"' not in _zeile_mit(html, "Ereignis des Asservats")
+
+
+def test_ohne_bekannte_zeitzone_wird_nicht_markiert_sondern_gesagt(synth_bundle):
+    """Ist die Zone der Box unbestimmbar, wird nicht geraten.
+
+    Eine leere Markierungsspalte läse sich als „keine eigenen Spuren" — der
+    Hinweis muss deshalb sagen, dass nicht markiert werden konnte.
+    """
+    from fritzformat import sha256_bytes, write_sidecar
+
+    for p in list(synth_bundle.glob("*_boxtime.json*")):
+        p.unlink()
+    sup = next(synth_bundle.glob("supportdata_standard_*.txt"))
+    body = sup.read_text(encoding="utf-8").replace(" CET ", " XYZ ").encode("utf-8")
+    sup.write_bytes(body)
+    write_sidecar(sup, sha256_bytes(body))
+
+    (synth_bundle / "fritzexport_20260106T095500Z.log").write_text(
+        "2026-01-06 11:00:00,000 INFO SICHERUNG BEGINN 2026-01-06T10:00:00Z\n"
+        "2026-01-06 11:05:00,000 INFO SICHERUNG ENDE 2026-01-06T10:05:00Z\n",
+        encoding="utf-8")
+    _ersetze_events(synth_bundle, [
+        {"date": "06.01.26", "time": "11:02:00", "category": "sys", "id": 1,
+         "message": "im Fenster, aber ohne Zonenwissen"}])
+
+    b = load_bundle(synth_bundle)
+    assert b.secured_box_from is None
+    m = build_model(b)
+    assert [e["during_acquisition"] for e in m.events] == [False]
+
+    res = analyze(b, m.real_aps, m.master.get("name", ""))
+    html = build_html(b, m, res, {"case_id": "", "item_id": "", "sb": "",
+                                  "date": "2026-01-06", "generated_at": "x"})
+    assert "nicht bestimmbar" in html
+    assert 'class="acq"' not in html
+
+
+def test_fenster_beginnt_beim_start_des_abzugs_nicht_beim_ersten_abruf(synth_bundle):
+    """Die eigene Anmeldung liegt **vor** dem ersten Datenabruf.
+
+    Am Korpus gemessen: Auf der 7530 AX protokolliert die Box die Anmeldung des
+    Werkzeugs um 11:34:59 Boxzeit, ``SICHERUNG BEGINN`` steht auf 11:35:00 — eine
+    Sekunde später. Ein Fenster, das erst beim ersten Abruf beginnt, verfehlt die
+    eigene Spur auf jedem Abzug des Korpus. Gezählt wird deshalb ab der ersten
+    Zeile des Sitzungslogs; ihr Kopf steht in Lokalzeit, der Versatz der
+    Abzugsmaschine kommt aus der Markerzeile, die beides trägt.
+    """
+    (synth_bundle / "fritzexport_20260106T095500Z.log").write_text(
+        "2026-01-06 10:58:30,000 INFO Starte Abzug\n"
+        "2026-01-06 11:00:00,000 INFO SICHERUNG BEGINN 2026-01-06T10:00:00Z\n"
+        "2026-01-06 11:05:00,000 INFO SICHERUNG ENDE 2026-01-06T10:05:00Z\n",
+        encoding="utf-8")
+    _ersetze_events(synth_bundle, [
+        {"date": "06.01.26", "time": "10:58:00", "category": "sys", "id": 1,
+         "message": "vor dem Start des Abzugs"},
+        {"date": "06.01.26", "time": "10:59:00", "category": "sys", "id": 2,
+         "message": "Anmeldung, vor dem ersten Abruf"},
+    ])
+
+    b = load_bundle(synth_bundle)
+    # Sitzungsbeginn 10:58:30 Lokalzeit = 09:58:30Z, Box +01:00 → 10:58:30 Boxzeit
+    assert b.secured_box_from.strftime("%H:%M:%S") == "10:58:30"
+
+    m = build_model(b)
+    assert [e["during_acquisition"] for e in m.events] == [False, True]
+
+
+def test_ereignis_auf_der_fenstergrenze_zaehlt_dazu(synth_bundle):
+    """Ereigniszeiten sind sekundengenau, die Fenstergrenze nicht.
+
+    Der Sitzungsbeginn kommt aus einem Logkopf mit Millisekunden. Steht die
+    Grenze auf 10:58:30,700 und das Ereignis auf 10:58:30, fällt es bei einem
+    strengen Vergleich heraus — obwohl es in derselben Sekunde liegt. Genau das
+    ist auf der 7530 AX des Korpus passiert: Fenster ab 11:34:59, Anmeldung um
+    11:34:59, keine Markierung. Die Grenze wird deshalb auf die Sekunde
+    abgeschnitten.
+    """
+    (synth_bundle / "fritzexport_20260106T095500Z.log").write_text(
+        "2026-01-06 10:58:30,700 INFO Starte Abzug\n"
+        "2026-01-06 11:00:00,000 INFO SICHERUNG BEGINN 2026-01-06T10:00:00Z\n"
+        "2026-01-06 11:05:00,000 INFO SICHERUNG ENDE 2026-01-06T10:05:00Z\n",
+        encoding="utf-8")
+    _ersetze_events(synth_bundle, [
+        {"date": "06.01.26", "time": "10:58:30", "category": "sys", "id": 1,
+         "message": "genau auf der Grenzsekunde"}])
+
+    b = load_bundle(synth_bundle)
+    m = build_model(b)
+    assert [e["during_acquisition"] for e in m.events] == [True]

@@ -120,6 +120,8 @@ td.exp,th.exp{width:26px;padding:5px 2px 5px 8px}
 .expbtn:hover{background:var(--bg-sunk);color:var(--accent)}
 .expbtn[aria-expanded=true]{transform:rotate(90deg)}
 .grades{white-space:nowrap;width:1%}
+.acq{display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;
+  background:#fde68a;color:#713f12;margin-right:5px;white-space:nowrap}
 .grade{display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;
   font-weight:700;margin-right:2px;letter-spacing:.02em}
 .gD1{background:var(--gd1b);color:var(--gd1)}
@@ -629,6 +631,29 @@ def render_rows(records, cells_fn, colspan) -> str:
     return "".join(out)
 
 
+def ereignis_note(b, m) -> str:
+    """Hinweis über der Ereignistabelle: der Abzug steht selbst im Protokoll.
+
+    Das Werkzeug meldet sich an der Box an, um zu lesen — die Box protokolliert
+    das. Die Einträge stammen damit vom Abzug und nicht vom Asservat. Ohne den
+    Hinweis müsste der Leser das aus Sicherungszeitraum und Zeitstempeln selbst
+    schließen; bei zweitausend Zeilen tut das niemand.
+
+    Ist der UTC-Offset der Box unbekannt, lässt sich das Fenster nicht in Boxzeit
+    umrechnen. Dann wird **nicht** markiert, und der Hinweis sagt das — eine leere
+    Markierungsspalte läse sich sonst als „keine eigenen Spuren".
+    """
+    satz = ("Das Werkzeug meldet sich für den Abzug selbst an der Box an; die Box "
+            "protokolliert diese Anmeldung wie jede andere.")
+    if b.secured_box_from is None:
+        return (satz + " Die Zeitzone der Box ist aus diesem Bundle nicht "
+                "bestimmbar, die betroffenen Zeilen sind deshalb nicht markiert.")
+    n = sum(1 for e in m.events if e.get("during_acquisition"))
+    return (satz + f' Im Sicherungszeitraum liegen <strong>{n}</strong> Einträge; '
+            'sie sind mit <span class="acq">Sicherung</span> markiert und stammen '
+            'vom Abzug, nicht vom Asservat.')
+
+
 def section(sid, num, title, key, count, body, note="", noun="Zeilen") -> str:
     note_html = f'<div class="notice notice-info">{note}</div>' if note else ""
     label = f"{count} {noun}" if count is not None else ""
@@ -709,7 +734,10 @@ def c_pb(p):
 
 
 def c_events(e):
-    return (f'<td class="mono">{esc(e["iso"])}</td><td>{esc(e["category"])}</td>'
+    marke = ('<span class="acq" title="Liegt im Sicherungszeitraum — '
+             'stammt vom Abzug, nicht vom Asservat">Sicherung</span>'
+             if e.get("during_acquisition") else "")
+    return (f'<td class="mono">{marke}{esc(e["iso"])}</td><td>{esc(e["category"])}</td>'
             f'<td class="num">{esc(e["id"])}</td><td class="mono">{esc(e["mac"])}</td>'
             f'<td class="msg">{esc(e["message"])}</td>')
 
@@ -992,7 +1020,8 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
         + section("s7", "7", "Anrufhistorie", "calls", len(m.calls), s7,
                   note=_calls_note(len(m.calls)), noun="Anrufe")
         + section("s8", "8", "Telefonbuch", "pb", len(m.phonebook), s8, noun="Einträge")
-        + section("s9", "9", "Ereignisse", "events", len(m.events), s9, noun="Ereignisse")
+        + section("s9", "9", "Ereignisse", "events", len(m.events), s9,
+                  note=ereignis_note(bundle, m), noun="Ereignisse")
         + section("s10", "10", "Vollständige Timeline (quellenübergreifend)", "timeline", len(timeline), s10,
                   noun="Datenpunkte", note=tl_note)
         + section("s11", "11", "DHCP-Konfiguration", "dhcp", None, dhcp_body)

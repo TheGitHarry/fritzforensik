@@ -211,7 +211,12 @@ def build_model(b: Bundle) -> Model:
         if mac and ("anmeldung" in low or "angemeldet" in low or "abgemeldet" in low):
             grades.append("D1")   # alt D2 → D1
         ev_ap = next((a for a in m.real_aps if a.lower() in low), "")
+        waehrend = bool(
+            ts and b.secured_box_from and b.secured_box_to
+            and b.secured_box_from <= ts.replace(tzinfo=None) <= b.secured_box_to
+        )
         m.events.append({
+            "during_acquisition": waehrend,
             "iso": ts.isoformat() if ts else "", "category": r.get("category") or "",
             "id": r.get("id"), "mac": mac, "message": msg,
             "f_name": "", "f_phone": phone, "f_ap": ev_ap, "f_iso": ts.isoformat() if ts else "",
