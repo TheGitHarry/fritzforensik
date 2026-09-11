@@ -79,4 +79,4 @@ die üblichen Pfade ab, verlassen Sie sich aber nicht darauf.
 ## Lizenz
 
 Mit einem Pull Request stellen Sie Ihren Beitrag unter dieselbe Lizenz wie das
-Projekt: Apache-2.0, siehe [LICENSE](LICENSE).
+Projekt: Apache-2.0, siehe [LICENSE](../LICENSE).

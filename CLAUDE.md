@@ -206,20 +206,23 @@ Jede Aussage hat **genau einen** Ort — dasselbe Prinzip wie bei `fritzformat`:
 | [ABDECKUNG.md](docs/ABDECKUNG.md) | Welche Modelle/Firmware getestet sind — **erzeugt**, nie von Hand ändern |
 | [SECURITY.md](docs/SECURITY.md) | Meldeweg für Sicherheitslücken, und was ausdrücklich keine ist |
 | [CONTRIBUTING.md](docs/CONTRIBUTING.md) | Beitragswege nach außen — verweist auf die Eigentümer, statt sie zu wiederholen |
-| [LICENSE](docs/LICENSE) | Apache-2.0 |
+| [LICENSE](LICENSE) | Apache-2.0 |
 | GitHub-Issues | Backlog — **ausschließlich** |
 
-Im **Stammverzeichnis** liegen nur `README.md` und diese Datei. Alles andere steht in
-**`docs/`** — ANFORDERUNGEN, methode, ABDECKUNG, CONTRIBUTING, SECURITY und LICENSE
-(seit 2026-09-11; vorher lag alles im Stamm).
+Im **Stammverzeichnis** liegen `README.md`, `LICENSE` und diese Datei. Alles andere steht
+in **`docs/`** — ANFORDERUNGEN, methode, ABDECKUNG, CONTRIBUTING und SECURITY (seit
+2026-09-11; vorher lag alles im Stamm).
 
-`CONTRIBUTING.md` und `SECURITY.md` findet GitHub auch dort — am 2026-09-11 an fremden
-Repos nachgemessen, die sie ausschließlich unter `docs/` führen: Das Community-Profil
-zeigt auf `docs/CONTRIBUTING.md`, und `/security/policy` gibt `docs/SECURITY.md` aus.
-Bei **LICENSE** war das Gegenteil zu erwarten: Kein geprüftes Repo wurde ohne Lizenzdatei
-im Stamm als lizenziert geführt, und die GitHub-Doku nennt nur die Wurzel. Verschoben
-wurde sie trotzdem — bewusst, um es am eigenen Repo zu sehen. Zeigt GitHub die Lizenz
-nicht mehr an, gehört sie zurück in den Stamm.
+`CONTRIBUTING.md` und `SECURITY.md` findet GitHub auch unter `docs/`. Am 2026-09-11 am
+eigenen Repo nachgemessen: Das Community-Profil zeigt auf `docs/CONTRIBUTING.md`, und
+`/security/policy` gibt `docs/SECURITY.md` aus.
+
+**`LICENSE` muss im Stamm bleiben.** Ebenfalls am eigenen Repo gemessen, und zwar durch
+Ausprobieren: Unter `docs/` meldete die API `license: null`, das Repo galt als *ohne
+Lizenz* — keine Anzeige in der Seitenleiste, kein Apache-2.0 im Repo-Kopf, nicht über
+Lizenzfilter auffindbar. Für ein Werkzeug, das andere nachnutzen sollen, ist das die
+missverständlichste aller Anzeigen. Die GitHub-Doku nennt für die Lizenz nur die Wurzel;
+das deckt sich. Nicht noch einmal verschieben.
 
 Wer einen Pfad ändert, ändert mehr als einen Link: `scripts/abdeckung.py` schreibt nach
 `docs/ABDECKUNG.md`, und `tests/format/` liest ANFORDERUNGEN und ABDECKUNG über feste
