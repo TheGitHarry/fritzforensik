@@ -61,6 +61,24 @@ def test_md5_mit_ausdruecklicher_erlaubnis():
         == "0123456789abcdef"
 
 
+@pytest.mark.parametrize("challenge", [
+    "2$1$$1$aa",                                      # der Umweg um die MD5-Sperre
+    "2$999$5a1711d73a4ef25e$6000$72a06aabd2db5fc4",   # zu wenige Iterationen (statisch)
+    "2$60000$5a1711d73a4ef25e$999$72a06aabd2db5fc4",  # zu wenige Iterationen (dynamisch)
+    "2$60000$5a1711d73a4e$6000$72a06aabd2db5fc4",     # Salt zu kurz
+    "2$60000$5a1711d73a4ef25e$6000$",                 # Salt leer
+])
+def test_schwache_pbkdf2_challenge_wird_nicht_beantwortet(challenge):
+    """Ein nachgebildetes Gerät darf die MD5-Sperre nicht mit ``2$`` und einer
+    Iteration umgehen — die Antwort wäre offline so billig zu raten wie MD5.
+    Auch ``--allow-md5`` gibt das nicht frei: Es erlaubt alte Firmware, keine
+    Challenge, die keine Box stellt."""
+    session = _login_session(challenge)
+    with pytest.raises(AuthError, match="zu schwaches PBKDF2"):
+        auth.login("https://box", "admin", "geheim", session, allow_md5=True)
+    session.post.assert_not_called()
+
+
 # ─────────────────────── Befund 1: TLS-Fingerabdruck ─────────────────────────
 
 def test_fingerabdruck_normalisierung():

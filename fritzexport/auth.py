@@ -30,9 +30,34 @@ class LoginResult:
     blocktime: int
 
 
+#: Untergrenzen für die Parameter einer PBKDF2-Challenge. AVMs Technical Note nennt
+#: 60000/6000 Iterationen und Salts von 8 Byte; die Grenzen liegen weit darunter und
+#: treffen nur Challenges, die niemand außer einem nachgebildeten Gerät stellt.
+PBKDF2_MIN_ITER = 1000
+PBKDF2_MIN_SALT_BYTES = 8
+
+
+def _check_pbkdf2_params(iter1: int, salt1: bytes, iter2: int, salt2: bytes) -> None:
+    """AuthError, wenn die Challenge das Passwort billig zu raten machte.
+
+    Iterationen und Salts wählt die Gegenstelle. Ein Gerät, das sich als Box ausgibt,
+    könnte mit ``2$1$$1$aa`` die MD5-Sperre umgehen: Die Antwort wäre dann zweimal
+    HMAC-SHA256 mit je einer Iteration — offline so schnell zu raten wie MD5.
+    """
+    if (min(iter1, iter2) < PBKDF2_MIN_ITER
+            or min(len(salt1), len(salt2)) < PBKDF2_MIN_SALT_BYTES):
+        raise AuthError(
+            f"Gegenstelle verlangt ein zu schwaches PBKDF2 (Iterationen {iter1}/{iter2}, "
+            f"Salt {len(salt1)}/{len(salt2)} Byte) — abgebrochen, das Passwort wurde "
+            "nicht verwendet. Keine FRITZ!Box stellt eine solche Challenge."
+        )
+
+
 def _pbkdf2_response(challenge: str, password: str) -> str:
     try:
         _, iter1, salt1, iter2, salt2 = challenge.split("$")
+        _check_pbkdf2_params(int(iter1), bytes.fromhex(salt1),
+                             int(iter2), bytes.fromhex(salt2))
         static_hash = hashlib.pbkdf2_hmac(
             "sha256", password.encode("utf-8"), bytes.fromhex(salt1), int(iter1)
         )
@@ -83,6 +108,10 @@ def login(
     das sich als Box ausgibt, bekäme sonst auf eine Challenge ohne ``2$`` hin
     ``md5(challenge-passwort)`` und könnte das Passwort offline in Minuten raten.
     Moderne Firmware (7.24+) antwortet auf ``version=2`` immer mit PBKDF2.
+
+    Aus demselben Grund werden die Parameter einer PBKDF2-Challenge geprüft
+    (:func:`_check_pbkdf2_params`) — sonst ließe sich die Sperre mit ``2$`` und einer
+    Iteration umgehen.
     """
     challenge_resp = session.get(base_url + LOGIN_PATH, timeout=10)
     challenge_resp.raise_for_status()
