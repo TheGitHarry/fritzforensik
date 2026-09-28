@@ -20,30 +20,73 @@ def test_normalize_host(raw, expected):
     assert cli.normalize_host(raw) == expected
 
 
-def test_probe_tls_schaltet_bei_selbstsigniertem_cert_auf_insecure(monkeypatch):
+FP = "ab" * 32
+
+
+def _selbstsigniert(monkeypatch, seen=None):
     def boom(url, timeout):
+        if seen is not None:
+            seen.append(url)
         raise requests.exceptions.SSLError("self-signed certificate")
 
     monkeypatch.setattr(cli.requests, "get", boom)
-    args = argparse.Namespace(insecure=False)
-    cli._probe_tls("https://192.168.2.1", args)
-    assert args.insecure is True
+    monkeypatch.setattr(cli, "_server_fingerprint", lambda url: FP)
+
+
+def _tls_args(**kw):
+    return argparse.Namespace(**{"insecure": False, "tls_fingerprint": None, **kw})
+
+
+def test_probe_tls_schaltet_nicht_still_auf_insecure(monkeypatch):
+    """Sicherheitsbefund: Ein selbstsigniertes Zertifikat schaltete früher still auf
+    --insecure — jedes Gerät, das sich als Box meldete, bekam die Anmeldung. Ohne
+    Bestätigung (kein TTY) wird jetzt abgebrochen."""
+    _selbstsigniert(monkeypatch)
+    monkeypatch.setattr(cli, "_confirm_fingerprint", lambda url, fp: False)
+    args = _tls_args()
+    assert cli._probe_tls("https://192.168.2.1", args) is False
+    assert args.insecure is False
+    assert args.tls_fingerprint is None
+
+
+def test_probe_tls_legt_bestaetigten_fingerabdruck_fest(monkeypatch):
+    _selbstsigniert(monkeypatch)
+    monkeypatch.setattr(cli, "_confirm_fingerprint", lambda url, fp: True)
+    args = _tls_args()
+    assert cli._probe_tls("https://192.168.2.1", args) is True
+    assert args.tls_fingerprint == FP
+    assert args.insecure is False
 
 
 def test_probe_tls_greift_auch_bei_host_ohne_schema(monkeypatch):
     """Regression: blanke IP wurde vom TLS-Probe übersprungen, dadurch blieb
-    der Benutzer-Auto-Detect ohne Insecure-Umschaltung und lieferte nichts."""
+    der Benutzer-Auto-Detect ohne TLS-Festlegung und lieferte nichts."""
     seen = []
+    _selbstsigniert(monkeypatch, seen)
+    monkeypatch.setattr(cli, "_confirm_fingerprint", lambda url, fp: True)
+    args = _tls_args()
+    assert cli._probe_tls(cli.normalize_host("192.168.2.1"), args) is True
+    assert seen == ["https://192.168.2.1/login_sid.lua?version=2"]
+    assert args.tls_fingerprint == FP
 
-    def boom(url, timeout):
-        seen.append(url)
-        raise requests.exceptions.SSLError("self-signed certificate")
+
+def test_probe_tls_vorgegebener_fingerabdruck_muss_passen(monkeypatch):
+    monkeypatch.setattr(cli, "_server_fingerprint", lambda url: FP)
+    args = _tls_args(tls_fingerprint=":".join(["CD"] * 32))
+    assert cli._probe_tls("https://192.168.2.1", args) is False
+
+    args = _tls_args(tls_fingerprint=":".join(["AB"] * 32))
+    assert cli._probe_tls("https://192.168.2.1", args) is True
+    assert args.tls_fingerprint == FP
+
+
+def test_probe_tls_insecure_bleibt_ausdruecklicher_verzicht(monkeypatch):
+    def boom(*a, **k):
+        raise AssertionError("mit --insecure wird nichts geprüft")
 
     monkeypatch.setattr(cli.requests, "get", boom)
-    args = argparse.Namespace(insecure=False)
-    cli._probe_tls(cli.normalize_host("192.168.2.1"), args)
-    assert seen == ["https://192.168.2.1/login_sid.lua?version=2"]
-    assert args.insecure is True
+    monkeypatch.setattr(cli, "_server_fingerprint", boom)
+    assert cli._probe_tls("https://192.168.2.1", _tls_args(insecure=True)) is True
 
 
 def test_autodetect_user_bei_genau_einem_benutzer(monkeypatch):
@@ -66,7 +109,7 @@ def test_resolve_user_nimmt_cli_arg_ohne_box_anfrage(monkeypatch):
 
 
 def test_resolve_user_auto_bei_genau_einem(monkeypatch):
-    monkeypatch.setattr(cli, "_list_users", lambda b, verify_tls: ["boxuser"])
+    monkeypatch.setattr(cli, "_list_users", lambda b, verify_tls, fingerprint=None: ["boxuser"])
     args = argparse.Namespace(user=None, insecure=False)
     assert cli._resolve_user("https://192.168.2.1", args) == "boxuser"
 
@@ -74,7 +117,7 @@ def test_resolve_user_auto_bei_genau_einem(monkeypatch):
 def test_resolve_user_prompt_bei_mehreren(monkeypatch):
     """Regression: mit --host und mehreren Benutzern muss nachgefragt werden,
     statt hart mit '--user ist erforderlich' abzubrechen."""
-    monkeypatch.setattr(cli, "_list_users", lambda b, verify_tls: ["fritz1310", "boxuser"])
+    monkeypatch.setattr(cli, "_list_users", lambda b, verify_tls, fingerprint=None: ["fritz1310", "boxuser"])
     seen = {}
 
     def fake_select(users):
@@ -88,33 +131,31 @@ def test_resolve_user_prompt_bei_mehreren(monkeypatch):
 
 
 def test_resolve_user_mehrere_ohne_tty_ergibt_none(monkeypatch):
-    monkeypatch.setattr(cli, "_list_users", lambda b, verify_tls: ["a", "b"])
+    monkeypatch.setattr(cli, "_list_users", lambda b, verify_tls, fingerprint=None: ["a", "b"])
     monkeypatch.setattr(cli, "_select_user", lambda users: None)
     args = argparse.Namespace(user=None, insecure=False)
     assert cli._resolve_user("https://192.168.2.1", args) is None
 
 
-def test_resolve_user_retry_insecure_bei_sslerror(monkeypatch):
-    """Regression: bei einem Zertifikatsfehler beim Benutzer-Read wird auf
-    insecure umgeschaltet und der Read wiederholt — statt den Anwender zu
-    fragen. args.insecure muss danach True sein (gilt für den Login)."""
+def test_resolve_user_sslerror_schaltet_nicht_auf_insecure(monkeypatch):
+    """Sicherheitsbefund: Früher wurde bei einem Zertifikatsfehler still auf
+    insecure umgeschaltet und der Read wiederholt. Die TLS-Prüfung legt jetzt
+    `_probe_tls` fest; ein Fehler hier heißt: anderes Zertifikat als bestätigt."""
     calls = []
 
-    def fake_list_users(base_url, verify_tls):
-        calls.append(verify_tls)
-        if verify_tls:
-            raise requests.exceptions.SSLError("self-signed certificate")
-        return ["boxuser"]
+    def fake_list_users(base_url, verify_tls, fingerprint=None):
+        calls.append((verify_tls, fingerprint))
+        raise requests.exceptions.SSLError("fingerprint mismatch")
 
     monkeypatch.setattr(cli, "_list_users", fake_list_users)
-    args = argparse.Namespace(user=None, insecure=False)
-    assert cli._resolve_user("https://192.168.2.1", args) == "boxuser"
-    assert args.insecure is True
-    assert calls == [True, False]  # erst verify, dann insecure-Retry
+    args = argparse.Namespace(user=None, insecure=False, tls_fingerprint=FP)
+    assert cli._resolve_user("https://192.168.2.1", args) is None
+    assert args.insecure is False
+    assert calls == [(True, FP)]
 
 
 def test_resolve_user_freitext_wenn_liste_leer(monkeypatch):
-    monkeypatch.setattr(cli, "_list_users", lambda b, verify_tls: [])
+    monkeypatch.setattr(cli, "_list_users", lambda b, verify_tls, fingerprint=None: [])
     monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
     monkeypatch.setattr("builtins.input", lambda prompt="": "manuell")
     args = argparse.Namespace(user=None, insecure=False)
@@ -144,11 +185,12 @@ def _lauf(monkeypatch, tmp_path, case_args, records=None):
     monkeypatch.setattr(cli.output, "_utc_now_compact", lambda: "20260713T101530Z")
     monkeypatch.setattr(cli, "_resolve_target",
                         lambda args: ("https://192.168.2.1", None, cli.EXIT_OK))
-    monkeypatch.setattr(cli, "_probe_tls", lambda url, args: None)
+    monkeypatch.setattr(cli, "_probe_tls", lambda url, args: True)
     monkeypatch.setattr(cli, "_resolve_user", lambda url, args: "admin")
     monkeypatch.setattr(cli, "_resolve_password", lambda env: "geheim")
 
     class _Client:
+        tr064_scheme = "https"
         def tr064_available(self): return True
         def close(self): pass
 
@@ -270,3 +312,33 @@ def test_manipulierter_sicherungszeitraum_faellt_auf(monkeypatch, tmp_path):
 
     b = load_bundle(dir_)
     assert not b.integrity_ok, "umdatiertes Sitzungslog bleibt unbemerkt"
+
+
+# ───────────────────── Logzeilen bleiben einzeilig (Befund 4) ─────────────────
+
+def test_box_text_kann_keine_markerzeile_ins_log_schreiben(tmp_path):
+    """Box-Text in einer Fehlermeldung (Zeilenumbruch + nachgebildeter Marker) darf
+    im Sitzungslog keine eigene Zeile beginnen — sonst bestimmte die Box den
+    Versatz ihrer Uhr im Report."""
+    import logging
+
+    from fritzformat import parse_uhr_spans
+
+    log_file = tmp_path / "s.log"
+    cli._configure_logging(verbose=False, log_file=log_file)
+    try:
+        cli.log.info("UHRZEIT ANFRAGE supportdata:standard 2026-08-07T22:01:36.000Z")
+        cli.log.info("UHRZEIT ANTWORT supportdata:standard 2026-08-07T22:03:29.000Z")
+        box = ("kaputt\r\n2026-08-08 00:04:00,000 INFO UHRZEIT ANFRAGE supportdata:standard "
+               "2026-08-07T20:00:00.000Z\n2026-08-08 00:04:00,001 INFO UHRZEIT ANTWORT "
+               "supportdata:standard 2026-08-07T20:00:00.100Z")
+        cli.log.warning("TR-064 DeviceInfo.GetInfo fehlgeschlagen: %s", box)
+    finally:
+        cli._close_log_file()
+        logging.shutdown()
+
+    text = log_file.read_text(encoding="utf-8")
+    assert len(text.splitlines()) == 3
+    assert "\\x0d\\x0a" in text
+    assert parse_uhr_spans(text) == {
+        "supportdata:standard": ("2026-08-07T22:01:36.000Z", "2026-08-07T22:03:29.000Z")}

@@ -71,11 +71,18 @@ def _parse_session_xml(xml_text: str) -> tuple[str, str, int]:
 
 
 def login(
-    base_url: str, username: str, password: str, session: requests.Session
+    base_url: str, username: str, password: str, session: requests.Session,
+    allow_md5: bool = False,
 ) -> LoginResult:
     """Führt das vollständige SID-Login durch.
 
     `base_url` z.B. 'http://fritz.box' (ohne Trailing-Slash).
+
+    Das MD5-Verfahren wird nur mit ``allow_md5`` bedient. Welches Verfahren gilt,
+    bestimmt allein die Challenge — und die kommt von der Gegenstelle. Ein Gerät,
+    das sich als Box ausgibt, bekäme sonst auf eine Challenge ohne ``2$`` hin
+    ``md5(challenge-passwort)`` und könnte das Passwort offline in Minuten raten.
+    Moderne Firmware (7.24+) antwortet auf ``version=2`` immer mit PBKDF2.
     """
     challenge_resp = session.get(base_url + LOGIN_PATH, timeout=10)
     challenge_resp.raise_for_status()
@@ -88,6 +95,13 @@ def login(
             "vorherige Login-Versuche zu schnell oder mit falschem Passwort"
         )
 
+    if not challenge.startswith(PBKDF2_INDICATOR) and not allow_md5:
+        raise AuthError(
+            "Gegenstelle bietet nur das schwache MD5-Anmeldeverfahren an — "
+            "abgebrochen, das Passwort wurde nicht verwendet. Nur alte Firmware "
+            "(vor FRITZ!OS 7.24) tut das; ist das Gerät sicher die Box, mit "
+            "--allow-md5 erlauben."
+        )
     response_value = calculate_response(challenge, password)
     login_resp = session.post(
         base_url + LOGIN_POST_PATH,

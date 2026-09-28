@@ -4,10 +4,11 @@ from __future__ import annotations
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 from xml.sax.saxutils import escape
 
 import requests
+from requests.adapters import HTTPAdapter
 from requests.auth import HTTPDigestAuth
 
 from . import auth
@@ -27,6 +28,101 @@ class Tr064Disabled(Tr064Error):
     Gibt der Aufrufer das Signal, auf einen Web-UI-Fallback umzuschwenken
     (für Forensik-Nutzungen, wo TR-064 manchmal nicht aktiv sein kann).
     """
+
+
+class UnsafeBoxPath(Tr064Error, ValueError):
+    """Pfad aus einer Box-Antwort, der die Box verlassen würde.
+
+    Pfade wie ``<Path>`` einer Sprachnachricht oder ``GetHostListPath`` sind
+    Fremdeingabe des Asservats. Angehängt an die Basis-URL machte
+    ``@andere.example/x`` aus ``https://<box>`` die URL
+    ``https://<box>@andere.example/x`` — die Anfrage ginge samt SID an einen
+    fremden Host.
+    """
+
+
+#: Zeichen, die in einem Box-Pfad (vor dem ``?``) nichts zu suchen haben: ``@`` und
+#: ``\`` verschieben die Autorität der URL, Steuerzeichen brechen Header und Log.
+_UNSICHERE_PFADZEICHEN = re.compile(r"[@\\\x00-\x20\x7f]")
+
+
+def check_box_path(path: str) -> str:
+    """``path`` unverändert zurückgeben, wenn er auf der Box bleibt; sonst UnsafeBoxPath.
+
+    Zulässig ist nur ein absoluter Pfad (``/…``) ohne Autoritätsanteil. Geprüft wird
+    der Teil vor dem ``?`` — die Query darf beliebige Werte tragen, sie kann den
+    Host nicht mehr ändern.
+    """
+    kopf = path.split("?", 1)[0]
+    if (not kopf.startswith("/") or kopf.startswith("//")
+            or _UNSICHERE_PFADZEICHEN.search(kopf)):
+        raise UnsafeBoxPath(f"Box lieferte einen Pfad, der die Box verlässt: {path!r}")
+    return path
+
+
+class _BoxSession(requests.Session):
+    """Session, die Weiterleitungen nur auf denselben Host folgt.
+
+    Was die Box antwortet, bestimmt das Asservat. Eine Weiterleitung auf einen
+    anderen Host brächte die Abzugsmaschine dazu, beliebige Ziele anzusprechen.
+    """
+
+    def get_redirect_target(self, resp):
+        ziel = super().get_redirect_target(resp)
+        if ziel:
+            neu = urlsplit(urljoin(resp.url, ziel))
+            alt = urlsplit(resp.url)
+            if (neu.hostname, neu.port) != (alt.hostname, alt.port) and not (
+                    neu.hostname == alt.hostname and neu.scheme == "https"
+                    and alt.scheme == "http"):
+                raise requests.exceptions.InvalidURL(
+                    f"Weiterleitung auf fremden Host verweigert: {ziel!r}")
+        return ziel
+
+
+class _PinnedAdapter(HTTPAdapter):
+    """HTTPS nur gegen genau das Zertifikat mit diesem SHA256-Fingerabdruck.
+
+    FRITZ!Boxen tragen ab Werk ein selbstsigniertes Zertifikat, das keine CA
+    bestätigt. Der Fingerabdruck ersetzt diese Prüfung: Er wurde vom Anwender
+    gegen die Box-Oberfläche abgeglichen (oder per ``--tls-fingerprint`` gesetzt).
+    """
+
+    def __init__(self, fingerprint: str):
+        self._fingerprint = fingerprint
+        super().__init__()
+
+    def init_poolmanager(self, *args, **kwargs):
+        kwargs["assert_fingerprint"] = self._fingerprint
+        super().init_poolmanager(*args, **kwargs)
+
+
+def normalize_fingerprint(fp: str) -> str:
+    """``AB:CD …`` / ``abcd…`` → ``abcd…`` (64 Hex-Zeichen); ValueError sonst."""
+    rein = re.sub(r"[\s:]", "", fp or "").lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", rein):
+        raise ValueError(f"Kein SHA256-Fingerabdruck: {fp!r}")
+    return rein
+
+
+def make_session(verify_tls: bool = True, tls_fingerprint: str | None = None) -> requests.Session:
+    """Session für alle Anfragen an die Box.
+
+    Mit Fingerabdruck wird jede HTTPS-Verbindung auf genau dieses Zertifikat
+    festgelegt; ``verify_tls`` ist dann ohne Belang. Ohne Fingerabdruck und mit
+    ``verify_tls=False`` findet **keine** Prüfung statt — das ist ausschließlich
+    der ausdrückliche ``--insecure``-Fall.
+    """
+    session = _BoxSession()
+    if tls_fingerprint:
+        session.verify = False
+        session.mount("https://", _PinnedAdapter(normalize_fingerprint(tls_fingerprint)))
+    else:
+        session.verify = verify_tls
+        if not verify_tls:
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    return session
 
 
 def normalize_host(host: str) -> str:
@@ -55,6 +151,15 @@ class FritzClient:
     username: str = ""
     password: str = field(default="", repr=False)
     tr064_port: int = 49000
+    #: ``http`` (Port 49000), ``https`` (Sicherheitsport der Box) oder ``""`` —
+    #: TR-064 gesperrt, weil kein verschlüsselter Zugang bestand und Klartext nicht
+    #: ausdrücklich erlaubt wurde. Siehe :meth:`secure_tr064`.
+    tr064_scheme: str = "http"
+
+    #: Klartext-Port und Dienst, über den die Box ihren TLS-Port für TR-064 nennt.
+    TR064_PLAIN_PORT = 49000
+    DEVICEINFO_SERVICE = "urn:dslforum-org:service:DeviceInfo:1"
+    DEVICEINFO_CONTROL = "/upnp/control/deviceinfo"
 
     @classmethod
     def login(
@@ -63,38 +168,97 @@ class FritzClient:
         username: str,
         password: str,
         verify_tls: bool = True,
+        tls_fingerprint: str | None = None,
+        allow_md5: bool = False,
+        allow_plain_tr064: bool = False,
     ) -> "FritzClient":
-        # Der automatische Rückfall bei selbstsignierten Box-Zertifikaten
-        # (``cli._probe_tls``) ist davon unberührt.
         base_url = normalize_host(host)
-        session = requests.Session()
-        session.verify = verify_tls
-        if not verify_tls:
-            import urllib3
-            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-        result = auth.login(base_url, username, password, session)
-        return cls(
+        session = make_session(verify_tls, tls_fingerprint)
+        result = auth.login(base_url, username, password, session, allow_md5=allow_md5)
+        client = cls(
             base_url=base_url,
             sid=result.sid,
             session=session,
             username=username,
             password=password,
         )
+        client.secure_tr064(allow_plain=allow_plain_tr064)
+        return client
+
+    def secure_tr064(self, allow_plain: bool = False) -> None:
+        """TR-064 auf den TLS-Port der Box umstellen.
+
+        Auf Port 49000 gingen Digest-Antwort (offline knackbar) und — in den
+        Web-UI-Rückfällen von hosts/mesh — die Web-UI-SID im Klartext durchs LAN.
+        Den TLS-Port nennt die Box über ``DeviceInfo:GetSecurityPort``; die Aktion
+        ist ohne Anmeldung zugänglich und wird deshalb **ohne** Digest gerufen.
+
+        Nennt die Box keinen Port, bleibt TR-064 gesperrt, es sei denn, Klartext
+        wurde ausdrücklich erlaubt (``--tr064-http``).
+        """
+        port = self._query_security_port()
+        if port:
+            self.tr064_scheme, self.tr064_port = "https", port
+        elif allow_plain:
+            self.tr064_scheme, self.tr064_port = "http", self.TR064_PLAIN_PORT
+        else:
+            self.tr064_scheme = ""
+
+    def _query_security_port(self) -> int | None:
+        action = "GetSecurityPort"
+        body = (
+            '<?xml version="1.0" encoding="utf-8"?>'
+            '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"'
+            ' s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">'
+            f'<s:Body><u:{action} xmlns:u="{self.DEVICEINFO_SERVICE}"/></s:Body></s:Envelope>'
+        )
+        host = self._tr064_host()
+        try:
+            resp = self.session.post(
+                f"http://{host}:{self.TR064_PLAIN_PORT}{self.DEVICEINFO_CONTROL}",
+                data=body,
+                headers={
+                    "Content-Type": 'text/xml; charset="utf-8"',
+                    "SOAPAction": f'"{self.DEVICEINFO_SERVICE}#{action}"',
+                },
+                timeout=10,
+            )
+            if resp.status_code != 200:
+                return None
+            port = int(_parse_soap_response(resp.text, action).get("NewSecurityPort", ""))
+        except (requests.RequestException, Tr064Error, ValueError):
+            return None
+        return port if 0 < port < 65536 else None
 
     def get(self, path: str, **kwargs) -> requests.Response:
         params = dict(kwargs.pop("params", {}) or {})
         params["sid"] = self.sid
-        return self.session.get(self.base_url + path, params=params, timeout=30, **kwargs)
+        return self.session.get(self.base_url + check_box_path(path),
+                                params=params, timeout=30, **kwargs)
 
     def post(self, path: str, data: dict | None = None, **kwargs) -> requests.Response:
         payload = dict(data or {})
         payload["sid"] = self.sid
-        return self.session.post(self.base_url + path, data=payload, timeout=30, **kwargs)
+        return self.session.post(self.base_url + check_box_path(path),
+                                 data=payload, timeout=30, **kwargs)
+
+    def _tr064_host(self) -> str:
+        host = urlsplit(self.base_url).hostname or self.base_url
+        return f"[{host}]" if ":" in host else host
 
     def tr064_url(self, path: str) -> str:
-        """TR-064 läuft auf eigenem Port (49000 HTTP), bauen wir aus base_url-Host."""
-        host = urlsplit(self.base_url).hostname or self.base_url
-        return f"http://{host}:{self.tr064_port}{path}"
+        """URL eines TR-064-Pfads — auf dem TLS-Port, sofern :meth:`secure_tr064` lief.
+
+        ``path`` stammt oft aus einer Box-Antwort und wird deshalb geprüft
+        (:func:`check_box_path`). Ist TR-064 gesperrt, gibt es keine URL, sondern
+        ``Tr064Disabled`` — die Extractoren fallen darauf bereits zurück.
+        """
+        check_box_path(path)
+        if not self.tr064_scheme:
+            raise Tr064Disabled(
+                "TR-064 nur im Klartext erreichbar (Box nennt keinen TLS-Port) — "
+                "gesperrt; mit --tr064-http ausdrücklich erlauben.")
+        return f"{self.tr064_scheme}://{self._tr064_host()}:{self.tr064_port}{path}"
 
     def tr064_call(
         self,
@@ -169,7 +333,7 @@ class FritzClient:
         try:
             self.session.get(self.tr064_url("/tr64desc.xml"), timeout=5)
             return True
-        except requests.RequestException:
+        except (requests.RequestException, Tr064Error):
             return False
 
     #: Descriptor-Pfade, unter denen Boxen ihr TR-064-Dienstverzeichnis
@@ -213,7 +377,7 @@ class FritzClient:
         for pfad in self.DESCRIPTOR_PATHS:
             try:
                 resp = self.session.get(self.tr064_url(pfad), timeout=10)
-            except requests.RequestException:
+            except (requests.RequestException, Tr064Error):
                 continue
             if resp.status_code != 200 or not resp.content:
                 continue

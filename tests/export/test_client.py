@@ -22,11 +22,12 @@ def gesehen(monkeypatch):
     class _Result:
         sid = "0123456789abcdef"
 
-    def _login(base_url, username, password, session):
+    def _login(base_url, username, password, session, **kw):
         gesehen.append(base_url)
         return _Result()
 
     monkeypatch.setattr(client_mod.auth, "login", _login)
+    monkeypatch.setattr(FritzClient, "secure_tr064", lambda self, allow_plain=False: None)
     return gesehen
 
 

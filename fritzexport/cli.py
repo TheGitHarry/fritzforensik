@@ -4,10 +4,14 @@ from __future__ import annotations
 import argparse
 import getpass
 import json
+import hashlib
 import logging
 import os
+import re
+import ssl
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import requests
 
@@ -25,7 +29,7 @@ from fritzformat import (
 
 from . import __version__, discover, output
 from .auth import AuthError, fetch_users
-from .client import FritzClient, normalize_host
+from .client import FritzClient, make_session, normalize_fingerprint, normalize_host
 from .extractors import EXTRACTORS, EXTRACTORS_WITH_AUDIO, EXTRACTORS_WITH_DIR
 from .extractors.services import genutzte_services
 
@@ -83,7 +87,26 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--insecure",
         action="store_true",
-        help="TLS-Zertifikat der Box NICHT prüfen (für selbstsignierte Box-Zertifikate)",
+        help="TLS-Zertifikat der Box überhaupt NICHT prüfen (besser: --tls-fingerprint)",
+    )
+    p.add_argument(
+        "--tls-fingerprint",
+        default=None,
+        metavar="SHA256",
+        help=(
+            "SHA256-Fingerabdruck des Box-Zertifikats; die Verbindung wird darauf "
+            "festgelegt (sonst interaktive Bestätigung bei selbstsigniertem Zertifikat)"
+        ),
+    )
+    p.add_argument(
+        "--allow-md5",
+        action="store_true",
+        help="Schwaches MD5-Anmeldeverfahren alter Firmware (vor FRITZ!OS 7.24) zulassen",
+    )
+    p.add_argument(
+        "--tr064-http",
+        action="store_true",
+        help="TR-064 im Klartext (Port 49000) zulassen, wenn die Box keinen TLS-Port nennt",
     )
     p.add_argument("--case-id", default=None, help="Case-ID für den Fallkopf (sonst Abfrage)")
     p.add_argument("--item-id", default=None, help="Asservat / Item-ID (sonst Abfrage)")
@@ -156,27 +179,93 @@ def _select_box(boxes: list[discover.DiscoveredBox]) -> discover.DiscoveredBox |
         sys.stdout.write("Ungültige Eingabe.\n")
 
 
-def _probe_tls(target_url: str, args: argparse.Namespace) -> None:
-    """Schaltet automatisch auf --insecure um, wenn das Box-Zertifikat
-    nicht vertrauenswürdig ist (selbstsigniert). Nur HTTPS-Targets."""
-    if args.insecure or not target_url.startswith("https://"):
-        return
+def _server_fingerprint(target_url: str) -> str:
+    """SHA256 des Zertifikats, das ``target_url`` vorzeigt — ungeprüft abgeholt.
+
+    Nur zum **Vorzeigen** bzw. Vergleichen; vertraut wird dem Wert erst, wenn er
+    zum Fingerabdruck passt, den der Anwender kennt.
+    """
+    teile = urlsplit(target_url)
+    pem = ssl.get_server_certificate((teile.hostname, teile.port or 443), timeout=10)
+    return hashlib.sha256(ssl.PEM_cert_to_DER_cert(pem)).hexdigest()
+
+
+def _format_fingerprint(fp: str) -> str:
+    return ":".join(fp[i:i + 2] for i in range(0, len(fp), 2)).upper()
+
+
+def _confirm_fingerprint(target_url: str, fp: str) -> bool:
+    """Fingerabdruck zeigen und bestätigen lassen; ohne TTY nie bestätigt."""
+    if not (sys.stdin and sys.stdin.isatty()):
+        return False
+    sys.stdout.write(
+        f"\nDas TLS-Zertifikat von {target_url} ist selbstsigniert.\n"
+        f"SHA256-Fingerabdruck:\n  {_format_fingerprint(fp)}\n\n"
+        "Abgleichen mit der Box-Oberfläche (Internet > Freigaben > FRITZ!Box-Dienste >\n"
+        "Zertifikat) oder dem Zertifikat im Browser. Stimmt er nicht, meldet sich hier\n"
+        "ein anderes Gerät als die Box — dann NICHT fortfahren.\n"
+    )
     try:
-        requests.get(
-            target_url + "/login_sid.lua?version=2",
-            timeout=10,
-        )
-    except requests.exceptions.SSLError as e:
-        log.warning(
-            "TLS-Zertifikat der Box ist nicht vertrauenswürdig "
-            "(vermutlich selbstsigniert): %s — schalte automatisch "
-            "auf --insecure um.",
-            e,
-        )
-        args.insecure = True
+        antwort = input("Fingerabdruck stimmt überein? [j/N]: ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        return False
+    return antwort in ("j", "ja", "y", "yes")
+
+
+def _probe_tls(target_url: str, args: argparse.Namespace) -> bool:
+    """Legt fest, wie die Box per TLS geprüft wird. False = nicht fortfahren.
+
+    Früher schaltete ein selbstsigniertes Zertifikat still auf ``--insecure`` um.
+    Weil Boxen per IP angesprochen werden und ab Werk selbstsigniert sind, hieß das
+    praktisch: nie eine Prüfung — jedes Gerät, das sich per SSDP als Box meldete,
+    bekam die Anmeldung. Jetzt wird die Verbindung auf den Fingerabdruck des
+    Zertifikats festgelegt, den der Anwender bestätigt oder per
+    ``--tls-fingerprint`` vorgibt. ``--insecure`` bleibt der ausdrückliche Verzicht.
+    """
+    if not target_url.startswith("https://"):
+        return True
+    if args.tls_fingerprint:
+        try:
+            erwartet = normalize_fingerprint(args.tls_fingerprint)
+            ist = _server_fingerprint(target_url)
+        except ValueError as e:
+            log.error("%s", e)
+            return False
+        except OSError as e:
+            log.error("Zertifikat der Box nicht abrufbar: %s", e)
+            return False
+        if ist != erwartet:
+            log.error(
+                "TLS-Fingerabdruck passt NICHT: erwartet %s, Gegenstelle zeigt %s — "
+                "Abbruch, das ist nicht die erwartete Box.",
+                _format_fingerprint(erwartet), _format_fingerprint(ist),
+            )
+            return False
+        args.tls_fingerprint = erwartet
+        return True
+    if args.insecure:
+        return True
+    try:
+        requests.get(target_url + "/login_sid.lua?version=2", timeout=10)
+    except requests.exceptions.SSLError:
+        try:
+            fp = _server_fingerprint(target_url)
+        except OSError as e:
+            log.error("Zertifikat der Box nicht abrufbar: %s", e)
+            return False
+        if not _confirm_fingerprint(target_url, fp):
+            log.error(
+                "TLS-Zertifikat nicht bestätigt (Fingerabdruck %s). Abbruch — "
+                "--tls-fingerprint angeben oder ausdrücklich --insecure.",
+                _format_fingerprint(fp),
+            )
+            return False
+        log.info("TLS-Verbindung festgelegt auf Fingerabdruck %s", _format_fingerprint(fp))
+        args.tls_fingerprint = fp
     except requests.RequestException:
         # andere Fehler werden später beim Login sichtbar
         pass
+    return True
 
 
 def _pause_if_double_clicked() -> None:
@@ -204,13 +293,9 @@ def _pause_if_double_clicked() -> None:
         pass
 
 
-def _list_users(base_url: str, verify_tls: bool) -> list[str]:
+def _list_users(base_url: str, verify_tls: bool, fingerprint: str | None = None) -> list[str]:
     """Fragt die Box nach ihrer Benutzerliste (leer bei Fehler/alter Firmware)."""
-    session = requests.Session()
-    session.verify = verify_tls
-    if not verify_tls:
-        import urllib3
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    session = make_session(verify_tls, fingerprint)
     try:
         return fetch_users(base_url, session)
     finally:
@@ -256,17 +341,13 @@ def _resolve_user(base_url: str, args: argparse.Namespace) -> str | None:
         return args.user
 
     try:
-        users = _list_users(base_url, verify_tls=not args.insecure)
+        users = _list_users(base_url, verify_tls=not args.insecure,
+                            fingerprint=getattr(args, "tls_fingerprint", None))
     except requests.exceptions.SSLError as e:
-        # Box-Zertifikat nicht vertrauenswürdig (selbstsigniert). Auf insecure
-        # umschalten und den Read wiederholen, statt den Anwender zu fragen.
-        # args.insecure gilt danach auch für den folgenden Login.
-        log.warning(
-            "TLS-Zertifikat der Box nicht vertrauenswürdig beim Benutzer-Read "
-            "(%s) — schalte auf --insecure um und versuche erneut.", e,
-        )
-        args.insecure = True
-        users = _list_users(base_url, verify_tls=False)
+        # Kein stiller Rückfall auf --insecure: Die Prüfung legt _probe_tls fest.
+        # Scheitert sie hier trotzdem, ist das Zertifikat ein anderes als bestätigt.
+        log.error("TLS-Prüfung beim Benutzer-Read fehlgeschlagen: %s", e)
+        return None
     if len(users) == 1:
         log.info("Einzelner Benutzer erkannt: %s — wird automatisch verwendet", users[0])
         return users[0]
@@ -307,6 +388,30 @@ def _resolve_password(env_name: str) -> str:
     return getpass.getpass(f"FRITZ!Box-Passwort (oder ${env_name} setzen): ")
 
 
+#: Alles, was eine Logzeile umbrechen kann — auch ``\r`` (``read_text`` macht daraus
+#: ``\n``) und die Unicode-Zeilentrenner.
+_ZEILENBRECHER = re.compile(r"[\x00-\x1f\x7f\x85\u2028\u2029]")
+
+
+class _EinzeiligFilter(logging.Filter):
+    """Hält jede Logmeldung auf **einer** Zeile.
+
+    Meldungen tragen Text der Box (Fehlerbeschreibungen, Antwortkörper, Dienstnamen).
+    Das Sitzungslog trägt Beweislast: Sicherungszeitraum und Versatz der Box-Uhr
+    stammen aus seinen Markerzeilen. Ein Zeilenumbruch in Box-Text könnte eine solche
+    Zeile nachbilden. Steuerzeichen werden deshalb als ``\\xNN`` geschrieben.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        sauber = _ZEILENBRECHER.sub(
+            lambda m: (f"\\x{ord(m.group()):02x}" if ord(m.group()) < 256
+                       else f"\\u{ord(m.group()):04x}"), msg)
+        if sauber != msg:
+            record.msg, record.args = sauber, None
+        return True
+
+
 def _configure_logging(verbose: bool, log_file: Path | None) -> None:
     level = logging.DEBUG if verbose else logging.INFO
     fmt = "%(asctime)s %(levelname)s %(message)s"
@@ -316,6 +421,8 @@ def _configure_logging(verbose: bool, log_file: Path | None) -> None:
             handlers.append(logging.FileHandler(log_file, encoding="utf-8"))
         except OSError as e:
             sys.stderr.write(f"WARN: Log-Datei {log_file} nicht schreibbar: {e}\n")
+    for h in handlers:
+        h.addFilter(_EinzeiligFilter())
     logging.basicConfig(level=level, format=fmt, handlers=handlers, force=True)
 
 
@@ -496,7 +603,8 @@ def main(argv: list[str] | None = None) -> int:
         label = box.friendly_name or box.model_name or "FRITZ!Box"
         sys.stdout.write(f"Gefundene FRITZ!Box: {box.ip}  —  {label}\n\n")
         args.host = box.url_https()
-        _probe_tls(args.host, args)
+        if not _probe_tls(args.host, args):
+            return EXIT_AUTH
         args.user = _resolve_user(args.host, args)
         if not args.user:
             return EXIT_AUTH
@@ -506,7 +614,8 @@ def main(argv: list[str] | None = None) -> int:
         return exit_code
     assert target_url is not None
 
-    _probe_tls(target_url, args)
+    if not _probe_tls(target_url, args):
+        return EXIT_AUTH
 
     args.user = _resolve_user(target_url, args)
     if not args.user:
@@ -519,10 +628,20 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         client = FritzClient.login(
-            target_url, args.user, password, verify_tls=not args.insecure
+            target_url, args.user, password,
+            verify_tls=not args.insecure,
+            tls_fingerprint=args.tls_fingerprint,
+            allow_md5=args.allow_md5,
+            allow_plain_tr064=args.tr064_http,
         )
-        if args.insecure:
+        if args.insecure and not args.tls_fingerprint:
             log.warning("TLS-Verifikation deaktiviert (--insecure)")
+        if client.tr064_scheme == "http":
+            log.warning("TR-064 im Klartext (--tr064-http): Digest-Antwort und SID "
+                        "gehen unverschlüsselt durchs LAN")
+        elif not client.tr064_scheme:
+            log.warning("Box nennt keinen TLS-Port für TR-064 — TR-064 gesperrt, "
+                        "nur Web-UI-Pfade. Klartext mit --tr064-http erlauben.")
     except AuthError as e:
         log.error("Authentifizierung fehlgeschlagen: %s", e)
         return EXIT_AUTH
@@ -536,7 +655,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if not client.tr064_available():
         log.warning(
-            "TR-064-Port 49000 nicht erreichbar. "
+            "TR-064 nicht erreichbar. "
             "Extractoren ohne TR-064 oder Port-49000-Fallback werden leere Ergebnisse liefern: "
             "wan, dhcp, portforward, storage"
         )

@@ -14,8 +14,9 @@ import logging
 import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from urllib.parse import urlsplit
 
-from ..client import FritzClient, Tr064Disabled, Tr064Error
+from ..client import FritzClient, Tr064Disabled, Tr064Error, UnsafeBoxPath
 
 log = logging.getLogger(__name__)
 
@@ -133,13 +134,24 @@ def _try_tr064(
         sid_match = re.search(r"[?&]sid=([0-9a-f]+)", list_url)
         list_sid = sid_match.group(1) if sid_match else ""
 
+        # Nur Pfad und Query der Box-URL übernehmen, Schema/Host/Port aus der
+        # eigenen Verbindung: Die URL ist Fremdeingabe, und der Host darin darf die
+        # Anfrage nicht woandershin lenken (und nicht zurück in den Klartext).
+        teile = urlsplit(list_url)
+        list_url = client.tr064_url(teile.path + (f"?{teile.query}" if teile.query else ""))
+
         # Pre-Snapshot
         pre_xml = client.session.get(list_url, timeout=30).text
         msgs = _parse_message_xml(pre_xml, slot)
         log.info("TAM-Slot %d: %d Nachrichten", slot, len(msgs))
 
         for msg in msgs:
-            audio = _download_audio_tr064(client, msg["audio_path"], list_sid)
+            try:
+                audio = _download_audio_tr064(client, msg["audio_path"], list_sid)
+            except UnsafeBoxPath as e:
+                log.error("TAM-Slot %d, Nachricht %d: %s — übersprungen",
+                          slot, msg["message_index"], e)
+                continue
             fname = f"tam{slot:02d}_msg{msg['message_index']:03d}.wav"
             (audio_dir / fname).write_bytes(audio)
             msg["audio_file"] = f"tam_audio/{fname}"
