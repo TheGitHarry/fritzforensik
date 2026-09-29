@@ -77,8 +77,8 @@ Datenquellen an, die kein Extractor abholt?** Die Extractor-Liste ist eine Setzu
 ohne diesen Abgleich fiele eine neue Datenquelle einer neueren Firmware nicht auf. Die
 Information ist **nur beim Abzug** erfassbar; sie steht in keiner anderen Bundle-Datei.
 
-Authentifizierung über das offizielle AVM Web-UI-SID-Verfahren (PBKDF2-Challenge-Response,
-MD5-Fallback für ältere Firmware). Die Box wird per SSDP-Auto-Discovery im LAN gefunden
+Authentifizierung über das offizielle AVM Web-UI-SID-Verfahren (PBKDF2-Challenge-Response;
+das schwache MD5-Verfahren älterer Firmware nur mit `--allow-md5`). Die Box wird per SSDP-Auto-Discovery im LAN gefunden
 oder explizit per `--host` adressiert.
 
 ## Nutzung
@@ -103,10 +103,24 @@ fritzexport --discover                                                  # nur Di
 Ohne `FRITZ_PW` wird das Passwort interaktiv abgefragt (`getpass`). Das Passwort darf
 **nie** als CLI-Argument übergeben werden.
 
-`--host` akzeptiert `fritz.box` wie `https://192.168.178.1`. Selbstsignierte Box-Zertifikate
-werden erkannt; das Tool schaltet dann selbstständig auf TLS ohne Verifikation um.
-`--insecure` lässt sich weiterhin explizit setzen. `--iface` setzt die Source-IP für
-SSDP-Multicast bei Multi-Interface-Hosts.
+`--host` akzeptiert `fritz.box` wie `https://192.168.178.1`. `--iface` setzt die Source-IP
+für SSDP-Multicast bei Multi-Interface-Hosts.
+
+**TLS.** Boxen tragen ab Werk ein selbstsigniertes Zertifikat. Das Tool zeigt dann dessen
+SHA256-Fingerabdruck und fragt, ob er mit dem der Box übereinstimmt (Box-Oberfläche:
+*Internet → Freigaben → FRITZ!Box-Dienste → Zertifikat*, oder im Browser). Nach der
+Bestätigung ist jede Verbindung des Laufs auf genau dieses Zertifikat festgelegt. Ohne
+Terminal (Automation) wird abgebrochen — dann den Wert vorab mit
+`--tls-fingerprint AB:CD:…` angeben. Hintergrund: Ein Gerät im Netz, das sich per SSDP
+als Box meldet, bekäme sonst die Anmeldung. `--insecure` verzichtet ausdrücklich auf jede
+Prüfung.
+
+| Flag | Wirkung |
+|---|---|
+| `--tls-fingerprint SHA256` | Verbindung auf dieses Box-Zertifikat festlegen |
+| `--insecure` | TLS gar nicht prüfen (nicht empfohlen) |
+| `--allow-md5` | MD5-Anmeldeverfahren alter Firmware (vor FRITZ!OS 7.24) zulassen |
+| `--tr064-http` | TR-064 im Klartext über Port 49000, wenn die Box keinen TLS-Port nennt |
 
 `--output` ist optional (Default `./export/` neben dem Binary). **Jeder Lauf bekommt ein
 eigenes Verzeichnis** mit UTC-Zeitstempel; ein zweiter Lauf überschreibt nie den ersten.
@@ -183,6 +197,11 @@ Extractoren mit TR-064 (`--wan`, `--dhcp`, `--portforward`, `--storage`, `--tr06
 
 Ist TR-064 nicht erreichbar, warnt das Tool und nennt die betroffenen Extractoren; die
 mit Web-UI-Fallback (`--tam`, `--mesh`) laufen trotzdem durch.
+
+TR-064 läuft **verschlüsselt** über den TLS-Port, den die Box per
+`DeviceInfo:GetSecurityPort` nennt (üblich 49443). Über Port 49000 gingen Digest-Antwort
+und Sitzungs-ID im Klartext durchs LAN. Nennt die Box keinen TLS-Port, bleibt TR-064
+gesperrt und nur die Web-UI-Wege laufen; Klartext erlaubt `--tr064-http` ausdrücklich.
 
 **Zusätzlich braucht der Box-Benutzer die TR-064-Berechtigung.** Fehlt sie, antwortet die
 Box auf jeden SOAP-Aufruf mit `UPnPError 401` — sichtbar als *"TR-064 nicht zugänglich"*.

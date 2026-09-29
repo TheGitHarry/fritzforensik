@@ -40,8 +40,21 @@ Zusage darf nicht ohne Not aufgeweicht werden. Ausgenommen ist `webbrowser`
 
 ## Wie fritzexport arbeitet
 
-- **Auth**: AVM Web-UI-SID-Verfahren (PBKDF2-Challenge-Response, MD5-Fallback für ältere
-  Firmware) — [auth.py](fritzexport/auth.py).
+- **Auth**: AVM Web-UI-SID-Verfahren (PBKDF2-Challenge-Response, MD5 nur mit
+  `--allow-md5`) — [auth.py](fritzexport/auth.py). Die Challenge bestimmt die
+  Gegenstelle; ohne Sperre bekäme ein falsches Gerät `md5(challenge-passwort)`.
+- **TLS**: Ein selbstsigniertes Box-Zertifikat schaltet **nicht** still auf
+  `--insecure`. `cli._probe_tls` lässt den Fingerabdruck bestätigen (oder nimmt
+  `--tls-fingerprint`), `client.make_session` legt jede Verbindung darauf fest.
+- **TR-064 über TLS**: `FritzClient.secure_tr064` stellt auf den Port aus
+  `GetSecurityPort` um; ohne ihn ist TR-064 gesperrt (`--tr064-http` erlaubt Klartext).
+- **Box-Pfade sind Fremdeingabe**: Jeder Pfad aus einer Box-Antwort läuft über
+  `client.check_box_path` (in `get`/`post`/`tr064_url`) — `@evil/x` hinter der
+  Basis-URL lenkte die Anfrage samt SID auf einen fremden Host. Box-URLs (TAM `NewURL`)
+  liefern nur Pfad und Query, Host und Port stammen aus der eigenen Verbindung.
+- **Logzeilen sind einzeilig**: `cli._EinzeiligFilter` schreibt Steuerzeichen als
+  `\xNN`, und `fritzformat/sessionlog.py` erkennt Marker nur als ganze Meldung. Beides
+  zusammen verhindert, dass Box-Text (Fehlerbeschreibungen) Marker nachbildet.
 - **Discovery**: SSDP-Multicast im LAN; bei genau einer Box automatischer Login, sonst
   Auswahlmenü oder `--host` — [discover.py](fritzexport/discover.py). Die `LOCATION`
   aus der SSDP-Antwort ist **unauthentifizierte Fremdeingabe** und wird vor jeder

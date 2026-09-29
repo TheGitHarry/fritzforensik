@@ -382,3 +382,24 @@ def test_zeitraum_ohne_log_wird_gerechnet(tmp_path) -> None:
     assert b.secured_source == "berechnet"
     assert b.secured_from == "2026-07-13T09:35:00Z"
     assert b.secured_to == "2026-07-13T09:41:22Z"
+
+
+def test_marker_in_fremdem_meldungstext_zaehlt_nicht() -> None:
+    """Sicherheitsbefund: Text der Box landet in Fehlermeldungen im Log. Ein darin
+    nachgebildeter Marker bestimmte früher — weil je Quelle das letzte Paar gewinnt —
+    den Versatz der Box-Uhr im Report. Ein Marker gilt nur als ganze Meldung."""
+    text = (
+        f"2026-08-08 00:01:36,323 INFO {MARKER_UHR_ANFRAGE} supportdata:standard "
+        "2026-08-07T22:01:36Z\n"
+        f"2026-08-08 00:03:29,780 INFO {MARKER_UHR_ANTWORT} supportdata:standard "
+        "2026-08-07T22:03:29Z\n"
+        "2026-08-08 00:04:00,000 WARNING TR-064 DeviceInfo.GetInfo fehlgeschlagen: "
+        f"TR-064 UPnPError 501: {MARKER_UHR_ANFRAGE} supportdata:standard "
+        f"2026-08-07T20:00:00Z {MARKER_UHR_ANTWORT} supportdata:standard "
+        "2026-08-07T20:00:00Z\n"
+        f"2026-08-08 00:04:01,000 WARNING Fehler: {MARKER_END} 2030-01-01T00:00:00Z\n"
+        f"2026-08-08 00:05:00,000 INFO {MARKER_END} 2026-08-07T22:05:00Z\n"
+    )
+    assert parse_uhr_spans(text) == {
+        "supportdata:standard": ("2026-08-07T22:01:36Z", "2026-08-07T22:03:29Z")}
+    assert parse_span(text) == ("", "2026-08-07T22:05:00Z")

@@ -34,16 +34,22 @@ MARKER_END = "SICHERUNG ENDE"
 MARKER_UHR_ANFRAGE = "UHRZEIT ANFRAGE"
 MARKER_UHR_ANTWORT = "UHRZEIT ANTWORT"
 
-#: Marker samt UTC-Wert irgendwo in der Zeile — der Zeilenkopf (Datum, Level) steht
-#: davor und wird bewusst ignoriert.
-_BEGIN_RE = re.compile(rf"{MARKER_BEGIN}\s+(\S+)")
-_END_RE = re.compile(rf"{MARKER_END}\s+(\S+)")
+#: Ein Marker gilt nur, wenn er die **ganze Meldung** ist: am Zeilenanfang nach dem
+#: optionalen Zeilenkopf (Datum, Uhrzeit, ``INFO``), am Zeilenende sein UTC-Wert.
+#: Früher genügte der Marker irgendwo in der Zeile — dann konnte Text der Box, der in
+#: einer Fehlermeldung mitgeloggt wird (``TR-064 … fehlgeschlagen: <Beschreibung>``),
+#: einen Marker nachbilden und, weil je Quelle das letzte Paar gewinnt, den Versatz
+#: der Box-Uhr im Report bestimmen. Der Zeilenkopf selbst wird weiter ignoriert.
+_KOPF = r"^(?:\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:,\d+)? )?(?:INFO )?"
+
+_BEGIN_RE = re.compile(rf"{_KOPF}{MARKER_BEGIN} (\S+)[ \t]*$", re.M)
+_END_RE = re.compile(rf"{_KOPF}{MARKER_END} (\S+)[ \t]*$", re.M)
 
 #: Wie oben, aber mit Quellenkennung vor dem UTC-Wert: (marker, quelle, iso).
 #: Beide Markerarten in **einem** Ausdruck, damit `parse_uhr_spans` sie in der
 #: Reihenfolge des Logs sieht — getrennt eingesammelt ließen sie sich nicht paaren.
 _UHR_ZEILE_RE = re.compile(
-    rf"({MARKER_UHR_ANFRAGE}|{MARKER_UHR_ANTWORT})\s+(\S+)\s+(\S+)")
+    rf"{_KOPF}({MARKER_UHR_ANFRAGE}|{MARKER_UHR_ANTWORT}) (\S+) (\S+)[ \t]*$", re.M)
 
 
 def begin_line(iso: str) -> str:
