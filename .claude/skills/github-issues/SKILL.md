@@ -11,12 +11,15 @@ Token aus `~/.env`.
 
 ## Token laden
 
-Der Token steht als `GH_TOKEN` in `/home/claude/.env` (gitignored). Immer nur diese
-eine Variable ziehen, nie die ganze Datei sourcen — dort liegen auch Mail- und
-Nextcloud-Zugangsdaten, die hier nichts zu suchen haben:
+Der Token steht als `GITHUB_PERSONAL_ACCESS_TOKEN` in `/home/claude/.env`
+(gitignored) — so heißt die Variable, weil der GitHub-MCP-Server genau diesen
+Namen erwartet; `gh` liest sie über `GH_TOKEN` aus der Umgebung. Immer nur diese
+eine Variable ziehen, nie die ganze Datei sourcen — dort liegen auch andere
+Zugangsdaten, die hier nichts zu suchen haben:
 
 ```bash
-export GH_TOKEN=$(grep '^GH_TOKEN=' /home/claude/.env | cut -d= -f2- | tr -d '"'"'"'')
+export GH_TOKEN=$(grep '^GITHUB_PERSONAL_ACCESS_TOKEN=' /home/claude/.env \
+  | cut -d= -f2- | tr -d "\"'")
 ```
 
 Den Token **nie ausgeben** — nicht in Logs, nicht in Kommandoausgaben, nicht in
