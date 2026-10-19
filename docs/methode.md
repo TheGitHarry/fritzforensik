@@ -25,10 +25,12 @@ Ziel: FRITZ!Box Supportdaten forensisch auswerten → gerätebezogene Verbindung
 > `test_kennung_im_versionsstring_ist_nicht_die_hwrevision`. Die Box selbst trennt beide
 > Größen: In ihrem TR-064-Descriptor (`:49000/tr64desc.xml`) führt eine 7590
 > `<HW>226</HW>` neben `<Major>154</Major>` und `<Display>154.08.25</Display>`. Die
-> Kennung ist also AVMs **Firmware-Major**. Welches Gerät hinter 259
-> steht, ist von hier aus **nicht** bestimmbar: Keine geprüfte Box trägt die Zahl in einer
-> der beiden Größen, auch keine 7590. Die Gleichsetzung mit „unserer" 7590 war deshalb
-> unbelegt; sie bleibt offen, statt geraten zu werden.
+> Kennung ist also AVMs **Firmware-Major**. Hinter 259 steht die **FRITZ!Box 7590 AX**:
+> Die Supportdateien der Testdaten des Papiers selbst führen `HWRevision 259`,
+> `ProductID Fritz_Box_HW259` und `firmware_info 259.08.20`, ihre Dateinamen lauten
+> `support_FRITZ.Box_7590_AX_259.08.20_…`. Auf der 7590 AX fallen Kennung und
+> `HWRevision` also zusammen, wie auf 7530 AX und 7690. Die 7590 (Kennung 154,
+> `HWRevision` 226) ist ein anderes Gerät; die frühere Gleichsetzung mit ihr war falsch.
 **Portabilität:** Die Übertragbarkeit auf andere FRITZ!OS-Versionen oder Hardware-Plattformen
 wird **nicht vorausgesetzt** und ist im Einzelfall gesondert zu prüfen. Insbesondere die
 Plattform 285 (FRITZ!Box 7690) ist **nicht** validiert, auch wenn dafür umfangreiche
@@ -231,4 +233,4 @@ Nachweise ausschließlich diese Methodik.
 | Status ≠ 1 → Zeitpunkt nicht bestimmbar (Verbindungsabbruch) | STATION_MODULE |
 | Events Events: nur Erstanmeldungen | Events Events |
 | Kein Personenbezug aus MAC allein ableitbar | alle |
-| Methodik validiert nur für FRITZ!OS 8.20 auf der Plattform 259 des Papiers — welches Gerät das ist, ist hier nicht bestimmbar (siehe Anmerkung unter *Kontext*); Übertragbarkeit auf andere Versionen/Plattformen im Einzelfall zu prüfen | alle |
+| Methodik validiert nur für FRITZ!OS 8.20 auf der Plattform 259 des Papiers (FRITZ!Box 7590 AX, siehe Anmerkung unter *Kontext*); Übertragbarkeit auf andere Versionen/Plattformen im Einzelfall zu prüfen | alle |
