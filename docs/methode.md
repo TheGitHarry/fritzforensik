@@ -87,7 +87,7 @@ Jeder Nachweis besteht aus: `{mac, timestamp, quelle, vertrauenswuerdig: true}`
 #### 2a — Sektion `dhcp`
 
 **Sektion:** `##### BEGIN SECTION dhcp`  
-**Kapazität:** Max. 37 Einträge (Ringspeicher — älteste werden überschrieben)
+**Kapazität:** Max. 37 Einträge (Ringspeicher — älteste werden überschrieben) *(Angabe der Vorfassung, nicht in v1.0)*
 
 **Zeilenformat:**
 ```
@@ -107,7 +107,7 @@ Jeder Nachweis besteht aus: `{mac, timestamp, quelle, vertrauenswuerdig: true}`
 **Sektion:** `##### BEGIN SECTION STATION_MODULE Module for station informations`  
 **Inhalt:** Zwei Listen — aktuell verbundene + ehemals verbundene Geräte
 
-Jeder Eintrag beginnt mit **MAC** des Geräts, endet mit **Connect History** (max. 50 Einträge, Ringspeicher).
+Jeder Eintrag beginnt mit **MAC** des Geräts, endet mit **Connect History** (max. 50 Einträge, Ringspeicher — Angabe der Vorfassung, nicht in v1.0).
 
 **Ringspeicher-Reihenfolge:** Neuester Eintrag unten, zweitältester oben, dann absteigend zeitlich nach unten.
 
@@ -117,8 +117,8 @@ Jeder Eintrag beginnt mit **MAC** des Geräts, endet mit **Connect History** (ma
 ```
 
 **Filterregel (Status-Code):**
-- Status `1` = aktive, bewusste Aktion → Timestamp **vertrauenswürdig**
-- Jeder andere Status (z.B. `4` = Verbindungsverlust) → Timestamp **ignorieren**
+- Status `1` kennzeichnet einen eingehenden Verbindungsnachweis → Timestamp **vertrauenswürdig**. Aussage laut Papier: Das Gerät hat zu diesem Zeitpunkt erfolgreich mit dem Netzwerk kommuniziert — **nicht**, dass eine Person gehandelt hat.
+- Jeder andere Status (z.B. `4`) → Timestamp **ignorieren**; laut Papier ein Verbindungsabbruch, der zeitlich nicht bestimmbar ist
 - Gilt **für An- und Abmeldung separat** — je Timestamp unabhängig prüfen
 
 **Sonderfall (noch verbunden):** Nur Anmeldungs-Timestamp vorhanden → einmaligen Nachweis extrahieren
@@ -128,7 +128,7 @@ Jeder Eintrag beginnt mit **MAC** des Geräts, endet mit **Connect History** (ma
 #### 2c — Sektion `WLAN_EVENTS`
 
 **Sektion:** `##### BEGIN SECTION WLAN_EVENTS Filtered Events`  
-**Kapazität:** Max. 100 Einträge
+**Kapazität:** Max. 100 Einträge *(Angabe der Vorfassung, nicht in v1.0)*
 
 **Spalten:** `time`, `mac`, `id`, `details`
 
@@ -139,6 +139,8 @@ Jeder Eintrag beginnt mit **MAC** des Geräts, endet mit **Connect History** (ma
 | `752` | Abmeldung | vertrauenswürdig |
 | `754` | Verbindungsverlust | **ignorieren** |
 
+Die Bedeutungsspalte stammt aus der Vorfassung. v1.0 sagt nur: `30005` und `752` sind Verbindungsnachweise (das Gerät hat erfolgreich kommuniziert); andere IDs weisen auf fehlende oder fehlerhafte Kommunikation hin, die zeitlich nicht zuverlässig bestimmbar ist.
+
 > Hinweis: `details`-Feld ist versionsübergreifend stabil, `id` kann sich zwischen FRITZ!OS-Versionen ändern
 
 ---
@@ -146,7 +148,7 @@ Jeder Eintrag beginnt mit **MAC** des Geräts, endet mit **Connect History** (ma
 #### 2d — Sektion `Events Events`
 
 **Sektion:** `##### BEGIN SECTION Events Events`  
-**Kapazität:** Max. **16 Einträge** (sehr begrenzt) — nur Erstanmeldungen
+**Kapazität:** Max. **16 Einträge** (sehr begrenzt) *(Angabe der Vorfassung, nicht in v1.0)* — laut v1.0 **meist** nur Erstanmeldungen
 
 **Filterregel:** Einträge die Gerätename **und** MAC nennen + Aktionstext "hat sich mit FRITZ!Box verbunden" (o.ä.)  
 Alle anderen Einträge der Sektion ignorieren.
@@ -158,7 +160,7 @@ Alle anderen Einträge der Sektion ignorieren.
 #### 2e — Untersektion `MESH Shringbuf`
 
 **Marker:** `===== Mesh Shringbuf Begin =====`  
-**Kapazität:** Max. 384 Zeilen
+**Kapazität:** Max. 384 Zeilen *(Angabe der Vorfassung, nicht in v1.0)*
 
 Zwei vertrauenswürdige Eintragstypen:
 
@@ -228,9 +230,9 @@ Nachweise ausschließlich diese Methodik.
 
 | Einschränkung | Quelle |
 |--------------|--------|
-| Keine lückenlose Erfassung — Ringpuffer überschreiben alte Daten | dhcp (37), STATION_MODULE (50), WLAN_EVENTS (100), Events (16), MESH (384) |
+| Keine lückenlose Erfassung — Ringpuffer überschreiben alte Daten | dhcp (37), STATION_MODULE (50), WLAN_EVENTS (100), Events (16), MESH (384) — Größen aus der Vorfassung, nicht in v1.0 |
 | Geräte mit statischer IP tauchen in DHCP-Logs ggf. nicht auf | dhcp, dhcpd |
 | Status ≠ 1 → Zeitpunkt nicht bestimmbar (Verbindungsabbruch) | STATION_MODULE |
-| Events Events: nur Erstanmeldungen | Events Events |
+| Events Events: meist nur Erstanmeldungen | Events Events |
 | Kein Personenbezug aus MAC allein ableitbar | alle |
 | Methodik validiert nur für FRITZ!OS 8.20 auf der Plattform 259 des Papiers (FRITZ!Box 7590 AX, siehe Anmerkung unter *Kontext*); Übertragbarkeit auf andere Versionen/Plattformen im Einzelfall zu prüfen | alle |
