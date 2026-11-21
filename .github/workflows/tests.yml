@@ -47,5 +47,8 @@ jobs:
         run: mypy
       # Ohne -m golden: Die Golden-Tests brauchen echte Abzüge, die bewusst nicht
       # im Repo liegen. Auf dem Runner sind sie deselektiert.
+      # Untergrenze der Testabdeckung steht unter [tool.coverage.report].
       - name: Run tests
-        run: python -m pytest
+        run: |
+          python -m coverage run -m pytest
+          python -m coverage report

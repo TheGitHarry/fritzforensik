@@ -429,10 +429,11 @@ python -m pytest              # vollständige Suite, offline, ohne Box
 python -m pytest -m golden    # zusätzlich gegen echte Bundles unter ~/testdata
 ruff check .                  # Lint, dieselbe Prüfung wie in der CI
 mypy                          # Typen, vorerst nur fritzformat
+coverage run -m pytest && coverage report   # Testabdeckung, Untergrenze wie in der CI
 ```
 
-ruff und mypy kommen mit `pip install -e '.[dev]'`. Versionen (Extra `lint`),
-Regelauswahl und mypy-Umfang stehen in `pyproject.toml`.
+ruff, mypy und coverage kommen mit `pip install -e '.[dev]'`. Versionen (Extra `lint`),
+Regelauswahl, mypy-Umfang und die Untergrenze der Testabdeckung stehen in `pyproject.toml`.
 
 Live-LAN-Tests (`@pytest.mark.network`) und Golden-Tests (`@pytest.mark.golden`) sind im
 Default-Lauf deselektiert. Die Golden-Tests brauchen echte Bundles, die bewusst **nicht**

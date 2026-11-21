@@ -30,9 +30,9 @@ fritzexport = "fritzexport.__main__:main"
 fritzreport = "fritzreport.__main__:main"
 
 [project.optional-dependencies]
-# lint trägt die einzige Versionsangabe für ruff und mypy; CI installiert genau
-# dieses Extra, dev zieht es mit. Anheben ist ein eigener Commit.
-lint = ["ruff==0.17.6", "mypy==2.4.1"]
+# lint trägt die einzige Versionsangabe der Prüfwerkzeuge (ruff, mypy, coverage);
+# CI installiert genau dieses Extra, dev zieht es mit. Anheben ist ein eigener Commit.
+lint = ["ruff==0.17.6", "mypy==2.4.1", "coverage==7.17.4"]
 dev = ["pyinstaller>=6", "pytest>=7", "certifi", "fritzforensik[lint]"]
 
 [tool.setuptools]
@@ -75,3 +75,16 @@ select = ["F", "B", "I", "S"]
 files = ["fritzformat"]
 strict = true
 python_version = "3.10"
+
+[tool.coverage.run]
+source = ["fritzformat", "fritzexport", "fritzreport"]
+
+[tool.coverage.report]
+# Untergrenze für die CI, nicht für den lokalen Lauf: Dort läuft zusätzlich
+# test_real_boxes_end_to_end gegen ~/testdata und hebt den Wert um gut drei Punkte
+# (2026-11-22: lokal 79,6 %, unter CI-Bedingungen 76,3 %). Die Zahl darf nur
+# steigen; wer Tests ergänzt, zieht sie im selben PR nach.
+fail_under = 76
+precision = 1
+show_missing = true
+skip_covered = true
