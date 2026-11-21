@@ -41,4 +41,15 @@ markers = [
     "network: Tests, die echte LAN-Verbindung benötigen (default deselected)",
     "golden: Tests gegen die echten Bundles unter ~/testdata (default deselected)",
 ]
-addopts = "-q -m 'not network and not golden'"
+# -ra listet am Ende jeden Skip mit Grund: test_filter.py skippt sonst still, wenn
+# node/jsdom fehlen. --strict-markers lässt einen vertippten Marker scheitern, statt
+# ihn wirkungslos durchzulassen; --strict-config tut dasselbe für die Konfiguration.
+addopts = "-q -ra --strict-markers --strict-config -m 'not network and not golden'"
+
+[tool.ruff.lint]
+# Regelauswahl ausdrücklich: Ohne select bestimmt die ruff-Version, was geprüft
+# wird, und das wechselt mit jedem Update. Die Version steht in tests.yml.
+# F = pyflakes (Ungenutztes, Tippfehler), B = bugbear (fehleranfällige Muster),
+# I = Importreihenfolge. Zeilenlänge (E501) und ruff format bewusst nicht: Beides
+# schriebe fast jede Datei um.
+select = ["F", "B", "I"]

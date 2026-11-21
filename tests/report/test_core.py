@@ -11,7 +11,6 @@ from fritzreport.model import build_model
 from fritzreport.render import build_html, build_timeline
 from fritzreport.supportdata import analyze
 
-
 # ───────────────────────── Bundle / Verifikation ─────────────────────────────
 
 def test_bundle_loads_and_verifies(synth_bundle):
@@ -105,7 +104,6 @@ def test_timeline_merges_sources(synth_bundle):
     m = build_model(b)
     res = analyze(b, m.real_aps, m.master.get("name", ""))
     tl = build_timeline(m, res["proofs"])
-    quellen = {t["quelle"].split(" ·")[0].split(" ")[0] for t in tl}
     assert "WLAN-Verbindung" in {t["quelle"] for t in tl}
     assert any(t["quelle"].startswith("Ereignis") for t in tl)
     assert any(t["quelle"] == "Anruf" for t in tl)
@@ -481,8 +479,14 @@ def test_deviceinfo_erscheint_im_bericht(synth_bundle):
 def test_ohne_deviceinfo_keine_leeren_zeilen(tmp_path):
     """Boxen ohne TR-064 liefern die Datenart nicht. Dann fehlen die Zeilen ganz,
     statt mit leerem Wert dazustehen."""
-    from fritzformat import build_envelope, dataset_filename, sha256_bytes, write_sidecar
     import json
+
+    from fritzformat import (
+        build_envelope,
+        dataset_filename,
+        sha256_bytes,
+        write_sidecar,
+    )
     body = json.dumps(build_envelope(tool="fritzexport", version="0.1", host="h",
                                      type_name="hosts", records=[])).encode("utf-8")
     p = tmp_path / dataset_filename("h", "20260106T100000Z", "hosts")
@@ -498,6 +502,7 @@ def test_ohne_deviceinfo_keine_leeren_zeilen(tmp_path):
 def _mit_anrufen(d, anzahl: int):
     """Ersetzt die calls.json des Bundles durch `anzahl` Datensätze."""
     import json
+
     from fritzformat import build_envelope, sha256_bytes, write_sidecar
     p = next(d.glob("*_calls.json"))
     records = [{"Typ": "1", "Datum": f"01.01.26 {i // 60:02d}:{i % 60:02d}",
@@ -726,8 +731,14 @@ def test_box_zeit_wird_woertlich_wiedergegeben(synth_bundle):
 def test_ohne_quelle_steht_nicht_geprueft(tmp_path):
     """Bundle ohne Supportdaten und ohne boxtime: Der Report muss das benennen,
     statt die Zeile wegzulassen — „ungeprüft" ist selbst eine Aussage."""
-    from fritzformat import dataset_filename, sha256_bytes, write_sidecar, build_envelope
     import json
+
+    from fritzformat import (
+        build_envelope,
+        dataset_filename,
+        sha256_bytes,
+        write_sidecar,
+    )
     body = json.dumps(build_envelope(tool="fritzexport", version="0.1", host="h",
                                      type_name="hosts", records=[]),
                       indent=2).encode("utf-8")

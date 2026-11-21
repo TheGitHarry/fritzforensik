@@ -36,7 +36,8 @@ def genutzte_services() -> set[str]:
     import importlib
     import pkgutil
 
-    from . import __name__ as paket, __path__ as pfad
+    from . import __name__ as paket
+    from . import __path__ as pfad
 
     gefunden: set[str] = set()
     for modul in pkgutil.iter_modules(pfad):

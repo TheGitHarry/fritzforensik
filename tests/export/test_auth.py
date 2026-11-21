@@ -6,10 +6,9 @@ hashlib.pbkdf2_hmac selbst ist Python-stdlib und nicht zu testen.
 """
 from __future__ import annotations
 
-import pytest
-
 from unittest.mock import MagicMock
 
+import pytest
 import requests
 
 from fritzexport.auth import (

@@ -29,7 +29,6 @@ from fritzexport.client import (
 )
 from fritzexport.extractors import tam
 
-
 # ───────────────────────── Befund 1: MD5-Downgrade ───────────────────────────
 
 def _login_session(challenge: str) -> MagicMock:

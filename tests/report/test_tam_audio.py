@@ -14,7 +14,13 @@ from __future__ import annotations
 import json
 import shutil
 
-from fritzformat import TOOL_NAME, build_envelope, dataset_filename, sha256_bytes, write_sidecar
+from fritzformat import (
+    TOOL_NAME,
+    build_envelope,
+    dataset_filename,
+    sha256_bytes,
+    write_sidecar,
+)
 from fritzreport.bundle import STATUS_MISSING, load_bundle
 
 HOST = "https://fritz.box"

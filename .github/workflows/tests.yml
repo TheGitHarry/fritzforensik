@@ -36,6 +36,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install "requests>=2.31" pytest
+      # Version festgenagelt: Regelauswahl steht in pyproject.toml, aber was eine
+      # Regel meldet, ändert sich mit ruff selbst. Anheben ist ein eigener Commit.
+      - name: Lint (ruff)
+        run: |
+          python -m pip install "ruff==0.17.6"
+          ruff check .
       # Ohne -m golden: Die Golden-Tests brauchen echte Abzüge, die bewusst nicht
       # im Repo liegen. Auf dem Runner sind sie deselektiert.
       - name: Run tests

@@ -1,19 +1,19 @@
+from .boxtime import extract as extract_boxtime
 from .calls import extract as extract_calls
-from .phonebook import extract as extract_phonebook
-from .wifi import extract as extract_wifi
-from .events import extract as extract_events
-from .tam import extract as extract_tam
-from .mesh import extract as extract_mesh
-from .hosts import extract as extract_hosts
-from .wan import extract as extract_wan
+from .deviceinfo import extract as extract_deviceinfo
 from .dhcp import extract as extract_dhcp
+from .events import extract as extract_events
+from .hosts import extract as extract_hosts
+from .mesh import extract as extract_mesh
+from .phonebook import extract as extract_phonebook
 from .portforward import extract as extract_portforward
+from .services import extract as extract_services
 from .storage import extract as extract_storage
 from .supportdata import extract as extract_supportdata
+from .tam import extract as extract_tam
 from .tr069 import extract as extract_tr069
-from .services import extract as extract_services
-from .boxtime import extract as extract_boxtime
-from .deviceinfo import extract as extract_deviceinfo
+from .wan import extract as extract_wan
+from .wifi import extract as extract_wifi
 
 EXTRACTORS = {
     "calls": extract_calls,

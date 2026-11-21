@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from fritzexport.client import Tr064Disabled, Tr064Error
+from fritzexport.client import Tr064Disabled
 from fritzexport.extractors import wan as wan_mod
 
 
