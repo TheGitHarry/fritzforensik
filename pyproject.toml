@@ -29,7 +29,10 @@ fritzexport = "fritzexport.__main__:main"
 fritzreport = "fritzreport.__main__:main"
 
 [project.optional-dependencies]
-dev = ["pyinstaller>=6", "pytest>=7", "certifi"]
+# lint trägt die einzige Versionsangabe für ruff; CI installiert genau dieses
+# Extra, dev zieht es mit. Anheben ist ein eigener Commit.
+lint = ["ruff==0.17.6"]
+dev = ["pyinstaller>=6", "pytest>=7", "certifi", "fritzforensik[lint]"]
 
 [tool.setuptools]
 packages = ["fritzformat", "fritzexport", "fritzexport.extractors", "fritzreport"]
@@ -48,7 +51,7 @@ addopts = "-q -ra --strict-markers --strict-config -m 'not network and not golde
 
 [tool.ruff.lint]
 # Regelauswahl ausdrücklich: Ohne select bestimmt die ruff-Version, was geprüft
-# wird, und das wechselt mit jedem Update. Die Version steht in tests.yml.
+# wird, und das wechselt mit jedem Update. Die Version steht im Extra lint.
 # F = pyflakes (Ungenutztes, Tippfehler), B = bugbear (fehleranfällige Muster),
 # I = Importreihenfolge. Zeilenlänge (E501) und ruff format bewusst nicht: Beides
 # schriebe fast jede Datei um.
