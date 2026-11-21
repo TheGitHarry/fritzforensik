@@ -116,6 +116,7 @@ def tls_server(tmp_path):
     fp = hashlib.sha256(ssl.PEM_cert_to_DER_cert(pem)).hexdigest()
     yield f"https://127.0.0.1:{srv.server_port}", fp
     srv.shutdown()
+    srv.server_close()
 
 
 def test_festgelegter_fingerabdruck_verbindet(tls_server):

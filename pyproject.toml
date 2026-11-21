@@ -48,6 +48,10 @@ markers = [
 # node/jsdom fehlen. --strict-markers lässt einen vertippten Marker scheitern, statt
 # ihn wirkungslos durchzulassen; --strict-config tut dasselbe für die Konfiguration.
 addopts = "-q -ra --strict-markers --strict-config -m 'not network and not golden'"
+# Jede Warnung ist ein Fehler. Ein offener Socket oder eine veraltete API fällt
+# so beim nächsten Lauf auf, statt in einer Zusammenfassung unterzugehen, die
+# niemand liest. Ausnahmen gezielt eintragen, mit Begründung.
+filterwarnings = ["error"]
 
 [tool.ruff.lint]
 # Regelauswahl ausdrücklich: Ohne select bestimmt die ruff-Version, was geprüft
