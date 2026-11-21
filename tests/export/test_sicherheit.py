@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import contextlib
 import http.server
 import shutil
 import ssl
@@ -237,10 +238,8 @@ def test_tam_liste_geht_an_die_eigene_box():
     ]
     c.tr064_url.side_effect = lambda p: f"https://192.168.2.1:49443{p}"
     c.session.get.return_value = MagicMock(text="<Root/>")
-    try:
+    with contextlib.suppress(Tr064Disabled):
         tam._try_tr064(c, MagicMock())
-    except Tr064Disabled:
-        pass
     url = c.session.get.call_args_list[0].args[0]
     assert url == "https://192.168.2.1:49443/tamcalllist.lua?sid=abc&tamindex=0"
 

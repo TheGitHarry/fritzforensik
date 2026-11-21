@@ -58,9 +58,19 @@ filterwarnings = ["error"]
 # Regelauswahl ausdrücklich: Ohne select bestimmt die ruff-Version, was geprüft
 # wird, und das wechselt mit jedem Update. Die Version steht im Extra lint.
 # F = pyflakes (Ungenutztes, Tippfehler), B = bugbear (fehleranfällige Muster),
-# I = Importreihenfolge, S = Sicherheit (bandit). Zeilenlänge (E501) und ruff format
-# bewusst nicht: Beides schriebe fast jede Datei um.
-select = ["F", "B", "I", "S"]
+# I = Importreihenfolge, S = Sicherheit (bandit), UP = veraltete Schreibweisen,
+# SIM = vereinfachbare Konstrukte, RUF = ruff-eigene Regeln. Zeilenlänge (E501) und
+# ruff format bewusst nicht: Beides schriebe fast jede Datei um.
+select = ["F", "B", "I", "S", "UP", "SIM", "RUF"]
+ignore = [
+    # Gedankenstrich und echtes Minuszeichen sind Typografie, keine Verwechslung;
+    # der Report zeigt Versätze bewusst mit "−".
+    "RUF001", "RUF002", "RUF003",
+    # __all__ ist nach Herkunftsmodul gegliedert, nicht alphabetisch.
+    "RUF022",
+    # "Jan Feb … Dec".split() liest sich besser als die ausgeschriebene Liste.
+    "SIM905",
+]
 
 [tool.ruff.lint.per-file-ignores]
 # S trifft in den Tests fast nur assert (S101) und Fixture-Kram wie feste Passwörter

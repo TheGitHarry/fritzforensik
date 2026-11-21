@@ -38,9 +38,8 @@ def test_doctype_ohne_entity_bleibt_erlaubt():
 
 @pytest.mark.parametrize("dokument", [BOMBE, EXTERN], ids=["expansion", "extern"])
 def test_entity_wird_als_parseerror_abgelehnt(dokument, caplog):
-    with caplog.at_level(logging.WARNING):
-        with pytest.raises(ET.ParseError):
-            parse_xml(dokument)
+    with caplog.at_level(logging.WARNING), pytest.raises(ET.ParseError):
+        parse_xml(dokument)
     assert "Entity" in caplog.text
 
 

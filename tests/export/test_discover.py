@@ -1,7 +1,6 @@
 """Offline-Tests für SSDP-Discovery (parser-pure + socket-mock)."""
 from __future__ import annotations
 
-import socket
 from unittest.mock import patch
 
 from fritzexport.discover import (
@@ -140,7 +139,7 @@ class _FakeSocket:
     def recvfrom(self, bufsize):
         if self._responses:
             return self._responses.pop(0)
-        raise socket.timeout()
+        raise TimeoutError()
 
     def close(self):
         pass
