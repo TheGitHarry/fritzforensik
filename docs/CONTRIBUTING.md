@@ -54,6 +54,10 @@ ruff check .
 mypy
 ```
 
+Die CI misst zusätzlich die Testabdeckung und scheitert unter der Untergrenze
+`fail_under` in `pyproject.toml`. Lokal prüfen mit
+`coverage run -m pytest && coverage report`.
+
 Die Suite läuft offline und ohne Box. Wenn Sie an der Filterlogik des Reports
 arbeiten, einmalig `npm ci` — sonst überspringt `tests/report/test_filter.py`
 still, und der grüne Lauf sagt über die Filter nichts aus.
