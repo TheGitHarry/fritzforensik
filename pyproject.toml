@@ -92,9 +92,9 @@ source = ["fritzformat", "fritzexport", "fritzreport"]
 [tool.coverage.report]
 # Untergrenze für die CI, nicht für den lokalen Lauf: Dort läuft zusätzlich
 # test_real_boxes_end_to_end gegen ~/testdata und hebt den Wert um gut drei Punkte
-# (2026-11-22: lokal 79,6 %, unter CI-Bedingungen 76,3 %). Die Zahl darf nur
+# (2026-11-22: lokal 82,3 %, unter CI-Bedingungen 79,0 %). Die Zahl darf nur
 # steigen; wer Tests ergänzt, zieht sie im selben PR nach.
-fail_under = 76
+fail_under = 78
 precision = 1
 show_missing = true
 skip_covered = true
