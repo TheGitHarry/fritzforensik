@@ -11,6 +11,7 @@ extractor-spezifische Zusatzfelder hinzu.
 from __future__ import annotations
 
 import datetime as _dt
+from typing import Any
 
 #: Pflichtfelder des Kopfes, in Schreibreihenfolge.
 ENVELOPE_KEYS = ("tool", "version", "host", "extracted_at", "type", "records")
@@ -56,13 +57,13 @@ def build_envelope(
     version: str,
     host: str,
     type_name: str,
-    records: list[dict],
+    records: list[dict[str, Any]],
     extracted_at: str | None = None,
-    discovery_meta: dict | None = None,
-    extra_meta: dict | None = None,
-) -> dict:
+    discovery_meta: dict[str, Any] | None = None,
+    extra_meta: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Baut den vollständigen Datensatz einer Datenart."""
-    payload: dict = {
+    payload: dict[str, Any] = {
         "tool": tool,
         "version": version,
         "host": host,
@@ -77,7 +78,7 @@ def build_envelope(
     return payload
 
 
-def read_envelope_meta(data: dict) -> dict:
+def read_envelope_meta(data: dict[str, Any]) -> dict[str, Any]:
     """Liest den Kopf einer geladenen Datenart heraus (fehlende Felder → "")."""
     data = data or {}
     return {

@@ -42,6 +42,9 @@ jobs:
         run: |
           python -m pip install ".[lint]"
           ruff check .
+      # Prüfumfang (vorerst nur fritzformat) und --strict stehen unter [tool.mypy].
+      - name: Typen (mypy)
+        run: mypy
       # Ohne -m golden: Die Golden-Tests brauchen echte Abzüge, die bewusst nicht
       # im Repo liegen. Auf dem Runner sind sie deselektiert.
       - name: Run tests
