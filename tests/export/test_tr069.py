@@ -3,8 +3,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from fritzexport.client import Tr064Disabled, Tr064Error
 from fritzexport.extractors import tr069 as tr069_mod
 

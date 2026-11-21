@@ -14,7 +14,6 @@ from fritzexport.extractors.tam import (
     _parse_webui_rows,
 )
 
-
 GETMESSAGELIST_RESPONSE = """<?xml version="1.0"?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
 <s:Body>

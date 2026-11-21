@@ -50,6 +50,7 @@ Vor einem Pull Request:
 
 ```bash
 python3 -m pytest
+ruff check .
 ```
 
 Die Suite läuft offline und ohne Box. Wenn Sie an der Filterlogik des Reports

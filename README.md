@@ -427,7 +427,11 @@ PyInstaller-Bootstrap-Extract wird ebenfalls auf den Stick geschrieben
 ```bash
 python -m pytest              # vollständige Suite, offline, ohne Box
 python -m pytest -m golden    # zusätzlich gegen echte Bundles unter ~/testdata
+ruff check .                  # Lint, dieselbe Prüfung wie in der CI
 ```
+
+Die ruff-Version steht in `.github/workflows/tests.yml`, die Regelauswahl in
+`pyproject.toml`.
 
 Live-LAN-Tests (`@pytest.mark.network`) und Golden-Tests (`@pytest.mark.golden`) sind im
 Default-Lauf deselektiert. Die Golden-Tests brauchen echte Bundles, die bewusst **nicht**

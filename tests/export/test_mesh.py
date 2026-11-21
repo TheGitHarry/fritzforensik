@@ -6,7 +6,6 @@ from unittest.mock import MagicMock
 from fritzexport.client import Tr064Disabled
 from fritzexport.extractors import mesh as mesh_mod
 
-
 # Realistisches AVM-Mesh-JSON (gekürzt). Zwei Knoten, ein Link, der in beiden
 # Endpoint-Interfaces auftaucht — Test prüft Dedup via link.uid.
 MESH_PAYLOAD = {

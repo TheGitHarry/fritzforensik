@@ -3,9 +3,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from fritzexport.client import Tr064Disabled, Tr064Error
+from fritzexport.client import Tr064Disabled
 from fritzexport.extractors import hosts as hosts_mod
-
 
 HOSTLIST_XML = b"""<?xml version="1.0" encoding="utf-8"?>
 <List>

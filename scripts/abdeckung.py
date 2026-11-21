@@ -40,7 +40,7 @@ HWREV_MODELL = {
 
 def _erste_zeilen(pfad: Path, anzahl: int = 400) -> list[str]:
     with pfad.open(encoding="utf-8", errors="replace") as f:
-        return [zeile for _, zeile in zip(range(anzahl), f)]
+        return [zeile for _, zeile in zip(range(anzahl), f, strict=False)]
 
 
 def firmware_kurz(roh: str) -> str:

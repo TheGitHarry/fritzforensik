@@ -9,16 +9,19 @@ from __future__ import annotations
 import json
 import re
 
+from fritzexport import output
+from fritzexport.extractors import EXTRACTORS
+from fritzexport.extractors.supportdata import _VARIANTS
 from fritzformat import (
     CASE_FILENAME,
+    JSON_TYPES,
     MARKER_BEGIN,
     MARKER_END,
     MARKER_UHR_ANFRAGE,
     MARKER_UHR_ANTWORT,
-    begin_line,
-    JSON_TYPES,
     SUPPORT_VARIANTS,
     TOOL_NAME,
+    begin_line,
     build_case,
     compact_from_iso,
     dataset_filename,
@@ -26,23 +29,19 @@ from fritzformat import (
     parse_span,
     parse_uhr_spans,
     read_case,
-    run_slug,
     read_envelope_meta,
+    run_slug,
     sha256_bytes,
     support_filename,
     uhr_anfrage_line,
-    uhr_jetzt_iso,
     uhr_antwort_line,
+    uhr_jetzt_iso,
     verify,
     write_case,
     write_sidecar,
 )
-from fritzexport import output
-from fritzexport.extractors import EXTRACTORS
-from fritzexport.extractors.supportdata import _VARIANTS
 from fritzreport.bundle import load_bundle
 from fritzreport.cli import is_bundle
-
 
 # ─────────────────────── Listen auf beiden Seiten identisch ──────────────────
 

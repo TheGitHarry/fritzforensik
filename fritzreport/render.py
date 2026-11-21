@@ -15,7 +15,7 @@ import html
 
 from . import __version__
 from .bundle import QUELLE_RECORD, STATUS_MISSING
-from .model import GRADE_LABEL, GRADE_SCHEMA, NO_AP, Model
+from .model import GRADE_LABEL, GRADE_SCHEMA, Model
 
 # ───────────────────────── CSS (aus PoC, 3 Grade) ────────────────────────────
 CSS = """
@@ -918,7 +918,7 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
         + "".join(f'<tr><th>{esc(r[0])}</th><td class="mono">{esc(r[1])}'
                   f'{r[2] if len(r) > 2 else ""}</td></tr>' for r in meta_rows)
         + "</table>"
-        + f'<h3>Kennzahlen <span class="grade gD3">D3</span></h3><table class="kv">'
+        + '<h3>Kennzahlen <span class="grade gD3">D3</span></h3><table class="kv">'
         + f'<tr><th>Hosts insgesamt</th><td>{len(m.hosts)}</td></tr>'
         + f'<tr><th>davon aktiv zum Extraktionszeitpunkt</th><td>{active_hosts}</td></tr>'
         + f'<tr><th>Clients (wifi.json)</th><td>{len(m.wifi)}</td></tr>'
@@ -931,7 +931,7 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
         + f'<tr><th>Einzigartige MAC-Adressen</th><td>{len(mac_set)}</td></tr>'
         + f'<tr><th>Zeitraum zeitgestempelter Datensätze</th><td class="mono">{esc(zeit_min)} — {esc(zeit_max)}</td></tr>'
         + "</table>"
-        + f'<h3>Ereignisse nach Kategorie <span class="grade gD3">D3</span></h3>'
+        + '<h3>Ereignisse nach Kategorie <span class="grade gD3">D3</span></h3>'
         + "<table class='stat'><thead><tr><th>Kategorie</th><th>Anzahl</th></tr></thead><tbody>"
         + "".join(f'<tr><td>{esc(k)}</td><td class="num">{v}</td></tr>'
                   for k, v in sorted(m.cat_counts.items(), key=lambda x: -x[1]))

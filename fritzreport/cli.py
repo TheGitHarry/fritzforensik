@@ -39,7 +39,6 @@ from .model import build_model
 from .render import _pick_device, build_html
 from .supportdata import analyze
 
-
 #: Zeitstempel der Report-Erzeugung — Format aus fritzformat, damit Report und
 #: Bundle dieselbe Schreibweise verwenden.
 _now_iso = utc_now_iso
