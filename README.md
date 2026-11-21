@@ -59,7 +59,7 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e '.[dev]'
 ```
 
-`requests` wird ausschließlich von fritzexport gebraucht. **fritzreport und fritzformat
+`requests` und `defusedxml` werden ausschließlich von fritzexport gebraucht. **fritzreport und fritzformat
 sind stdlib-only** — ein Test (`tests/format/test_stdlib_only.py`) wacht darüber, damit
 das Report-Binary schlank und netzwerkfrei bleibt.
 

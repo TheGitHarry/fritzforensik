@@ -17,6 +17,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from ..client import FritzClient, Tr064Disabled, Tr064Error, UnsafeBoxPath
+from ..xmlsafe import parse_xml
 
 log = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ _GTABS_RE = re.compile(r"g_tabs\s*=\s*(\[.*?\])\s*;", re.DOTALL)
 def _parse_message_xml(xml_text: str, tam_index: int) -> list[dict]:
     """XML-Format: <Root><Message><Index/>... <New/> <Path/> ...</Message></Root>."""
     try:
-        root = ET.fromstring(xml_text)
+        root = parse_xml(xml_text)
     except ET.ParseError:
         return []
     messages: list[dict] = []

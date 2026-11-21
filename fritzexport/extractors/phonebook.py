@@ -6,6 +6,7 @@ import re
 import xml.etree.ElementTree as ET
 
 from ..client import FritzClient
+from ..xmlsafe import parse_xml
 
 DATA_PATH = "/data.lua"
 FIRMWARECFG_PATH = "/cgi-bin/firmwarecfg"
@@ -69,7 +70,7 @@ def _export_phonebook(client: FritzClient, book_id: int) -> str:
 
 def _parse_xml(xml_text: str, book_id: int, book_name: str) -> list[dict]:
     try:
-        root = ET.fromstring(xml_text)
+        root = parse_xml(xml_text)
     except ET.ParseError:
         return []
     contacts: list[dict] = []
