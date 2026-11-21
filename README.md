@@ -430,8 +430,8 @@ python -m pytest -m golden    # zusätzlich gegen echte Bundles unter ~/testdata
 ruff check .                  # Lint, dieselbe Prüfung wie in der CI
 ```
 
-Die ruff-Version steht in `.github/workflows/tests.yml`, die Regelauswahl in
-`pyproject.toml`.
+ruff kommt mit `pip install -e '.[dev]'`. Version (Extra `lint`) und Regelauswahl
+stehen in `pyproject.toml`.
 
 Live-LAN-Tests (`@pytest.mark.network`) und Golden-Tests (`@pytest.mark.golden`) sind im
 Default-Lauf deselektiert. Die Golden-Tests brauchen echte Bundles, die bewusst **nicht**
