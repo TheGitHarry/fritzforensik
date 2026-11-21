@@ -14,6 +14,7 @@ nicht der Fehler.
 """
 from __future__ import annotations
 
+import argparse
 import datetime as _dt
 import json
 import sys
@@ -43,7 +44,8 @@ def today() -> str:
     return _dt.date.today().isoformat()
 
 
-def collect_case(args, *, defaults: dict | None = None, intro: str = "") -> dict:
+def collect_case(args: argparse.Namespace, *, defaults: dict[str, str] | None = None,
+                 intro: str = "") -> dict[str, str]:
     """Fallkopf erheben: CLI-Werte gewinnen, der Rest wird abgefragt.
 
     Beide Werkzeuge fragen dasselbe ab — die Funktion liegt deshalb hier und nicht
@@ -57,7 +59,7 @@ def collect_case(args, *, defaults: dict | None = None, intro: str = "") -> dict
                    and sys.stdout is not None and sys.stdout.isatty())
 
     def field(name: str) -> str:
-        cli_val = getattr(args, name, None)
+        cli_val: str | None = getattr(args, name, None)
         if cli_val is not None:
             return cli_val
         default = defaults.get(name, "") or ("" if name != "date" else today())
@@ -78,7 +80,7 @@ def collect_case(args, *, defaults: dict | None = None, intro: str = "") -> dict
 
 
 def build_case(case_id: str = "", item_id: str = "", sb: str = "",
-               date: str = "", written_at: str = "") -> dict:
+               date: str = "", written_at: str = "") -> dict[str, str]:
     """Fallkopf-Dict in der Form, wie es auf die Platte geht."""
     case = {
         "case_id": case_id or "",
@@ -91,14 +93,14 @@ def build_case(case_id: str = "", item_id: str = "", sb: str = "",
     return case
 
 
-def write_case(bundle_dir: Path | str, case: dict) -> Path:
+def write_case(bundle_dir: Path | str, case: dict[str, str]) -> Path:
     """Schreibt ``case.json`` und gibt den Pfad zurück."""
     p = case_path(bundle_dir)
     p.write_text(json.dumps(case, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return p
 
 
-def read_case(bundle_dir: Path | str) -> dict:
+def read_case(bundle_dir: Path | str) -> dict[str, str]:
     """Liest ``case.json`` → Dict; **leeres Dict**, wenn nichts Brauchbares dasteht.
 
     Fehlt die Datei, ist sie kaputt oder enthält kein Objekt, wird das als „kein

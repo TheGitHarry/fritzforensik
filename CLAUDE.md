@@ -158,6 +158,7 @@ Verbindungsnachweise: methode.md-Parser → D1+D2, 802.11-Log-Parser → D1+D3.
 python3 -m pytest             # volle Suite, offline
 python3 -m pytest -m golden   # NUR die Golden-Tests gegen ~/testdata/_work
 ruff check .                  # Lint (F, B, I), Version im Extra lint der pyproject.toml
+mypy                          # --strict, vorerst nur fritzformat ([tool.mypy])
 ```
 
 `tests/{format,export,report}/`. Standardmäßig deselektiert: `network` (echtes LAN) und
