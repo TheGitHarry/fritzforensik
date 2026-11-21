@@ -73,7 +73,7 @@ def test_extract_uses_tr064_path():
     records = hosts_mod.extract(client)
     assert len(records) == 2
     # Path-eigene SID muss durchgereicht worden sein, nicht überschrieben
-    args, kwargs = client.session.get.call_args
+    _args, kwargs = client.session.get.call_args
     assert kwargs["params"].get("sid") == "abc"
 
 

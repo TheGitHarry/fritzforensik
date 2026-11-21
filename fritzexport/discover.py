@@ -181,7 +181,7 @@ def _msearch_once(timeout: float, iface: str | None) -> list[tuple[bytes, tuple]
         while True:
             try:
                 data, addr = sock.recvfrom(8192)
-            except socket.timeout:
+            except TimeoutError:
                 break
             responses.append((data, addr))
         return responses
