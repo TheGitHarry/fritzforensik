@@ -40,7 +40,7 @@ EXIT_PARTIAL = 3
 EXIT_AMBIGUOUS = 4
 EXIT_NO_DISCOVERY = 5
 
-PASSWORD_ENV = "FRITZ_PW"
+PASSWORD_ENV = "FRITZ_PW"  # noqa: S105 - Name der Umgebungsvariable, kein Passwort
 
 log = logging.getLogger("fritzexport")
 
@@ -612,7 +612,7 @@ def main(argv: list[str] | None = None) -> int:
     target_url, discovery_meta, exit_code = _resolve_target(args)
     if exit_code != EXIT_OK:
         return exit_code
-    assert target_url is not None
+    assert target_url is not None  # noqa: S101 - nur für mypy, exit_code schließt None aus
 
     if not _probe_tls(target_url, args):
         return EXIT_AUTH

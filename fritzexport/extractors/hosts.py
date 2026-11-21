@@ -41,6 +41,7 @@ import logging
 import xml.etree.ElementTree as ET
 
 from ..client import FritzClient, Tr064Disabled, Tr064Error
+from ..xmlsafe import parse_xml
 
 log = logging.getLogger(__name__)
 
@@ -122,7 +123,7 @@ def _fetch_hostlist_xml(client: FritzClient, hostlist_path: str) -> bytes | None
 def _parse_hostlist_xml(xml_bytes: bytes) -> list[dict]:
     """XML-Format: <List><Item>... <MACAddress/>...</Item>...</List>."""
     try:
-        root = ET.fromstring(xml_bytes)
+        root = parse_xml(xml_bytes)
     except ET.ParseError as e:
         log.warning("HostList-XML nicht parsebar: %s", e)
         return []

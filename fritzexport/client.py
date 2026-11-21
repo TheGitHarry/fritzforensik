@@ -12,6 +12,7 @@ from requests.adapters import HTTPAdapter
 from requests.auth import HTTPDigestAuth
 
 from . import auth
+from .xmlsafe import parse_xml
 
 
 class Tr064Error(RuntimeError):
@@ -410,7 +411,7 @@ def _parse_service_list(xml_bytes: bytes) -> list[dict]:
     Präfix steht am Wurzel-Tag.
     """
     try:
-        root = ET.fromstring(xml_bytes)
+        root = parse_xml(xml_bytes)
     except ET.ParseError:
         return []
     ns = root.tag.split("}", 1)[0] + "}" if root.tag.startswith("{") else ""
@@ -445,7 +446,7 @@ _SOAP_NS = "{http://schemas.xmlsoap.org/soap/envelope/}"
 def _parse_soap_response(xml_text: str, action: str) -> dict[str, str]:
     """Pflückt alle Elemente des `<u:ActionResponse>`-Bodys als flaches Dict."""
     try:
-        root = ET.fromstring(xml_text)
+        root = parse_xml(xml_text)
     except ET.ParseError as e:
         raise Tr064Error(f"Konnte SOAP-Antwort nicht parsen: {e}") from e
     body = root.find(f"{_SOAP_NS}Body")

@@ -20,9 +20,10 @@ version = "0.0.0"
 description = "Forensik-Werkzeuge für AVM FRITZ!Box: Live-Datenabzug (fritzexport) und HTML-Report (fritzreport)"
 readme = "README.md"
 requires-python = ">=3.10"
-# requests wird ausschließlich von fritzexport benötigt. fritzreport und
-# fritzformat sind stdlib-only; ein Test wacht darüber (tests/format/test_stdlib_only.py).
-dependencies = ["requests>=2.31"]
+# requests und defusedxml braucht ausschließlich fritzexport (defusedxml für XML aus
+# Box-Antworten, #57). fritzreport und fritzformat sind stdlib-only; ein Test wacht
+# darüber (tests/format/test_stdlib_only.py).
+dependencies = ["requests>=2.31", "defusedxml>=0.7.1"]
 
 [project.scripts]
 fritzexport = "fritzexport.__main__:main"
@@ -57,9 +58,15 @@ filterwarnings = ["error"]
 # Regelauswahl ausdrücklich: Ohne select bestimmt die ruff-Version, was geprüft
 # wird, und das wechselt mit jedem Update. Die Version steht im Extra lint.
 # F = pyflakes (Ungenutztes, Tippfehler), B = bugbear (fehleranfällige Muster),
-# I = Importreihenfolge. Zeilenlänge (E501) und ruff format bewusst nicht: Beides
-# schriebe fast jede Datei um.
-select = ["F", "B", "I"]
+# I = Importreihenfolge, S = Sicherheit (bandit). Zeilenlänge (E501) und ruff format
+# bewusst nicht: Beides schriebe fast jede Datei um.
+select = ["F", "B", "I", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+# S trifft in den Tests fast nur assert (S101) und Fixture-Kram wie feste Passwörter
+# und subprocess; dort ist das gewollt. Im Produktivcode ist jede Ausnahme einzeln
+# per noqa begründet.
+"tests/**" = ["S"]
 
 [tool.mypy]
 # Vorerst nur der Formatvertrag: klein, von beiden Werkzeugen genutzt, und dort

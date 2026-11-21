@@ -9,7 +9,7 @@ Formatmodul:
 
 | Paket | Rolle | Abhängigkeiten |
 |---|---|---|
-| `fritzexport/` | **Live-Abzug** aus einer laufenden Box → Bundle-Verzeichnis | `requests` |
+| `fritzexport/` | **Live-Abzug** aus einer laufenden Box → Bundle-Verzeichnis | `requests`, `defusedxml` |
 | `fritzreport/` | Bundle → **self-contained HTML-Report** (kein Box-Zugriff) | **stdlib-only** |
 | `fritzformat/` | gemeinsamer **Formatvertrag** beider Seiten | **stdlib-only** |
 
@@ -52,6 +52,10 @@ Zusage darf nicht ohne Not aufgeweicht werden. Ausgenommen ist `webbrowser`
   `client.check_box_path` (in `get`/`post`/`tr064_url`) — `@evil/x` hinter der
   Basis-URL lenkte die Anfrage samt SID auf einen fremden Host. Box-URLs (TAM `NewURL`)
   liefern nur Pfad und Query, Host und Port stammen aus der eigenen Verbindung.
+- **XML nur über `xmlsafe.parse_xml`**: Jede Box-Antwort ist Fremdeingabe, und
+  `xml.etree` expandiert Entities. Der Helfer lehnt Entity-Deklarationen ab (#57) und
+  übersetzt die Ausnahme in `ET.ParseError`, damit die vorhandenen `except` greifen.
+  Ein direktes `ET.fromstring` meldet ruff als `S314`.
 - **Logzeilen sind einzeilig**: `cli._EinzeiligFilter` schreibt Steuerzeichen als
   `\xNN`, und `fritzformat/sessionlog.py` erkennt Marker nur als ganze Meldung. Beides
   zusammen verhindert, dass Box-Text (Fehlerbeschreibungen) Marker nachbildet.
@@ -157,7 +161,7 @@ Verbindungsnachweise: methode.md-Parser → D1+D2, 802.11-Log-Parser → D1+D3.
 ```bash
 python3 -m pytest             # volle Suite, offline
 python3 -m pytest -m golden   # NUR die Golden-Tests gegen ~/testdata/_work
-ruff check .                  # Lint (F, B, I), Version im Extra lint der pyproject.toml
+ruff check .                  # Lint (F, B, I, S), Version im Extra lint der pyproject.toml
 mypy                          # --strict, vorerst nur fritzformat ([tool.mypy])
 ```
 
@@ -205,8 +209,8 @@ nächsten Tag ungeprüft an.
   wegen fehlender Permissions.
 - **certifi** wird nur für fritzexport gebündelt (`--collect-data certifi`); ohne das ist
   TLS gegen Boxen mit selbstsigniertem Zertifikat kaputt. fritzreport braucht es nicht.
-- Im Report-Build wird `requests` zwar installiert (die gemeinsame Testsuite braucht es),
-  landet aber **nicht** im Binary — fritzreport importiert es nicht.
+- Im Report-Build werden `requests` und `defusedxml` zwar installiert (die gemeinsame
+  Testsuite braucht sie), landen aber **nicht** im Binary — fritzreport importiert sie nicht.
 
 ## Doku-Eigentum
 

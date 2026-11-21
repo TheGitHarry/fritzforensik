@@ -62,7 +62,7 @@ def build(tool: str) -> int:
     cmd.append(str(target))
 
     print(" ".join(cmd))
-    return subprocess.call(cmd, cwd=REPO_ROOT)
+    return subprocess.call(cmd, cwd=REPO_ROOT)  # noqa: S603 - Kommando fest im Skript gebaut
 
 
 def main() -> int:

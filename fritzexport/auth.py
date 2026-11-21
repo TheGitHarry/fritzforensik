@@ -12,6 +12,8 @@ from dataclasses import dataclass
 
 import requests
 
+from .xmlsafe import parse_xml
+
 log = logging.getLogger("fritzexport")
 
 LOGIN_PATH = "/login_sid.lua?version=2"
@@ -70,7 +72,7 @@ def _pbkdf2_response(challenge: str, password: str) -> str:
 
 
 def _md5_response(challenge: str, password: str) -> str:
-    digest = hashlib.md5(
+    digest = hashlib.md5(  # noqa: S324 - AVM-Verfahren alter Firmware, nur mit --allow-md5
         f"{challenge}-{password}".encode("utf-16-le")
     ).hexdigest()
     return f"{challenge}-{digest}"
@@ -84,7 +86,7 @@ def calculate_response(challenge: str, password: str) -> str:
 
 
 def _parse_session_xml(xml_text: str) -> tuple[str, str, int]:
-    root = ET.fromstring(xml_text)
+    root = parse_xml(xml_text)
     sid = (root.findtext("SID") or "").strip()
     challenge = (root.findtext("Challenge") or "").strip()
     blocktime_text = (root.findtext("BlockTime") or "0").strip()
@@ -160,7 +162,7 @@ def fetch_users(base_url: str, session: requests.Session) -> list[str]:
     try:
         resp = session.get(base_url + LOGIN_PATH, timeout=10)
         resp.raise_for_status()
-        root = ET.fromstring(resp.text)
+        root = parse_xml(resp.text)
     except requests.exceptions.SSLError:
         raise
     except (requests.RequestException, ET.ParseError) as e:

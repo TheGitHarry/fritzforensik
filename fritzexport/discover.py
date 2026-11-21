@@ -14,6 +14,8 @@ import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
 from urllib.parse import urlsplit
 
+from .xmlsafe import parse_xml
+
 SSDP_MULTICAST = "239.255.255.250"
 SSDP_PORT = 1900
 SSDP_ST_IGD = "urn:schemas-upnp-org:device:InternetGatewayDevice:1"
@@ -100,7 +102,7 @@ def parse_ssdp_response(raw: bytes) -> dict | None:
 def parse_device_xml(xml_bytes: bytes) -> dict:
     """Liest friendlyName/modelName/modelDescription aus IGD-Description-XML."""
     try:
-        root = ET.fromstring(xml_bytes)
+        root = parse_xml(xml_bytes)
     except ET.ParseError:
         return {}
     ns = ""
@@ -130,7 +132,8 @@ def _fetch_device_xml(location: str, timeout: float) -> bytes:
     schema = urlsplit(location).scheme.lower()
     if schema not in ERLAUBTE_SCHEMATA:
         raise ValueError(f"Unerwartetes Schema in LOCATION: {location!r}")
-    with urllib.request.urlopen(location, timeout=timeout) as resp:
+    # Schema ist oben auf http/https begrenzt.
+    with urllib.request.urlopen(location, timeout=timeout) as resp:  # noqa: S310
         return resp.read(MAX_DESC_BYTES)
 
 
@@ -255,7 +258,7 @@ def discover(
                 box.friendly_name = info.get("friendly_name", "")
                 box.model_name = info.get("model_name", "")
                 box.model_description = info.get("model_description", "")
-            except Exception:
+            except Exception:  # noqa: S110 - Box ohne XML-Metadaten übernehmen, s. _fetch_device_xml
                 pass
         if not _is_fritzbox(box):
             continue
