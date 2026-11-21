@@ -554,9 +554,10 @@ def _parse_box_iso(wert: str):
         dt = datetime.fromisoformat(wert)
     except ValueError:
         return None
-    if dt.tzinfo is None:
+    offset = dt.utcoffset()   # None genau dann, wenn keine Zone angegeben ist
+    if offset is None:
         return dt
-    return (dt - dt.utcoffset()).replace(tzinfo=None)
+    return (dt - offset).replace(tzinfo=None)
 
 
 def _add_offset(b, quelle, box_lokal, von, bis, box, *, beidseitig, herkunft,

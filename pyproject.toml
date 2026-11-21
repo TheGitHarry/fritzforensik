@@ -79,12 +79,30 @@ ignore = [
 "tests/**" = ["S"]
 
 [tool.mypy]
-# Vorerst nur der Formatvertrag: klein, von beiden Werkzeugen genutzt, und dort
-# kostet ein falscher Typ am meisten. Die Werkzeuge folgen paketweise, wenn sie
-# unter --strict sauber sind; ein Lauf über alles meldete zu viele Fehlalarme.
-files = ["fritzformat"]
+# fritzformat streng: klein, von beiden Werkzeugen genutzt, und dort kostet ein
+# falscher Typ am meisten. Die Werkzeuge folgen paketweise, erst im Normalmodus
+# (Override unten), --strict später.
+files = ["fritzformat", "fritzreport"]
 strict = true
 python_version = "3.10"
+
+[[tool.mypy.overrides]]
+# Normalmodus für fritzreport. strict gilt in mypy nur global; die Schalter, die es
+# einschaltet (mypy --help), werden hier einzeln zurückgenommen. Unter --strict
+# meldet fritzreport derzeit gut 130 Stellen, fast alle fehlende Annotationen.
+module = ["fritzreport", "fritzreport.*"]
+disallow_any_generics = false
+disallow_subclassing_any = false
+disallow_untyped_calls = false
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = false
+disallow_untyped_decorators = false
+warn_unused_ignores = false
+warn_return_any = false
+implicit_reexport = true
+strict_equality = false
+extra_checks = false
 
 [tool.coverage.run]
 source = ["fritzformat", "fritzexport", "fritzreport"]
