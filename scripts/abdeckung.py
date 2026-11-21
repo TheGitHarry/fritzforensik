@@ -26,7 +26,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from fritzformat.names import JSON_TYPES, SUPPORT_VARIANTS  # noqa: E402
+from fritzformat.names import JSON_TYPES, SUPPORT_VARIANTS
 
 #: HWRevision → Handelsname. Aus den Supportdaten ist nur die Revision
 #: sicher ablesbar; das Modell steht dort nicht durchgängig als Klartext.

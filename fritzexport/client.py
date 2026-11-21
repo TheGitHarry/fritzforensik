@@ -172,7 +172,7 @@ class FritzClient:
         tls_fingerprint: str | None = None,
         allow_md5: bool = False,
         allow_plain_tr064: bool = False,
-    ) -> "FritzClient":
+    ) -> FritzClient:
         base_url = normalize_host(host)
         session = make_session(verify_tls, tls_fingerprint)
         result = auth.login(base_url, username, password, session, allow_md5=allow_md5)
@@ -392,7 +392,7 @@ class FritzClient:
         auth.logout(self.base_url, self.sid, self.session)
         self.session.close()
 
-    def __enter__(self) -> "FritzClient":
+    def __enter__(self) -> FritzClient:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
@@ -452,7 +452,7 @@ def _parse_soap_response(xml_text: str, action: str) -> dict[str, str]:
     body = root.find(f"{_SOAP_NS}Body")
     if body is None or len(body) == 0:
         raise Tr064Error("SOAP-Antwort ohne Body")
-    response = list(body)[0]  # erstes Kind-Element ist <u:ActionResponse>
+    response = next(iter(body))  # erstes Kind-Element ist <u:ActionResponse>
     return {child.tag.split("}", 1)[-1]: (child.text or "") for child in response}
 
 

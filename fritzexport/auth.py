@@ -5,6 +5,7 @@ MD5-Fallback für ältere Stände.
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import logging
 import xml.etree.ElementTree as ET
@@ -180,11 +181,9 @@ def fetch_users(base_url: str, session: requests.Session) -> list[str]:
 
 def logout(base_url: str, sid: str, session: requests.Session) -> None:
     """Höflich abmelden — Box gibt Session-Slot zurück."""
-    try:
+    with contextlib.suppress(requests.RequestException):
         session.get(
             base_url + LOGIN_POST_PATH,
             params={"logout": "1", "sid": sid},
             timeout=5,
         )
-    except requests.RequestException:
-        pass
