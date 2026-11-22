@@ -9,7 +9,8 @@ from ..client import FritzClient
 CALLS_PATH = "/fon_num/foncalls_list.lua"
 
 
-def extract(client: FritzClient) -> list[dict]:
+def extract(client: FritzClient) -> list[dict[str, str]]:
+    """Je Anruf ein Datensatz; die Schlüssel sind die Spaltennamen der Box."""
     resp = client.get(CALLS_PATH, params={"csv": ""})
     resp.raise_for_status()
     text = resp.text

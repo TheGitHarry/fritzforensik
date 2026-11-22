@@ -10,7 +10,12 @@ import json
 import re
 
 from fritzexport import output
-from fritzexport.extractors import EXTRACTORS
+from fritzexport.extractors import (
+    EXTRACTORS,
+    EXTRACTORS_PLAIN,
+    EXTRACTORS_WITH_AUDIO,
+    EXTRACTORS_WITH_DIR,
+)
 from fritzexport.extractors.supportdata import _VARIANTS
 from fritzformat import (
     CASE_FILENAME,
@@ -52,6 +57,19 @@ def test_extractor_registry_deckt_sich_mit_den_datenarten() -> None:
         f"nur im Export {set(EXTRACTORS) - set(JSON_TYPES)}, "
         f"nur im Format {set(JSON_TYPES) - set(EXTRACTORS)}"
     )
+
+
+def test_aufrufgruppen_ergeben_genau_die_registry() -> None:
+    """cli.py ruft über drei typisierte Gruppen auf, die Reihenfolge steht in
+    EXTRACTORS. Ein Extractor, der nur dort eingetragen ist, liefe nie; einer in
+    zwei Gruppen würde mit der falschen Signatur aufgerufen."""
+    gruppen = [EXTRACTORS_PLAIN, EXTRACTORS_WITH_AUDIO, EXTRACTORS_WITH_DIR]
+    alle = [name for g in gruppen for name in g]
+    assert len(alle) == len(set(alle)), "Ein Extractor steht in mehr als einer Gruppe"
+    assert set(alle) == set(EXTRACTORS)
+    for g in gruppen:
+        for name, fn in g.items():
+            assert EXTRACTORS[name] is fn, f"{name}: andere Funktion als in EXTRACTORS"
 
 
 def test_supportdaten_varianten_decken_sich() -> None:

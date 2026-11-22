@@ -23,6 +23,7 @@ trennt beide in ihrem TR-064-Descriptor (``<HW>226</HW>`` neben ``<Major>154</Ma
 from __future__ import annotations
 
 import logging
+from typing import TypedDict
 
 from ..client import FritzClient, Tr064Disabled, Tr064Error
 
@@ -32,7 +33,25 @@ SERVICE = "urn:dslforum-org:service:DeviceInfo:1"
 CONTROL = "/upnp/control/deviceinfo"
 
 
-def extract(client: FritzClient) -> list[dict]:
+class DeviceInfoRecord(TypedDict):
+    """Selbstauskunft der Box laut TR-064 ``DeviceInfo:1``."""
+    record_type: str
+    model_name: str
+    description: str
+    product_class: str
+    manufacturer: str
+    manufacturer_oui: str
+    serial_number: str
+    software_version: str
+    hardware_version: str
+    spec_version: str
+    provisioning_code: str
+    uptime_s: int | str   # Sekunden, oder "", wenn die Box keine Zahl liefert
+    device_log: str
+    raw: dict[str, str]          # die TR-064-Antwort unverändert
+
+
+def extract(client: FritzClient) -> list[DeviceInfoRecord]:
     try:
         info = client.tr064_call(SERVICE, CONTROL, "GetInfo")
     except Tr064Disabled as e:

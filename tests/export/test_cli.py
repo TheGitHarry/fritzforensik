@@ -180,7 +180,7 @@ def _lauf(monkeypatch, tmp_path, case_args, records=None):
     """Vollständigen main()-Lauf mit gemocktem Client/Extractor fahren."""
     import logging
 
-    from fritzexport.extractors import EXTRACTORS
+    from fritzexport.extractors import EXTRACTORS, EXTRACTORS_PLAIN
 
     monkeypatch.setattr(cli.output, "_utc_now_compact", lambda: "20260713T101530Z")
     monkeypatch.setattr(cli, "_resolve_target",
@@ -196,7 +196,10 @@ def _lauf(monkeypatch, tmp_path, case_args, records=None):
 
     monkeypatch.setattr(cli.FritzClient, "login",
                         classmethod(lambda cls, *a, **kw: _Client()))
-    monkeypatch.setitem(EXTRACTORS, "hosts", lambda c: records or [{"mac": "aa:bb"}])
+    attrappe = lambda c: records or [{"mac": "aa:bb"}]
+    # cli.py ruft über die Gruppe auf; EXTRACTORS mitziehen, damit beide übereinstimmen.
+    monkeypatch.setitem(EXTRACTORS, "hosts", attrappe)
+    monkeypatch.setitem(EXTRACTORS_PLAIN, "hosts", attrappe)
 
     rc = cli.main(["--host", "192.168.2.1", "--user", "admin", "--hosts",
                    "--no-prompt", "--output", str(tmp_path / "export"), *case_args])

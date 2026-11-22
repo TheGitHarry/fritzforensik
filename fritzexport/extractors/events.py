@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import logging
+from typing import TypedDict
+
+from fritzformat import RawJson
 
 from ..client import FritzClient
 
@@ -21,7 +24,21 @@ _FILTERS: dict[str, str] = {
 }
 
 
-def _fetch(client: FritzClient, filter_val: str) -> list[dict]:
+class LogLine(TypedDict):
+    """Eine Zeile des Ereignisprotokolls, wie ein Filter sie liefert."""
+    date: str
+    time: str
+    message: str
+    id: int | str            # Zahl von der Box; "" wenn die Spalte fehlt
+    category: str
+    raw: list[object] | RawJson   # die Zeile unverändert: Liste oder Objekt, je nach Firmware
+
+
+class EventRecord(LogLine):
+    found_in_filters: list[str]
+
+
+def _fetch(client: FritzClient, filter_val: str) -> list[LogLine]:
     try:
         resp = client.post(DATA_PATH, data={"page": "log", "xhr": "1", "filter": filter_val})
         resp.raise_for_status()
@@ -31,7 +48,7 @@ def _fetch(client: FritzClient, filter_val: str) -> list[dict]:
         return []
     data = payload.get("data") or {}
     raw = data.get("log") or []
-    events: list[dict] = []
+    events: list[LogLine] = []
     for row in raw:
         if isinstance(row, list):
             events.append(
@@ -49,16 +66,16 @@ def _fetch(client: FritzClient, filter_val: str) -> list[dict]:
                 {
                     "date":     row.get("date", ""),
                     "time":     row.get("time", ""),
-                    "message":  row.get("msg", row.get("message", "")),
+                    "message":  row["msg"] if "msg" in row else row.get("message", ""),
                     "id":       row.get("id", ""),
-                    "category": row.get("group", row.get("category", "")),
+                    "category": row["group"] if "group" in row else row.get("category", ""),
                     "raw": row,
                 }
             )
     return events
 
 
-def extract(client: FritzClient) -> list[dict]:
+def extract(client: FritzClient) -> list[EventRecord]:
     """Ereignisse aller Filter, ein Datensatz je Logzeile.
 
     Dasselbe Ereignis kann in mehreren Filtern stehen (``all`` und ``sys``) und wird
@@ -68,9 +85,9 @@ def extract(client: FritzClient) -> list[dict]:
     Filter gehört zum n-ten in einem anderen, und es bleiben so viele Datensätze,
     wie der ergiebigste Filter Zeilen hatte.
     """
-    seen: dict[tuple, dict] = {}
+    seen: dict[tuple[str, str, str, int], EventRecord] = {}
     for filter_name, filter_val in _FILTERS.items():
-        vorkommen: dict[tuple, int] = {}
+        vorkommen: dict[tuple[str, str, str], int] = {}
         for event in _fetch(client, filter_val):
             zeile = (event["date"], event["time"], event["message"])
             n = vorkommen.get(zeile, 0)
@@ -79,6 +96,5 @@ def extract(client: FritzClient) -> list[dict]:
             if key in seen:
                 seen[key]["found_in_filters"].append(filter_name)
             else:
-                event["found_in_filters"] = [filter_name]
-                seen[key] = event
+                seen[key] = {**event, "found_in_filters": [filter_name]}
     return list(seen.values())

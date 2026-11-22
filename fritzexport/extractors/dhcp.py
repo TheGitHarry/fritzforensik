@@ -11,6 +11,7 @@ des Pools.
 from __future__ import annotations
 
 import logging
+from typing import TypedDict
 
 from ..client import FritzClient, Tr064Disabled, Tr064Error
 
@@ -20,7 +21,26 @@ DHCP_SERVICE = "urn:dslforum-org:service:LANHostConfigManagement:1"
 DHCP_CONTROL = "/upnp/control/lanhostconfigmgm"
 
 
-def extract(client: FritzClient) -> list[dict]:
+class DhcpRecord(TypedDict):
+    """DHCP-Konfiguration laut TR-064 ``LANHostConfigManagement:1``."""
+    record_type: str
+    dhcp_server_enable: str
+    dhcp_server_configurable: str
+    dhcp_relay: str
+    min_address: str
+    max_address: str
+    reserved_addresses: str
+    subnet_mask: str
+    domain_name: str
+    ip_routers: str
+    dns_servers: str
+    subnet_mask_configurable: str
+    ip_routers_configurable: str
+    dns_servers_configurable: str
+    raw: dict[str, str]          # die TR-064-Antwort unverändert
+
+
+def extract(client: FritzClient) -> list[DhcpRecord]:
     """Ein Konfigurations-Record. Bei deaktiviertem TR-064-Service: leer."""
     try:
         info = client.tr064_call(DHCP_SERVICE, DHCP_CONTROL, "GetInfo")
@@ -30,7 +50,7 @@ def extract(client: FritzClient) -> list[dict]:
     except Tr064Error as e:
         log.warning("TR-064 LANHostConfigManagement.GetInfo fehlgeschlagen: %s", e)
         return []
-    record = {
+    record: DhcpRecord = {
         "record_type": "dhcp_config",
         "dhcp_server_enable": info.get("NewDHCPServerEnable", ""),
         "dhcp_server_configurable": info.get("NewDHCPServerConfigurable", ""),

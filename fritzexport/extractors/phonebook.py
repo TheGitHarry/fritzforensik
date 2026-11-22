@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import re
 import xml.etree.ElementTree as ET
-from typing import Any
+from typing import TypedDict
 
 from ..client import FritzClient
 from ..xmlsafe import parse_xml
@@ -17,7 +17,26 @@ FIRMWARECFG_PATH = "/cgi-bin/firmwarecfg"
 _GBOOKS_RE = re.compile(r"g_books\s*=\s*(\[.*?\])\s*;", re.DOTALL)
 
 
-def _parse_books_payload(text: str) -> list[dict]:
+class Phonebook(TypedDict):
+    id: int
+    name: str
+
+
+class PhoneNumber(TypedDict):
+    type: str
+    number: str
+    vanity: str
+
+
+class Contact(TypedDict):
+    """Ein Kontakt aus dem XML-Export eines Telefonbuchs."""
+    phonebook_id: int
+    phonebook_name: str
+    name: str
+    numbers: list[PhoneNumber]
+
+
+def _parse_books_payload(text: str) -> list[Phonebook]:
     """Akzeptiert sowohl JSON-Antworten (data.phonebooks) als auch HTML mit g_books."""
     try:
         data = json.loads(text)
@@ -34,14 +53,16 @@ def _parse_books_payload(text: str) -> list[dict]:
         except ValueError:
             return []
 
-    books: list[dict] = []
+    books: list[Phonebook] = []
     for entry in books_raw:
         if not isinstance(entry, dict):
             continue
-        roh_id: Any = entry.get("uniqueid", entry.get("id", -1))
+        roh_id = entry.get("uniqueid", entry.get("id", -1))
+        if not isinstance(roh_id, (int, str, float)):   # None, Liste, Objekt
+            continue
         try:
             book_id = int(roh_id)
-        except (TypeError, ValueError):
+        except ValueError:
             continue
         if book_id < 0:
             continue
@@ -49,7 +70,7 @@ def _parse_books_payload(text: str) -> list[dict]:
     return books
 
 
-def _list_phonebooks(client: FritzClient) -> list[dict]:
+def _list_phonebooks(client: FritzClient) -> list[Phonebook]:
     resp = client.post(
         DATA_PATH,
         data={"page": "bookLi", "xhr": "1", "xhrId": "all", "lang": "de"},
@@ -70,16 +91,16 @@ def _export_phonebook(client: FritzClient, book_id: int) -> str:
     return resp.text
 
 
-def _parse_xml(xml_text: str, book_id: int, book_name: str) -> list[dict]:
+def _parse_xml(xml_text: str, book_id: int, book_name: str) -> list[Contact]:
     try:
         root = parse_xml(xml_text)
     except ET.ParseError:
         return []
-    contacts: list[dict] = []
+    contacts: list[Contact] = []
     for contact in root.iter("contact"):
         person = contact.find("person")
         name = (person.findtext("realName") if person is not None else "") or ""
-        numbers = [
+        numbers: list[PhoneNumber] = [
             {
                 "type": n.get("type", ""),
                 "number": (n.text or "").strip(),
@@ -99,9 +120,9 @@ def _parse_xml(xml_text: str, book_id: int, book_name: str) -> list[dict]:
     return contacts
 
 
-def extract(client: FritzClient) -> list[dict]:
+def extract(client: FritzClient) -> list[Contact]:
     books = _list_phonebooks(client)
-    all_entries: list[dict] = []
+    all_entries: list[Contact] = []
     for book in books:
         xml_text = _export_phonebook(client, book["id"])
         all_entries.extend(_parse_xml(xml_text, book["id"], book.get("name", "")))

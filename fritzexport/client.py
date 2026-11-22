@@ -3,7 +3,10 @@ from __future__ import annotations
 
 import re
 import xml.etree.ElementTree as ET
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from types import TracebackType
+from typing import TypedDict
 from urllib.parse import urljoin, urlsplit
 from xml.sax.saxutils import escape
 
@@ -13,6 +16,13 @@ from requests.auth import HTTPDigestAuth
 
 from . import auth
 from .xmlsafe import parse_xml
+
+
+class ServiceEntry(TypedDict):
+    """Ein Dienst aus dem TR-064-Verzeichnis der Box."""
+    service_type: str
+    control_url: str
+    scpd_url: str
 
 
 class Tr064Error(RuntimeError):
@@ -68,7 +78,7 @@ class _BoxSession(requests.Session):
     anderen Host brächte die Abzugsmaschine dazu, beliebige Ziele anzusprechen.
     """
 
-    def get_redirect_target(self, resp):
+    def get_redirect_target(self, resp: requests.Response) -> str | None:
         ziel = super().get_redirect_target(resp)
         if ziel:
             neu = urlsplit(urljoin(resp.url, ziel))
@@ -93,9 +103,10 @@ class _PinnedAdapter(HTTPAdapter):
         self._fingerprint = fingerprint
         super().__init__()
 
-    def init_poolmanager(self, *args, **kwargs):
-        kwargs["assert_fingerprint"] = self._fingerprint
-        super().init_poolmanager(*args, **kwargs)
+    def init_poolmanager(self, connections: int, maxsize: int, block: bool = False,
+                         **pool_kwargs: object) -> None:
+        pool_kwargs["assert_fingerprint"] = self._fingerprint
+        super().init_poolmanager(connections, maxsize, block, **pool_kwargs)
 
 
 def normalize_fingerprint(fp: str) -> str:
@@ -231,17 +242,17 @@ class FritzClient:
             return None
         return port if 0 < port < 65536 else None
 
-    def get(self, path: str, **kwargs) -> requests.Response:
-        params = dict(kwargs.pop("params", {}) or {})
-        params["sid"] = self.sid
+    def get(self, path: str, params: Mapping[str, str] | None = None) -> requests.Response:
+        mit_sid = dict(params or {})
+        mit_sid["sid"] = self.sid
         return self.session.get(self.base_url + check_box_path(path),
-                                params=params, timeout=30, **kwargs)
+                                params=mit_sid, timeout=30)
 
-    def post(self, path: str, data: dict | None = None, **kwargs) -> requests.Response:
+    def post(self, path: str, data: Mapping[str, str] | None = None) -> requests.Response:
         payload = dict(data or {})
         payload["sid"] = self.sid
         return self.session.post(self.base_url + check_box_path(path),
-                                 data=payload, timeout=30, **kwargs)
+                                 data=payload, timeout=30)
 
     def _tr064_host(self) -> str:
         host = urlsplit(self.base_url).hostname or self.base_url
@@ -353,7 +364,7 @@ class FritzClient:
     #: Abgleich „welche Dienste holt ein Extractor ab".
     TR064_URN_PREFIX = "urn:dslforum-org:service:"
 
-    def tr064_services(self) -> list[dict]:
+    def tr064_services(self) -> list[ServiceEntry]:
         """Welche TR-064-Dienste bietet diese Box an?
 
         Liest das Dienstverzeichnis der Box (``/tr64desc.xml`` o. ä.) und gibt
@@ -395,11 +406,12 @@ class FritzClient:
     def __enter__(self) -> FritzClient:
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:
+    def __exit__(self, exc_type: type[BaseException] | None, exc: BaseException | None,
+                 tb: TracebackType | None) -> None:
         self.close()
 
 
-def _parse_service_list(xml_bytes: bytes) -> list[dict]:
+def _parse_service_list(xml_bytes: bytes) -> list[ServiceEntry]:
     """Sammelt alle ``<service>``-Einträge einer Descriptor-XML.
 
     Rekursiv über ``<deviceList>``: Boxen schachteln Geräte (das
@@ -416,10 +428,10 @@ def _parse_service_list(xml_bytes: bytes) -> list[dict]:
         return []
     ns = root.tag.split("}", 1)[0] + "}" if root.tag.startswith("{") else ""
 
-    gefunden: list[dict] = []
+    gefunden: list[ServiceEntry] = []
     gesehen: set[str] = set()
 
-    def sammle(knoten) -> None:
+    def sammle(knoten: ET.Element) -> None:
         for liste in knoten.findall(f"{ns}serviceList"):
             for dienst in liste.findall(f"{ns}service"):
                 typ = (dienst.findtext(f"{ns}serviceType") or "").strip()

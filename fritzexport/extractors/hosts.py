@@ -39,6 +39,7 @@ from __future__ import annotations
 import datetime as _dt
 import logging
 import xml.etree.ElementTree as ET
+from typing import Literal, TypedDict
 
 from ..client import FritzClient, Tr064Disabled, Tr064Error
 from ..xmlsafe import parse_xml
@@ -120,16 +121,38 @@ def _fetch_hostlist_xml(client: FritzClient, hostlist_path: str) -> bytes | None
     return resp.content
 
 
-def _parse_hostlist_xml(xml_bytes: bytes) -> list[dict]:
+#: Ein Host-Datensatz. Die Schlüssel sind die Feldnamen der Box (``MACAddress``,
+#: ``X_AVM-DE_Guest`` …) und kommen nur vor, wo die Box sie liefert; dazu ``source``
+#: und die Zeitfelder aus ``query.lua``. Werte sind Text, nur die ``*_epoch`` Zahlen.
+HostRecord = dict[str, str | int]
+
+
+class LandeviceEntry(TypedDict):
+    """Ein Gerät aus ``query.lua``. Die Box liefert die Werte als Text."""
+    mac: str
+    landevice_uid: str
+    name: str
+    ip: str
+    active: str
+    guest: str
+    interface: str
+    speed: str
+    first_seen: str
+    last_seen: str
+    first_seen_epoch: int
+    last_seen_epoch: int
+
+
+def _parse_hostlist_xml(xml_bytes: bytes) -> list[HostRecord]:
     """XML-Format: <List><Item>... <MACAddress/>...</Item>...</List>."""
     try:
         root = parse_xml(xml_bytes)
     except ET.ParseError as e:
         log.warning("HostList-XML nicht parsebar: %s", e)
         return []
-    records: list[dict] = []
+    records: list[HostRecord] = []
     for item in root.iter("Item"):
-        record: dict = {}
+        record: HostRecord = {}
         for field in _ITEM_FIELDS:
             value = item.findtext(field)
             if value is not None:
@@ -140,7 +163,7 @@ def _parse_hostlist_xml(xml_bytes: bytes) -> list[dict]:
     return records
 
 
-def _iterate_generic_entries(client: FritzClient) -> list[dict]:
+def _iterate_generic_entries(client: FritzClient) -> list[HostRecord]:
     """Alt-Firmware-Fallback: Index-für-Index via GetGenericHostEntry.
 
     Liefert deutlich weniger Felder, aber wenigstens MAC/IP/Name/Active.
@@ -154,7 +177,7 @@ def _iterate_generic_entries(client: FritzClient) -> list[dict]:
         count = int((resp.get(COUNT_RESULT_KEY) or "0").strip())
     except ValueError:
         return []
-    records: list[dict] = []
+    records: list[HostRecord] = []
     for idx in range(count):
         try:
             entry = client.tr064_call(
@@ -195,7 +218,7 @@ def _fetch_hostlist_xml_webui(client: FritzClient) -> bytes | None:
     return resp.content
 
 
-def _iso_utc(value) -> str:
+def _iso_utc(value: object) -> str:
     """Unix-Epoch → ``YYYY-MM-DDTHH:MM:SSZ``; ``0`` und Unbrauchbares → ``""``."""
     try:
         epoch = int(str(value).strip() or 0)
@@ -211,14 +234,14 @@ def _iso_utc(value) -> str:
         return ""
 
 
-def _epoch(value) -> int:
+def _epoch(value: object) -> int:
     try:
         return max(0, int(str(value).strip() or 0))
     except (TypeError, ValueError):
         return 0
 
 
-def _landevice_eintraege(antwort) -> list[dict]:
+def _landevice_eintraege(antwort: object) -> list[LandeviceEntry]:
     """Antwort von ``query.lua`` in flache Einträge je Gerät übersetzen.
 
     Die Antwort ist ein Objekt, dessen Schlüssel der **Parametername** ist. AVM
@@ -232,7 +255,7 @@ def _landevice_eintraege(antwort) -> list[dict]:
         liste = list(liste.values())
     if not isinstance(liste, list):
         return []
-    eintraege: list[dict] = []
+    eintraege: list[LandeviceEntry] = []
     for e in liste:
         if not isinstance(e, dict):
             continue
@@ -257,11 +280,13 @@ def _landevice_eintraege(antwort) -> list[dict]:
 
 
 #: Was aus einem Eintrag in den verbundenen Datensatz übernommen wird.
-_ZEITFELDER = ("landevice_uid", "first_seen", "last_seen",
-               "first_seen_epoch", "last_seen_epoch")
+_ZEITFELDER: tuple[Literal["landevice_uid", "first_seen", "last_seen",
+                           "first_seen_epoch", "last_seen_epoch"], ...] = (
+    "landevice_uid", "first_seen", "last_seen", "first_seen_epoch", "last_seen_epoch")
 
 
-def _merge_landevice(records: list[dict], eintraege: list[dict]) -> list[dict]:
+def _merge_landevice(records: list[HostRecord],
+                     eintraege: list[LandeviceEntry]) -> list[HostRecord]:
     """Zeitangaben je MAC an die Hosts-Datensätze heften.
 
     Vorhandene Felder der Hostliste werden **nie** überschrieben — es kommen nur die
@@ -269,7 +294,7 @@ def _merge_landevice(records: list[dict], eintraege: list[dict]) -> list[dict]:
     Datensatz angehängt und trägt ``source: "query_lua"``; sonst verschwiege die Liste
     ein Gerät, das die Box sehr wohl kennt.
     """
-    nach_mac = {(r.get("MACAddress") or "").upper(): r for r in records if r.get("MACAddress")}
+    nach_mac = {str(r.get("MACAddress") or "").upper(): r for r in records if r.get("MACAddress")}
     for e in eintraege:
         mac = e["mac"].upper()
         treffer = nach_mac.get(mac)
@@ -277,7 +302,7 @@ def _merge_landevice(records: list[dict], eintraege: list[dict]) -> list[dict]:
             for feld in _ZEITFELDER:
                 treffer[feld] = e[feld]
             continue
-        record = {
+        record: HostRecord = {
             "IPAddress": e["ip"],
             "MACAddress": mac,
             "InterfaceType": e["interface"],
@@ -293,7 +318,7 @@ def _merge_landevice(records: list[dict], eintraege: list[dict]) -> list[dict]:
     return records
 
 
-def _fetch_landevice(client: FritzClient) -> list[dict]:
+def _fetch_landevice(client: FritzClient) -> list[LandeviceEntry]:
     """``landevice``-Liste holen — leere Liste, wo die Box sie nicht hergibt.
 
     Gefangen wird nur, was von der Box kommen kann: Netz- und HTTP-Fehler (erben von
@@ -311,7 +336,7 @@ def _fetch_landevice(client: FritzClient) -> list[dict]:
         return []
 
 
-def extract(client: FritzClient) -> list[dict]:
+def extract(client: FritzClient) -> list[HostRecord]:
     """Vollständige Hosts-Liste der Box, inkl. Mesh-Repeater-Clients.
 
     Angereichert um ``first_seen``/``last_seen`` aus ``query.lua``, soweit die Box sie

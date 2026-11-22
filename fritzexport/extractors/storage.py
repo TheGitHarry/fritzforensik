@@ -13,6 +13,7 @@ Records:
 from __future__ import annotations
 
 import logging
+from typing import TypedDict
 
 from ..client import FritzClient, Tr064Disabled, Tr064Error
 
@@ -24,7 +25,32 @@ MAX_USERS = 32
 _OOB_CODES = {402, 713, 714, 820}
 
 
-def _info_record(client: FritzClient) -> dict | None:
+class StorageInfo(TypedDict):
+    """Speicher- und Freigabe-Einstellungen laut TR-064 ``X_AVM-DE_Storage:1``."""
+    record_type: str
+    enable: str
+    status: str
+    smb_enable: str
+    smb_netbios_name: str
+    smb_workgroup_name: str
+    ftp_enable: str
+    ftp_status: str
+    ftp_internet_access_enabled: str
+    webdav_enable: str
+    myfritz_permit_internet_access: str
+    raw: dict[str, str]
+
+
+class StorageUser(TypedDict):
+    record_type: str
+    index: int
+    username: str
+    rights: str
+    enabled: str
+    raw: dict[str, str]
+
+
+def _info_record(client: FritzClient) -> StorageInfo | None:
     try:
         info = client.tr064_call(STORAGE_SERVICE, STORAGE_CONTROL, "GetInfo")
     except Tr064Disabled as e:
@@ -51,8 +77,8 @@ def _info_record(client: FritzClient) -> dict | None:
     }
 
 
-def _user_records(client: FritzClient) -> list[dict]:
-    records: list[dict] = []
+def _user_records(client: FritzClient) -> list[StorageUser]:
+    records: list[StorageUser] = []
     for idx in range(MAX_USERS):
         try:
             user = client.tr064_call(
@@ -81,9 +107,9 @@ def _user_records(client: FritzClient) -> list[dict]:
     return records
 
 
-def extract(client: FritzClient) -> list[dict]:
+def extract(client: FritzClient) -> list[StorageInfo | StorageUser]:
     """Storage-Hauptrecord plus User-Records (falls überhaupt USB aktiv)."""
-    records: list[dict] = []
+    records: list[StorageInfo | StorageUser] = []
     info = _info_record(client)
     if info is None:
         return []

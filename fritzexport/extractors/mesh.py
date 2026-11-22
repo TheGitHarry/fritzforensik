@@ -12,6 +12,9 @@ Session-SID, falls TR-064 deaktiviert.
 from __future__ import annotations
 
 import logging
+from typing import TypedDict
+
+from fritzformat import RawJson
 
 from ..client import FritzClient, Tr064Disabled, Tr064Error
 
@@ -44,20 +47,56 @@ def _split_path_query(url_path: str) -> tuple[str, dict[str, str]]:
     return path, params
 
 
-def _fetch_meshlist_json_tr064(client: FritzClient, mesh_path: str) -> dict | None:
+class MeshNodeRecord(TypedDict):
+    record_type: str          # "node"
+    uid: str
+    device_name: str
+    device_model: str
+    device_manufacturer: str
+    device_firmware_version: str
+    device_mac_address: str
+    is_meshed: bool
+    mesh_role: str
+    meshd_version: str
+    raw: RawJson
+
+
+class MeshLinkRecord(TypedDict):
+    record_type: str          # "link"
+    uid: str
+    type: str
+    state: str
+    node_1_uid: str
+    node_2_uid: str
+    node_interface_1_uid: str
+    node_interface_2_uid: str
+    max_data_rate_rx: int | str   # Zahl von der Box; "" wenn sie fehlt
+    max_data_rate_tx: int | str
+    cur_data_rate_rx: int | str
+    cur_data_rate_tx: int | str
+    owning_node_uid: str
+    owning_interface_uid: str
+    raw: RawJson
+
+
+MeshRecord = MeshNodeRecord | MeshLinkRecord
+
+
+def _fetch_meshlist_json_tr064(client: FritzClient, mesh_path: str) -> object:
     """JSON via TR-064-gelieferten Pfad auf Port 49000 (SID darin gehört dorthin)."""
     path, params = _split_path_query(mesh_path)
     # meshlist.lua gilt nur auf Port 49000, nicht auf Port 80 (→ 404).
     resp = client.session.get(client.tr064_url(path), params=params, timeout=30)
     resp.raise_for_status()
     try:
-        return resp.json()
+        daten: object = resp.json()   # Form ungeprüft; extract prüft auf dict
+        return daten
     except ValueError:
         log.warning("Mesh-List-Antwort ist kein JSON (TR-064-Pfad)")
         return None
 
 
-def _fetch_meshlist_json_webui(client: FritzClient) -> dict | None:
+def _fetch_meshlist_json_webui(client: FritzClient) -> object:
     """Fallback: meshlist.lua auf Port 49000 mit WebUI-SID.
 
     Funktioniert auch ohne TR-064-Berechtigung des Users, da meshlist.lua
@@ -68,13 +107,14 @@ def _fetch_meshlist_json_webui(client: FritzClient) -> dict | None:
     )
     resp.raise_for_status()
     try:
-        return resp.json()
+        daten: object = resp.json()
+        return daten
     except ValueError:
         log.warning("Mesh-List-Antwort ist kein JSON (Web-UI-Fallback)")
         return None
 
 
-def _node_record(node: dict) -> dict:
+def _node_record(node: RawJson) -> MeshNodeRecord:
     return {
         "record_type": "node",
         "uid": node.get("uid", ""),
@@ -90,7 +130,7 @@ def _node_record(node: dict) -> dict:
     }
 
 
-def _link_record(link: dict, node_uid: str, interface_uid: str) -> dict:
+def _link_record(link: RawJson, node_uid: str, interface_uid: str) -> MeshLinkRecord:
     return {
         "record_type": "link",
         "uid": link.get("uid", ""),
@@ -110,9 +150,9 @@ def _link_record(link: dict, node_uid: str, interface_uid: str) -> dict:
     }
 
 
-def _flatten(payload: dict) -> list[dict]:
+def _flatten(payload: RawJson) -> list[MeshRecord]:
     nodes = payload.get("nodes") or []
-    records: list[dict] = []
+    records: list[MeshRecord] = []
     seen_links: set[str] = set()
     for node in nodes:
         if not isinstance(node, dict):
@@ -135,9 +175,9 @@ def _flatten(payload: dict) -> list[dict]:
     return records
 
 
-def extract(client: FritzClient) -> list[dict]:
+def extract(client: FritzClient) -> list[MeshRecord]:
     """Mesh-Topologie: Nodes + Links als flache Records mit record_type-Marker."""
-    payload: dict | None = None
+    payload: object = None
     mesh_path = _get_meshlist_path_via_tr064(client)
     if mesh_path:
         try:

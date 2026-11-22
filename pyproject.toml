@@ -84,28 +84,12 @@ ignore = [
 "tests/**" = ["S"]
 
 [tool.mypy]
-# Streng für fritzformat und fritzreport. fritzexport läuft noch im Normalmodus
-# (Override unten), bis es unter --strict sauber ist.
+# Alle drei Pakete streng. Any steht nur in fritzformat.RawJson: rohes JSON aus
+# Bundle-Dateien und Box-Antworten, ungeprüfte Fremdeingabe. Wer Felder daraus
+# liest, legt ihren Typ fest; die Datensätze sind als TypedDict typisiert.
 files = ["fritzformat", "fritzreport", "fritzexport"]
 strict = true
 python_version = "3.10"
-
-[[tool.mypy.overrides]]
-# Normalmodus für fritzexport. strict gilt in mypy nur global; die Schalter, die es
-# einschaltet (mypy --help), werden hier einzeln zurückgenommen.
-module = ["fritzexport", "fritzexport.*"]
-disallow_any_generics = false
-disallow_subclassing_any = false
-disallow_untyped_calls = false
-disallow_untyped_defs = false
-disallow_incomplete_defs = false
-check_untyped_defs = false
-disallow_untyped_decorators = false
-warn_unused_ignores = false
-warn_return_any = false
-implicit_reexport = true
-strict_equality = false
-extra_checks = false
 
 [tool.coverage.run]
 source = ["fritzformat", "fritzexport", "fritzreport"]

@@ -18,6 +18,7 @@ eine Kandidatenliste für künftige Extractoren.
 from __future__ import annotations
 
 import logging
+from typing import TypedDict
 
 from ..client import FritzClient
 
@@ -56,7 +57,13 @@ def genutzte_services() -> set[str]:
     return gefunden
 
 
-def extract(client: FritzClient) -> list[dict]:
+class ServiceRecord(TypedDict):
+    service_type: str
+    control_url: str
+    genutzt: bool
+
+
+def extract(client: FritzClient) -> list[ServiceRecord]:
     # hasattr statt direktem Aufruf: Der Abzug darf nicht daran scheitern, dass
     # ein Client die Methode nicht kennt — etwa ein älterer oder ein Ersatz in
     # einem Testaufbau. Eine fehlende Dienstliste ist kein Grund, den ganzen
@@ -70,7 +77,7 @@ def extract(client: FritzClient) -> list[dict]:
         return []
 
     genutzt = genutzte_services()
-    records = [
+    records: list[ServiceRecord] = [
         {
             "service_type": d["service_type"],
             "control_url": d["control_url"],

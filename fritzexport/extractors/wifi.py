@@ -31,6 +31,9 @@ im Klartext heraus, und ein Report ist ein Dokument, das weitergereicht wird.
 from __future__ import annotations
 
 import logging
+from typing import Literal, TypedDict
+
+from fritzformat import RawJson
 
 from ..client import FritzClient, Tr064Disabled, Tr064Error
 
@@ -46,7 +49,35 @@ WLAN_CONTROL = "/upnp/control/wlanconfig{}"
 WLAN_INSTANCES = (1, 2, 3)
 
 
-def _normalize(entry: dict, status: str) -> dict:
+class _WifiZusatz(TypedDict, total=False):
+    """Felder, die nur einer der beiden Wege kennt."""
+    is_guest: bool                 # nur Web-UI
+    raw: RawJson                   # Web-UI-Eintrag unverändert
+    auth_state: str                # nur TR-064 …
+    signal_strength: str
+    channel_width: str
+    wlan_instance: int
+    wlan_ssid: str
+    wlan_standard: str
+    raw_tr064: dict[str, str]      # TR-064-Antwort unverändert
+
+
+class WifiClient(_WifiZusatz):
+    """Ein Client aus der Web-UI-Geräteliste, aus TR-064 oder aus beiden."""
+    source: str                    # "webui" | "tr064" | "webui+tr064"
+    status: str
+    name: str
+    mac: str
+    ipv4: str
+    ipv6: str
+    interface: str
+    port: str
+    speed: str
+    uid: str
+    last_seen: str
+
+
+def _normalize(entry: RawJson, status: str) -> WifiClient:
     ipv4 = v if isinstance(v := entry.get("ipv4"), dict) else {}
     ipv6 = v if isinstance(v := entry.get("ipv6"), dict) else {}
     options = v if isinstance(v := entry.get("options"), dict) else {}
@@ -67,9 +98,9 @@ def _normalize(entry: dict, status: str) -> dict:
     }
 
 
-def _tr064_clients(client: FritzClient) -> list[dict]:
+def _tr064_clients(client: FritzClient) -> list[WifiClient]:
     """Assoziierte WLAN-Clients je Funkinstanz — leer, wo TR-064 nicht mitspielt."""
-    gefunden: list[dict] = []
+    gefunden: list[WifiClient] = []
     for i in WLAN_INSTANCES:
         service, control = WLAN_SERVICE.format(i), WLAN_CONTROL.format(i)
         try:
@@ -117,11 +148,14 @@ def _tr064_clients(client: FritzClient) -> list[dict]:
 
 #: Was der TR-064-Weg zusätzlich weiß. Nur diese Felder werden in einen vorhandenen
 #: Web-UI-Datensatz übernommen — und auch das nur, wo er selbst nichts führt.
-_TR064_ZUSATZ = ("speed", "ipv4", "auth_state", "signal_strength", "channel_width",
-                 "wlan_instance", "wlan_ssid", "wlan_standard", "raw_tr064")
+_ZusatzFeld = Literal["speed", "ipv4", "auth_state", "signal_strength", "channel_width",
+                      "wlan_instance", "wlan_ssid", "wlan_standard", "raw_tr064"]
+_TR064_ZUSATZ: tuple[_ZusatzFeld, ...] = (
+    "speed", "ipv4", "auth_state", "signal_strength", "channel_width",
+    "wlan_instance", "wlan_ssid", "wlan_standard", "raw_tr064")
 
 
-def extract(client: FritzClient) -> list[dict]:
+def extract(client: FritzClient) -> list[WifiClient]:
     resp = client.post(
         DATA_PATH,
         data={"page": "netDev", "xhr": "1", "xhrId": "all", "lang": "de"},
@@ -132,7 +166,7 @@ def extract(client: FritzClient) -> list[dict]:
     except ValueError:
         payload = {}
     data = (payload.get("data") or {})
-    devices: list[dict] = []
+    devices: list[WifiClient] = []
     for entry in data.get("active") or []:
         if isinstance(entry, dict):
             devices.append(_normalize(entry, status="active"))

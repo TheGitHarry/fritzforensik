@@ -19,6 +19,7 @@ Zwei Eigenheiten der Box, die beim Ändern zu beachten sind:
 from __future__ import annotations
 
 import logging
+from typing import TypedDict
 
 from fritzformat import uhr_anfrage_line, uhr_antwort_line, uhr_jetzt_iso
 
@@ -33,7 +34,21 @@ CONTROL = "/upnp/control/time"
 QUELLE = "tr064:time"
 
 
-def extract(client: FritzClient) -> list[dict]:
+class BoxClock(TypedDict):
+    """Uhrzeit und Zeitzone der Box laut TR-064 ``Time:1``."""
+    record_type: str
+    box_current_local_time: str
+    box_local_timezone: str
+    box_local_timezone_name: str
+    box_daylight_savings_used: str
+    box_daylight_savings_start: str
+    box_daylight_savings_end: str
+    box_ntp_server1: str
+    box_ntp_server2: str
+    raw: dict[str, str]          # die TR-064-Antwort unverändert
+
+
+def extract(client: FritzClient) -> list[BoxClock]:
     log.info(uhr_anfrage_line(QUELLE, uhr_jetzt_iso()))
     try:
         info = client.tr064_call(SERVICE, CONTROL, "GetInfo")
