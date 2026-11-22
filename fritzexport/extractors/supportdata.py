@@ -86,7 +86,11 @@ def _wait_for_enter_unix(timeout_seconds: int) -> bool:
 
 
 def _wait_for_enter_windows(timeout_seconds: int) -> bool:
-    import msvcrt  # nur auf Windows verfügbar
+    if not sys.platform.startswith("win"):
+        # Wird nur unter Windows aufgerufen. Die Prüfung lässt mypy den Rest auf
+        # anderen Plattformen überspringen, wo msvcrt nicht existiert.
+        return False
+    import msvcrt
 
     end = time.monotonic() + timeout_seconds
     last_shown = -1
