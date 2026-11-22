@@ -223,9 +223,12 @@ Sprachnachricht mit dieser Herkunft in der Chain-of-Custody-Tabelle.
 
 ### Ereignislog (`--events`)
 
-Ruft alle Filterkategorien ab (`all`, `sys`, `net`, `wlan`, `fon`, `usb`) und dedupliziert
-nach `(date, time, message)`. Jeder Eintrag trägt ein `found_in_filters`-Array — Einträge,
-die eine Firmware nur in einer Kategorie liefert, gehen nicht verloren.
+Ruft alle Filterkategorien ab (`all`, `sys`, `net`, `wlan`, `fon`, `usb`) und führt
+dasselbe Ereignis aus mehreren Filtern zu einem Eintrag zusammen. Jeder Eintrag trägt ein
+`found_in_filters`-Array — Einträge, die eine Firmware nur in einer Kategorie liefert, gehen
+nicht verloren. Ein Eintrag entspricht einer Logzeile: Gleiche Zeilen (`date`, `time`,
+`message`) innerhalb eines Filters bleiben getrennte Einträge, zum Beispiel zwei
+Anmeldeversuche in derselben Sekunde.
 
 ### Erweiterte Supportdaten (`--supportdata`)
 
