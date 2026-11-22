@@ -571,7 +571,7 @@ def _parse_uptime(sf, extracted_at: str) -> dict:
             # Volle Spanne, nicht nur die Tage: Liegen die Stunden der Laufzeit über
             # der Tageszeit des Abzugs, verschöbe das Weglassen den Start um einen Tag.
             boot = (base - spanne).strftime("%Y-%m-%d")
-        except Exception:
+        except (ValueError, AttributeError, OverflowError):
             boot = ""
     return {
         "file": sf.name, "uptime_text": text, "up_line": up_ln,

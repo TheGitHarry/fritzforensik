@@ -83,7 +83,7 @@ def parse_ssdp_response(raw: bytes) -> dict | None:
     """
     try:
         text = raw.decode("ascii", errors="replace")
-    except Exception:
+    except Exception:  # noqa: BLE001 - wirft für bytes nie (errors="replace")
         return None
     lines = text.split("\r\n")
     if not lines or not lines[0].upper().startswith("HTTP/"):
@@ -258,7 +258,7 @@ def discover(
                 box.friendly_name = info.get("friendly_name", "")
                 box.model_name = info.get("model_name", "")
                 box.model_description = info.get("model_description", "")
-            except Exception:  # noqa: S110 - Box ohne XML-Metadaten übernehmen, s. _fetch_device_xml
+            except Exception:  # noqa: BLE001, S110 - Box ohne XML-Metadaten übernehmen
                 pass
         if not _is_fritzbox(box):
             continue

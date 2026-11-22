@@ -26,7 +26,7 @@ def _fetch(client: FritzClient, filter_val: str) -> list[dict]:
         resp = client.post(DATA_PATH, data={"page": "log", "xhr": "1", "filter": filter_val})
         resp.raise_for_status()
         payload = resp.json()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - ein Filter fällt aus, die übrigen laufen weiter
         log.debug("events filter=%s fehlgeschlagen: %s", filter_val, e)
         return []
     data = payload.get("data") or {}

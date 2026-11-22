@@ -260,7 +260,7 @@ def _try_webui(client: FritzClient, audio_dir: Path) -> tuple[list[dict], dict]:
                     row["audio_file"] = f"tam_audio/{fname}"
                     row["audio_sha256"] = hashlib.sha256(audio).hexdigest()
                     row["audio_bytes"] = len(audio)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 - Fehler steht im Datensatz
                     row["audio_error"] = str(e)
         records.extend(rows)
 
