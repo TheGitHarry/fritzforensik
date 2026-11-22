@@ -186,6 +186,9 @@ def _server_fingerprint(target_url: str) -> str:
     zum Fingerabdruck passt, den der Anwender kennt.
     """
     teile = urlsplit(target_url)
+    if not teile.hostname:
+        # get_server_certificate((None, 443)) fragte den eigenen Rechner (localhost).
+        raise ValueError(f"Kein Hostname in {target_url!r}")
     pem = ssl.get_server_certificate((teile.hostname, teile.port or 443), timeout=10)
     return hashlib.sha256(ssl.PEM_cert_to_DER_cert(pem)).hexdigest()
 
