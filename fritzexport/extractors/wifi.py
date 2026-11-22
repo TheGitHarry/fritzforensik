@@ -47,9 +47,9 @@ WLAN_INSTANCES = (1, 2, 3)
 
 
 def _normalize(entry: dict, status: str) -> dict:
-    ipv4 = entry.get("ipv4") if isinstance(entry.get("ipv4"), dict) else {}
-    ipv6 = entry.get("ipv6") if isinstance(entry.get("ipv6"), dict) else {}
-    options = entry.get("options") if isinstance(entry.get("options"), dict) else {}
+    ipv4 = v if isinstance(v := entry.get("ipv4"), dict) else {}
+    ipv6 = v if isinstance(v := entry.get("ipv6"), dict) else {}
+    options = v if isinstance(v := entry.get("options"), dict) else {}
     return {
         "source": "webui",
         "status": status,

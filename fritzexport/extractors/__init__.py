@@ -1,3 +1,6 @@
+from collections.abc import Callable
+from typing import Any
+
 from .boxtime import extract as extract_boxtime
 from .calls import extract as extract_calls
 from .deviceinfo import extract as extract_deviceinfo
@@ -15,7 +18,9 @@ from .tr069 import extract as extract_tr069
 from .wan import extract as extract_wan
 from .wifi import extract as extract_wifi
 
-EXTRACTORS = {
+# Die Extractoren haben verschiedene Signaturen (manche bekommen ein Verzeichnis);
+# cli.py wählt den Aufruf über EXTRACTORS_WITH_AUDIO/_WITH_DIR.
+EXTRACTORS: dict[str, Callable[..., Any]] = {
     "calls": extract_calls,
     "phonebook": extract_phonebook,
     "wifi": extract_wifi,

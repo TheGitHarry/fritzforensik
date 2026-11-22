@@ -81,10 +81,7 @@ def parse_ssdp_response(raw: bytes) -> dict | None:
     Gibt Header-Dict zurück, falls SERVER-Header AVM-Substring enthält;
     sonst None (bei Fremdgeräten oder Parse-Fehler).
     """
-    try:
-        text = raw.decode("ascii", errors="replace")
-    except Exception:  # noqa: BLE001 - wirft für bytes nie (errors="replace")
-        return None
+    text = raw.decode("ascii", errors="replace")
     lines = text.split("\r\n")
     if not lines or not lines[0].upper().startswith("HTTP/"):
         return None
@@ -154,7 +151,7 @@ def _local_ipv4_interfaces() -> list[str]:
     ips: set[str] = set()
     try:
         for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
-            ips.add(info[4][0])
+            ips.add(str(info[4][0]))   # AF_INET: immer (Adresse, Port)
     except OSError:
         pass
     return sorted(ip for ip in ips if not ip.startswith("127."))

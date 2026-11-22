@@ -162,7 +162,7 @@ Verbindungsnachweise: methode.md-Parser → D1+D2, 802.11-Log-Parser → D1+D3.
 python3 -m pytest             # volle Suite, offline
 python3 -m pytest -m golden   # NUR die Golden-Tests gegen ~/testdata/_work
 ruff check .                  # Lint; Regeln und Version stehen in pyproject.toml
-mypy                          # fritzformat --strict, fritzreport normal ([tool.mypy])
+mypy                          # fritzformat --strict, die Werkzeuge normal ([tool.mypy])
 coverage run -m pytest && coverage report   # Untergrenze fail_under in pyproject.toml
 ```
 

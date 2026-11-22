@@ -87,6 +87,18 @@ def test_fingerabdruck_normalisierung():
         normalize_fingerprint("abcd")
 
 
+@pytest.mark.parametrize("url", ["https:///login", "https://:443"])
+def test_fingerabdruck_ohne_hostname_wird_abgewiesen(url, monkeypatch):
+    """Ohne Hostname fragte get_server_certificate den eigenen Rechner (localhost)."""
+    from fritzexport import cli
+
+    def kein_netz(*a, **k):
+        raise AssertionError("darf nicht verbinden")
+    monkeypatch.setattr(ssl, "get_server_certificate", kein_netz)
+    with pytest.raises(ValueError, match="Kein Hostname"):
+        cli._server_fingerprint(url)
+
+
 @pytest.fixture
 def tls_server(tmp_path):
     """HTTPS-Server mit frisch erzeugtem selbstsigniertem Zertifikat."""
