@@ -85,6 +85,32 @@ def test_schluessel_ist_datum_zeit_text_nicht_kategorie():
     assert records[0]["raw"] == ZEILE
 
 
+def test_identische_zeilen_einer_antwort_bleiben_getrennt():
+    """Zwei gleiche Zeilen in derselben Sekunde sind zwei Ereignisse (#62),
+    etwa zwei fehlgeschlagene Anmeldungen. Zusammengelegt ginge die Anzahl verloren."""
+    records = events_mod.extract(_client({"0": {"data": {"log": [ZEILE, ZEILE]}}}))
+    assert len(records) == 2
+    assert [r["found_in_filters"] for r in records] == [["all"], ["all"]]
+
+
+def test_vorkommen_werden_ueber_filter_paarweise_zusammengefuehrt():
+    """Das n-te Vorkommen in einem Filter ist dasselbe Ereignis wie das n-te in
+    einem anderen. Es zählt das Maximum über die Filter, nicht die Summe."""
+    records = events_mod.extract(_client({
+        "0": {"data": {"log": [ZEILE, ZEILE]}},
+        "sys": {"data": {"log": [ZEILE]}},
+    }))
+    assert [r["found_in_filters"] for r in records] == [["all", "sys"], ["all"]]
+
+
+def test_mehr_vorkommen_im_kategorie_filter_als_in_all():
+    records = events_mod.extract(_client({
+        "0": {"data": {"log": [ZEILE]}},
+        "sys": {"data": {"log": [ZEILE, ZEILE, ZEILE]}},
+    }))
+    assert [r["found_in_filters"] for r in records] == [["all", "sys"], ["sys"], ["sys"]]
+
+
 def test_ereignis_nur_in_kategorie_wird_aufgenommen():
     """Manche Firmware liefert Einträge nur im Kategorie-Filter, nicht in "all"."""
     nur_wlan = ["01.01.26", "11:00:00", "WLAN-Gerät angemeldet", "", "wlan"]

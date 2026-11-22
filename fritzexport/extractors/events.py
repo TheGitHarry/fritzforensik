@@ -59,10 +59,23 @@ def _fetch(client: FritzClient, filter_val: str) -> list[dict]:
 
 
 def extract(client: FritzClient) -> list[dict]:
+    """Ereignisse aller Filter, ein Datensatz je Logzeile.
+
+    Dasselbe Ereignis kann in mehreren Filtern stehen (``all`` und ``sys``) und wird
+    dann zusammengeführt. Gleiche Zeilen *innerhalb* einer Antwort sind dagegen
+    verschiedene Ereignisse, etwa zwei Anmeldeversuche in derselben Sekunde (#62).
+    Deshalb zählt der Schlüssel das Vorkommen mit: das n-te Vorkommen in einem
+    Filter gehört zum n-ten in einem anderen, und es bleiben so viele Datensätze,
+    wie der ergiebigste Filter Zeilen hatte.
+    """
     seen: dict[tuple, dict] = {}
     for filter_name, filter_val in _FILTERS.items():
+        vorkommen: dict[tuple, int] = {}
         for event in _fetch(client, filter_val):
-            key = (event["date"], event["time"], event["message"])
+            zeile = (event["date"], event["time"], event["message"])
+            n = vorkommen.get(zeile, 0)
+            vorkommen[zeile] = n + 1
+            key = (*zeile, n)
             if key in seen:
                 seen[key]["found_in_filters"].append(filter_name)
             else:
