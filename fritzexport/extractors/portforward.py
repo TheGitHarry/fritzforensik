@@ -11,6 +11,7 @@ liefert UPnPError 713 wenn Index OOB — als Bound-Marker behandelt.
 from __future__ import annotations
 
 import logging
+from typing import TypedDict
 
 from ..client import FritzClient, Tr064Disabled, Tr064Error
 
@@ -24,7 +25,20 @@ ENTRY_ACTION = "GetGenericPortMappingEntry"
 _OOB_CODES = {713, 402, 714}
 
 
-def extract(client: FritzClient) -> list[dict]:
+class PortMapping(TypedDict):
+    """Eine Portfreigabe laut TR-064 ``WANIPConnection:1``."""
+    index: int
+    remote_host: str
+    external_port: str
+    protocol: str
+    internal_port: str
+    internal_client: str
+    enabled: str
+    description: str
+    lease_duration: str
+
+
+def extract(client: FritzClient) -> list[PortMapping]:
     """Liefert pro Port-Mapping einen Record."""
     try:
         count_resp = client.tr064_call(
@@ -40,7 +54,7 @@ def extract(client: FritzClient) -> list[dict]:
         count = int((count_resp.get(COUNT_RESULT_KEY) or "0").strip())
     except ValueError:
         return []
-    records: list[dict] = []
+    records: list[PortMapping] = []
     # Defensiver Index-Schutz: einige Boxen geben Count und brechen vor
     # dem letzten Index ab. Wir laufen bis Count, fangen 713 als End-Marker.
     for idx in range(count):

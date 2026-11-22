@@ -17,7 +17,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import TypedDict
 
-from .bundle import Bundle, Dataset, RawJson
+from fritzformat import RawJson
+
+from .bundle import Bundle, Dataset
 from .records import FilterFields, Origin
 
 # Neues 3-Grade-System (kombinierbar).

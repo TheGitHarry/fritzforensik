@@ -17,6 +17,7 @@ import logging
 import sys
 import time
 from pathlib import Path
+from typing import TypedDict
 
 from fritzformat import (
     compact_from_iso,
@@ -202,14 +203,30 @@ def _fetch_enhanced(client: FritzClient) -> tuple[bytes, str] | None:
     return abruf
 
 
+class _SupportInhalt(TypedDict, total=False):
+    content: str              # nur ohne output_dir: Text statt Datei
+
+
+class SupportRecord(_SupportInhalt):
+    type: str
+    filename: str
+    size_bytes: int
+    sha256: str
+
+
+class SupportMeta(TypedDict):
+    supportdata_fetched: list[str]
+    supportdata_missing: list[str]
+
+
 def extract(
     client: FritzClient, output_dir: Path | None = None
-) -> tuple[list[dict], dict]:
+) -> tuple[list[SupportRecord], SupportMeta]:
     """Lädt alle verfügbaren Supportdaten-Varianten und legt sie als Rohdateien ab.
 
     Gibt immer ein (records, extra_meta)-Tupel zurück.
     """
-    records: list[dict] = []
+    records: list[SupportRecord] = []
     fetched: list[str] = []
     missing: list[str] = []
 
@@ -240,7 +257,7 @@ def extract(
                 "Supportdaten '%s' gespeichert: %s (%d Bytes)",
                 short_name, raw_path, len(content),
             )
-            record: dict = {
+            record: SupportRecord = {
                 "type": short_name,
                 "filename": filename,
                 "size_bytes": len(content),
@@ -268,7 +285,7 @@ def extract(
             "User braucht das Recht 'FRITZ!Box-Einstellungen'."
         )
 
-    extra_meta = {
+    extra_meta: SupportMeta = {
         "supportdata_fetched": fetched,
         "supportdata_missing": missing,
     }

@@ -30,6 +30,7 @@ from .digest import (
 )
 from .envelope import (
     ENVELOPE_KEYS,
+    RawJson,
     build_envelope,
     compact_from_iso,
     read_envelope_meta,
@@ -70,7 +71,7 @@ __all__ = [
     "collect_case", "read_case", "write_case",
     "SIDECAR_SUFFIX", "sha256_bytes", "sha256_file", "read_sidecar", "verify",
     "write_sidecar",
-    "ENVELOPE_KEYS", "build_envelope", "read_envelope_meta", "utc_now_iso",
+    "ENVELOPE_KEYS", "RawJson", "build_envelope", "read_envelope_meta", "utc_now_iso",
     "utc_now_compact", "compact_from_iso",
     "TOOL_NAME", "JSON_TYPES", "SUPPORT_VARIANTS", "BUNDLE_GLOB", "RUN_FALLBACK",
     "dataset_filename", "dataset_glob", "support_filename", "support_glob",

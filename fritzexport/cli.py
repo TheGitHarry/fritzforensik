@@ -10,6 +10,7 @@ import os
 import re
 import ssl
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -30,7 +31,13 @@ from fritzformat import (
 from . import __version__, discover, output
 from .auth import AuthError, fetch_users
 from .client import FritzClient, make_session, normalize_fingerprint, normalize_host
-from .extractors import EXTRACTORS, EXTRACTORS_WITH_AUDIO, EXTRACTORS_WITH_DIR
+from .extractors import (
+    EXTRACTORS,
+    EXTRACTORS_PLAIN,
+    EXTRACTORS_WITH_AUDIO,
+    EXTRACTORS_WITH_DIR,
+    Records,
+)
 from .extractors.services import genutzte_services
 
 EXIT_OK = 0
@@ -341,7 +348,8 @@ def _resolve_user(base_url: str, args: argparse.Namespace) -> str | None:
     Gibt None zurück, wenn nichts aufgelöst werden konnte (Meldung erfolgt hier).
     """
     if args.user:
-        return args.user
+        user: str = args.user
+        return user
 
     try:
         users = _list_users(base_url, verify_tls=not args.insecure,
@@ -461,7 +469,7 @@ def _close_log_file() -> None:
                 sys.stderr.write(f"WARN: Sidecar für {path.name} nicht schreibbar: {e}\n")
 
 
-def _finalize_output_dir(output_dir: Path, case: dict, run_stamp: str) -> Path:
+def _finalize_output_dir(output_dir: Path, case: dict[str, str], run_stamp: str) -> Path:
     """Abzugsverzeichnis auf den sprechenden Namen bringen; gibt den Pfad zurück.
 
     Läuft als **letzter** Schritt, wenn nichts mehr in die Logdatei geschrieben
@@ -492,13 +500,15 @@ def _finalize_output_dir(output_dir: Path, case: dict, run_stamp: str) -> Path:
     return ziel
 
 
-def _resolve_target(args: argparse.Namespace) -> tuple[str | None, dict | None, int]:
+def _resolve_target(
+        args: argparse.Namespace) -> tuple[str | None, discover.DiscoveryMeta | None, int]:
     """Liefert (target_url, discovery_meta, exit_code).
 
     exit_code != 0 bedeutet: nicht weitermachen, exit_code zurückgeben.
     """
     if args.host:
-        return args.host, {"discovery_method": "manual", "target": args.host}, EXIT_OK
+        meta_manuell: discover.DiscoveryMeta = {"discovery_method": "manual", "target": args.host}
+        return args.host, meta_manuell, EXIT_OK
 
     log.info("Suche FRITZ!Box im LAN per SSDP …")
     try:
@@ -525,7 +535,7 @@ def _resolve_target(args: argparse.Namespace) -> tuple[str | None, dict | None, 
         target = chosen.url_https()
         label = chosen.friendly_name or chosen.model_name or "FRITZ!Box"
         log.info("Ausgewählt: %s at %s", label, chosen.ip)
-        meta = {
+        meta: discover.DiscoveryMeta = {
             "discovery_method": "ssdp",
             "target": target,
             "discovered": chosen.to_dict(),
@@ -686,14 +696,16 @@ def main(argv: list[str] | None = None) -> int:
     try:
         for name in _selected_extractors(args):
             log.info("Starte Extractor: %s", name)
+            records: Records
+            extra_meta: Mapping[str, object] | None
             try:
                 if name in EXTRACTORS_WITH_AUDIO:
                     audio_dir = output_dir / f"{name}_audio"
-                    records, extra_meta = EXTRACTORS[name](client, audio_dir)
+                    records, extra_meta = EXTRACTORS_WITH_AUDIO[name](client, audio_dir)
                 elif name in EXTRACTORS_WITH_DIR:
-                    records, extra_meta = EXTRACTORS[name](client, output_dir)
+                    records, extra_meta = EXTRACTORS_WITH_DIR[name](client, output_dir)
                 else:
-                    records = EXTRACTORS[name](client)
+                    records = EXTRACTORS_PLAIN[name](client)
                     extra_meta = None
             except Exception as e:  # noqa: BLE001 - ein Extractor bricht den Abzug nicht ab
                 log.error("Extractor '%s' fehlgeschlagen: %s", name, e)

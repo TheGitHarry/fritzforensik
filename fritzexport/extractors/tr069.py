@@ -7,6 +7,7 @@ Passwörter liefert die Box üblicherweise maskiert oder leer.
 from __future__ import annotations
 
 import logging
+from typing import TypedDict
 
 from ..client import FritzClient, Tr064Disabled, Tr064Error
 
@@ -27,7 +28,21 @@ def _safe_call(client: FritzClient, action: str) -> dict[str, str] | None:
         return None
 
 
-def extract(client: FritzClient) -> list[dict]:
+class Tr069Record(TypedDict):
+    """Fernwartungs-Konfiguration laut TR-064 ``ManagementServer:1``."""
+    acs_url: str
+    username: str
+    password: str
+    periodic_inform_enable: str
+    periodic_inform_interval_sec: str
+    connection_request_url: str
+    connection_request_username: str
+    connection_request_password: str
+    upgrades_managed: str
+    raw: dict[str, str]          # die TR-064-Antwort unverändert
+
+
+def extract(client: FritzClient) -> list[Tr069Record]:
     info = _safe_call(client, "GetInfo")
     if info is None:
         return []

@@ -1,6 +1,7 @@
-from collections.abc import Callable
-from typing import Any
+from collections.abc import Callable, Mapping, Sequence
+from pathlib import Path
 
+from ..client import FritzClient
 from .boxtime import extract as extract_boxtime
 from .calls import extract as extract_calls
 from .deviceinfo import extract as extract_deviceinfo
@@ -18,9 +19,19 @@ from .tr069 import extract as extract_tr069
 from .wan import extract as extract_wan
 from .wifi import extract as extract_wifi
 
-# Die Extractoren haben verschiedene Signaturen (manche bekommen ein Verzeichnis);
-# cli.py wählt den Aufruf über EXTRACTORS_WITH_AUDIO/_WITH_DIR.
-EXTRACTORS: dict[str, Callable[..., Any]] = {
+#: Was ein Extractor zurückgibt: je Datenart eine Liste von Datensätzen. Jedes
+#: Modul typisiert seine Datensätze selbst; hier zählt nur, dass sie als JSON-Objekt
+#: in die Hülle passen.
+Records = Sequence[Mapping[str, object]]
+
+#: Extractor, der nur den Client braucht.
+Extract = Callable[[FritzClient], Records]
+#: Extractor, der zusätzlich ein Verzeichnis bekommt und Metadaten für den Kopf liefert.
+ExtractWithDir = Callable[[FritzClient, Path], tuple[Records, Mapping[str, object]]]
+
+# Alle Extractoren in Abrufreihenfolge. Die Reihenfolge bestimmt auch die der
+# CLI-Schalter; cli.py ruft über die beiden typisierten Gruppen darunter auf.
+EXTRACTORS: dict[str, Extract | ExtractWithDir] = {
     "calls": extract_calls,
     "phonebook": extract_phonebook,
     "wifi": extract_wifi,
@@ -41,8 +52,19 @@ EXTRACTORS: dict[str, Callable[..., Any]] = {
 
 # Extractoren, die einen audio_dir-Parameter akzeptieren und ein
 # (records, extra_meta)-Tupel statt nur records zurückgeben.
-EXTRACTORS_WITH_AUDIO = {"tam"}
+EXTRACTORS_WITH_AUDIO: dict[str, ExtractWithDir] = {"tam": extract_tam}
 
 # Extractoren, die output_dir (das Hauptverzeichnis) akzeptieren und ein
 # (records, extra_meta)-Tupel zurückgeben. Werden für Rohdatei-Ablage genutzt.
-EXTRACTORS_WITH_DIR = {"supportdata"}
+EXTRACTORS_WITH_DIR: dict[str, ExtractWithDir] = {"supportdata": extract_supportdata}
+
+# Alle übrigen: nur der Client.
+EXTRACTORS_PLAIN: dict[str, Extract] = {
+    name: fn for name, fn in (
+        ("calls", extract_calls), ("phonebook", extract_phonebook), ("wifi", extract_wifi),
+        ("events", extract_events), ("mesh", extract_mesh), ("hosts", extract_hosts),
+        ("wan", extract_wan), ("dhcp", extract_dhcp), ("portforward", extract_portforward),
+        ("storage", extract_storage), ("tr069", extract_tr069), ("services", extract_services),
+        ("boxtime", extract_boxtime), ("deviceinfo", extract_deviceinfo),
+    )
+}

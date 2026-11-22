@@ -17,12 +17,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, TypedDict
-
-#: Inhalt einer Bundle-Datei, wie ``json.load`` ihn liefert: ungeprüfte Fremdeingabe.
-#: ``Any`` steht hier mit Absicht — was davon gilt, entscheidet erst ``model.py``,
-#: dort sind die Datensätze fest typisiert.
-RawJson = dict[str, Any]
+from typing import TypedDict
 
 
 class Slice(TypedDict):
@@ -43,6 +38,7 @@ from fritzformat import (
     JSON_TYPES,
     SIDECAR_SUFFIX,
     SUPPORT_VARIANTS,
+    RawJson,
     dataset_glob,
     parse_span,
     parse_uhr_spans,

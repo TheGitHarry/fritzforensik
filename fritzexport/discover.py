@@ -12,6 +12,7 @@ import socket
 import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
+from typing import TypedDict
 from urllib.parse import urlsplit
 
 from .xmlsafe import parse_xml
@@ -59,6 +60,20 @@ M_SEARCH_PACKETS: tuple[bytes, ...] = (
 M_SEARCH = M_SEARCH_PACKETS[0]
 
 
+#: Absender einer SSDP-Antwort: (IP, Port).
+Absender = tuple[str, int]
+
+
+class _DiscoveryMetaExtra(TypedDict, total=False):
+    discovered: dict[str, str]   # DiscoveredBox.to_dict(); fehlt bei --host
+
+
+class DiscoveryMeta(_DiscoveryMetaExtra):
+    """Wie die Box gefunden wurde; steht im Kopf jeder Datenart."""
+    discovery_method: str        # "manual" | "ssdp"
+    target: str
+
+
 @dataclass
 class DiscoveredBox:
     ip: str
@@ -71,11 +86,11 @@ class DiscoveredBox:
     def url_https(self) -> str:
         return f"https://{self.ip}"
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, str]:
         return asdict(self)
 
 
-def parse_ssdp_response(raw: bytes) -> dict | None:
+def parse_ssdp_response(raw: bytes) -> dict[str, str] | None:
     """Parst eine SSDP-Antwort (HTTP-over-UDP).
 
     Gibt Header-Dict zurück, falls SERVER-Header AVM-Substring enthält;
@@ -96,7 +111,7 @@ def parse_ssdp_response(raw: bytes) -> dict | None:
     return headers
 
 
-def parse_device_xml(xml_bytes: bytes) -> dict:
+def parse_device_xml(xml_bytes: bytes) -> dict[str, str]:
     """Liest friendlyName/modelName/modelDescription aus IGD-Description-XML."""
     try:
         root = parse_xml(xml_bytes)
@@ -131,7 +146,8 @@ def _fetch_device_xml(location: str, timeout: float) -> bytes:
         raise ValueError(f"Unerwartetes Schema in LOCATION: {location!r}")
     # Schema ist oben auf http/https begrenzt.
     with urllib.request.urlopen(location, timeout=timeout) as resp:  # noqa: S310
-        return resp.read(MAX_DESC_BYTES)
+        daten: bytes = resp.read(MAX_DESC_BYTES)
+        return daten
 
 
 def _is_fritzbox(box: DiscoveredBox) -> bool:
@@ -157,7 +173,7 @@ def _local_ipv4_interfaces() -> list[str]:
     return sorted(ip for ip in ips if not ip.startswith("127."))
 
 
-def _msearch_once(timeout: float, iface: str | None) -> list[tuple[bytes, tuple]]:
+def _msearch_once(timeout: float, iface: str | None) -> list[tuple[bytes, Absender]]:
     """Sendet einmal M-SEARCH und sammelt Antworten bis Timeout.
 
     OSError wird hochgereicht — Aufrufer entscheidet über Fallback.
@@ -174,7 +190,7 @@ def _msearch_once(timeout: float, iface: str | None) -> list[tuple[bytes, tuple]
     try:
         for packet in M_SEARCH_PACKETS:
             sock.sendto(packet, (SSDP_MULTICAST, SSDP_PORT))
-        responses: list[tuple[bytes, tuple]] = []
+        responses: list[tuple[bytes, Absender]] = []
         while True:
             try:
                 data, addr = sock.recvfrom(8192)
@@ -186,7 +202,7 @@ def _msearch_once(timeout: float, iface: str | None) -> list[tuple[bytes, tuple]
         sock.close()
 
 
-def _collect_responses(timeout: float, iface: str | None) -> list[tuple[bytes, tuple]]:
+def _collect_responses(timeout: float, iface: str | None) -> list[tuple[bytes, Absender]]:
     """M-SEARCH mit Windows-Fallback: bei OSError pro Schnittstelle nachprobieren."""
     if iface:
         try:
@@ -210,7 +226,7 @@ def _collect_responses(timeout: float, iface: str | None) -> list[tuple[bytes, t
             e,
             ", ".join(candidates),
         )
-        responses: list[tuple[bytes, tuple]] = []
+        responses: list[tuple[bytes, Absender]] = []
         for ip in candidates:
             try:
                 responses.extend(_msearch_once(timeout, ip))

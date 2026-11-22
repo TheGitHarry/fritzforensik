@@ -6,6 +6,7 @@ der gemeinsame Formatvertrag mit fritzreport.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from fritzformat import (
@@ -29,10 +30,10 @@ def write(
     output_dir: Path,
     host: str,
     type_name: str,
-    records: list[dict],
+    records: Sequence[Mapping[str, object]],
     timestamp: str | None = None,
-    discovery_meta: dict | None = None,
-    extra_meta: dict | None = None,
+    discovery_meta: Mapping[str, object] | None = None,
+    extra_meta: Mapping[str, object] | None = None,
 ) -> Path:
     """Schreibt Records als JSON + .sha256-Sidecar. Gibt JSON-Pfad zurück."""
     output_dir.mkdir(parents=True, exist_ok=True)

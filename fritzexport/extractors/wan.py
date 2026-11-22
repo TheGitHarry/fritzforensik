@@ -14,6 +14,7 @@ weiter durch.
 from __future__ import annotations
 
 import logging
+from typing import TypedDict
 
 from ..client import FritzClient, Tr064Disabled, Tr064Error
 
@@ -25,6 +26,62 @@ WANCOMMON_SERVICE = "urn:dslforum-org:service:WANCommonInterfaceConfig:1"
 WANCOMMON_CONTROL = "/upnp/control/wancommonifconfig1"
 WANDSL_SERVICE = "urn:dslforum-org:service:WANDSLInterfaceConfig:1"
 WANDSL_CONTROL = "/upnp/control/wandslifconfig1"
+
+
+class _ConnectionFelder(TypedDict, total=False):
+    """Felder je beantwortetem Aufruf; fehlt eine Antwort, fehlen ihre Felder."""
+    connection_status: str
+    last_connection_error: str
+    uptime: str
+    external_ipv4: str
+    connection_type: str
+    dns_servers: str
+    mac_address: str
+    external_ipv6: str
+    ipv6_prefix_length: str
+
+
+class ConnectionRecord(_ConnectionFelder):
+    record_type: str
+
+
+class _CountersFelder(TypedDict, total=False):
+    """Felder je beantwortetem Aufruf; fehlt eine Antwort, fehlen ihre Felder."""
+    total_bytes_sent: str
+    total_bytes_received: str
+    total_packets_sent: str
+    total_packets_received: str
+    wan_access_type: str
+    physical_link_status: str
+    layer1_upstream_max: str
+    layer1_downstream_max: str
+    bytes_sent_64: str
+    bytes_received_64: str
+    byte_send_rate: str
+    byte_receive_rate: str
+
+
+class CountersRecord(_CountersFelder):
+    record_type: str
+
+
+class DslRecord(TypedDict):
+    """DSL-Linkdaten laut TR-064 ``WANDSLInterfaceConfig:1``."""
+    record_type: str
+    status: str
+    modulation_type: str
+    upstream_max_rate: str
+    downstream_max_rate: str
+    upstream_curr_rate: str
+    downstream_curr_rate: str
+    upstream_noise_margin: str
+    downstream_noise_margin: str
+    upstream_attenuation: str
+    downstream_attenuation: str
+    raw: dict[str, str]
+
+
+WanRecord = ConnectionRecord | CountersRecord | DslRecord
 
 
 def _safe_call(
@@ -45,7 +102,7 @@ def _safe_call(
         return None
 
 
-def _connection_record(client: FritzClient) -> dict | None:
+def _connection_record(client: FritzClient) -> ConnectionRecord | None:
     status = _safe_call(client, WANIPCONN_SERVICE, WANIPCONN_CONTROL, "GetStatusInfo")
     extip = _safe_call(client, WANIPCONN_SERVICE, WANIPCONN_CONTROL, "GetExternalIPAddress")
     info = _safe_call(client, WANIPCONN_SERVICE, WANIPCONN_CONTROL, "GetInfo")
@@ -54,7 +111,7 @@ def _connection_record(client: FritzClient) -> dict | None:
     )
     if status is None and extip is None and info is None:
         return None
-    record: dict = {"record_type": "connection"}
+    record: ConnectionRecord = {"record_type": "connection"}
     if status:
         record["connection_status"] = status.get("NewConnectionStatus", "")
         record["last_connection_error"] = status.get("NewLastConnectionError", "")
@@ -71,7 +128,7 @@ def _connection_record(client: FritzClient) -> dict | None:
     return record
 
 
-def _counters_record(client: FritzClient) -> dict | None:
+def _counters_record(client: FritzClient) -> CountersRecord | None:
     total_sent = _safe_call(
         client, WANCOMMON_SERVICE, WANCOMMON_CONTROL, "GetTotalBytesSent"
     )
@@ -90,7 +147,7 @@ def _counters_record(client: FritzClient) -> dict | None:
     addon = _safe_call(client, WANCOMMON_SERVICE, WANCOMMON_CONTROL, "GetAddonInfos")
     if not any([total_sent, total_recv, pkt_sent, pkt_recv, link, addon]):
         return None
-    record: dict = {"record_type": "counters"}
+    record: CountersRecord = {"record_type": "counters"}
     if total_sent:
         record["total_bytes_sent"] = total_sent.get("NewTotalBytesSent", "")
     if total_recv:
@@ -112,7 +169,7 @@ def _counters_record(client: FritzClient) -> dict | None:
     return record
 
 
-def _dsl_record(client: FritzClient) -> dict | None:
+def _dsl_record(client: FritzClient) -> DslRecord | None:
     info = _safe_call(client, WANDSL_SERVICE, WANDSL_CONTROL, "GetInfo")
     if info is None:
         return None
@@ -132,9 +189,9 @@ def _dsl_record(client: FritzClient) -> dict | None:
     }
 
 
-def extract(client: FritzClient) -> list[dict]:
+def extract(client: FritzClient) -> list[WanRecord]:
     """WAN-Status, Traffic-Counter, DSL-Linkdaten als getrennte Records."""
-    records: list[dict] = []
+    records: list[WanRecord] = []
     for record in (
         _connection_record(client),
         _counters_record(client),

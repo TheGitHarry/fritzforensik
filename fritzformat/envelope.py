@@ -11,7 +11,13 @@ extractor-spezifische Zusatzfelder hinzu.
 from __future__ import annotations
 
 import datetime as _dt
+from collections.abc import Mapping, Sequence
 from typing import Any
+
+#: JSON, wie ``json.load`` bzw. ``resp.json()`` ihn liefert: ungeprüfte Fremdeingabe,
+#: aus einer Bundle-Datei oder einer Box-Antwort. ``Any`` steht hier mit Absicht und
+#: an keiner anderen Stelle — wer Felder daraus liest, legt ihren Typ fest.
+RawJson = dict[str, Any]
 
 #: Pflichtfelder des Kopfes, in Schreibreihenfolge.
 ENVELOPE_KEYS = ("tool", "version", "host", "extracted_at", "type", "records")
@@ -57,13 +63,13 @@ def build_envelope(
     version: str,
     host: str,
     type_name: str,
-    records: list[dict[str, Any]],
+    records: Sequence[Mapping[str, object]],
     extracted_at: str | None = None,
-    discovery_meta: dict[str, Any] | None = None,
-    extra_meta: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+    discovery_meta: Mapping[str, object] | None = None,
+    extra_meta: Mapping[str, object] | None = None,
+) -> dict[str, object]:
     """Baut den vollständigen Datensatz einer Datenart."""
-    payload: dict[str, Any] = {
+    payload: dict[str, object] = {
         "tool": tool,
         "version": version,
         "host": host,
@@ -78,7 +84,7 @@ def build_envelope(
     return payload
 
 
-def read_envelope_meta(data: dict[str, Any]) -> dict[str, Any]:
+def read_envelope_meta(data: RawJson) -> RawJson:
     """Liest den Kopf einer geladenen Datenart heraus (fehlende Felder → "")."""
     data = data or {}
     return {

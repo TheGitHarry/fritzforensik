@@ -14,6 +14,7 @@ import logging
 import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import TypedDict
 from urllib.parse import urlsplit
 
 from ..client import FritzClient, Tr064Disabled, Tr064Error, UnsafeBoxPath
@@ -34,13 +35,57 @@ _OOB_CODES = {713, 714, 820}
 _GTABS_RE = re.compile(r"g_tabs\s*=\s*(\[.*?\])\s*;", re.DOTALL)
 
 
-def _parse_message_xml(xml_text: str, tam_index: int) -> list[dict]:
+class _TamZusatz(TypedDict, total=False):
+    caller_number: str            # nur TR-064
+    in_phonebook: bool            # nur TR-064
+    audio_file: str               # gesetzt, wenn die Aufnahme gespeichert wurde
+    audio_sha256: str
+    audio_bytes: int
+    audio_error: str              # nur Web-UI: Download fehlgeschlagen
+    state_restored: bool | None   # nur TR-064: None = nichts zurückzusetzen
+
+
+class TamMessage(_TamZusatz):
+    """Eine Nachricht des Anrufbeantworters."""
+    tam_index: int
+    message_index: int
+    date: str
+    duration: str
+    caller_name: str
+    called_number: str
+    is_new: bool
+    audio_path: str
+
+
+class _MutationZusatz(TypedDict, total=False):
+    reason: str
+    error: str
+
+
+class StateMutation(_MutationZusatz):
+    """Ein Eingriff, um den Gelesen-Status einer Nachricht zurückzusetzen."""
+    tam_index: int
+    message_index: int
+    action: str
+
+
+class _TamMetaZusatz(TypedDict, total=False):
+    tam_state_mutations: list[StateMutation]   # nur TR-064
+    tam_state_warning: str                     # nur Web-UI
+
+
+class TamMeta(_TamMetaZusatz):
+    tam_method: str            # "tr064" | "webui"
+    tam_state_preserved: bool
+
+
+def _parse_message_xml(xml_text: str, tam_index: int) -> list[TamMessage]:
     """XML-Format: <Root><Message><Index/>... <New/> <Path/> ...</Message></Root>."""
     try:
         root = parse_xml(xml_text)
     except ET.ParseError:
         return []
-    messages: list[dict] = []
+    messages: list[TamMessage] = []
     for m in root.iter("Message"):
         try:
             msg_idx = int((m.findtext("Index") or "0").strip())
@@ -97,10 +142,10 @@ def _download_audio_tr064(
 
 def _try_tr064(
     client: FritzClient, audio_dir: Path
-) -> tuple[list[dict], dict]:
+) -> tuple[list[TamMessage], TamMeta]:
     audio_dir.mkdir(parents=True, exist_ok=True)
-    records: list[dict] = []
-    state_mutations: list[dict] = []
+    records: list[TamMessage] = []
+    state_mutations: list[StateMutation] = []
     state_preserved = True
 
     for slot in range(MAX_SLOTS):
@@ -207,7 +252,7 @@ def _try_tr064(
 
         records.extend(msgs)
 
-    extra_meta = {
+    extra_meta: TamMeta = {
         "tam_method": "tr064",
         "tam_state_preserved": state_preserved,
         "tam_state_mutations": state_mutations,
@@ -215,7 +260,7 @@ def _try_tr064(
     return records, extra_meta
 
 
-def _try_webui(client: FritzClient, audio_dir: Path) -> tuple[list[dict], dict]:
+def _try_webui(client: FritzClient, audio_dir: Path) -> tuple[list[TamMessage], TamMeta]:
     """Web-UI-Fallback: parsing der HTML-Tabelle, kein State-Restore.
 
     Liest die Liste der TAM-Slots aus `g_tabs` der tam-Page und holt für
@@ -223,7 +268,7 @@ def _try_webui(client: FritzClient, audio_dir: Path) -> tuple[list[dict], dict]:
     aus `<a href="...">`-Attributen extrahiert.
     """
     audio_dir.mkdir(parents=True, exist_ok=True)
-    records: list[dict] = []
+    records: list[TamMessage] = []
 
     overview = client.post(
         DATA_PATH, data={"page": "tam", "xhr": "1", "xhrId": "all", "lang": "de"}
@@ -288,7 +333,7 @@ def _strip_tags(html: str) -> str:
     return _TAG_RE.sub("", html).strip().replace("&nbsp;", " ").replace("&amp;", "&")
 
 
-def _parse_webui_rows(html: str, tam_index: int) -> list[dict]:
+def _parse_webui_rows(html: str, tam_index: int) -> list[TamMessage]:
     """Heuristischer Parser der `#uiTamCalls`-Tabelle."""
     table_m = re.search(
         r'<table[^>]*id=["\']?uiTamCalls["\']?[^>]*>(?P<body>.*?)</table>',
@@ -297,7 +342,7 @@ def _parse_webui_rows(html: str, tam_index: int) -> list[dict]:
     )
     if not table_m:
         return []
-    rows: list[dict] = []
+    rows: list[TamMessage] = []
     seq = 0
     for row in _ROW_RE.finditer(table_m.group("body")):
         body = row.group("body")
@@ -335,7 +380,7 @@ def _parse_webui_rows(html: str, tam_index: int) -> list[dict]:
 
 def extract(
     client: FritzClient, audio_dir: Path | None = None
-) -> tuple[list[dict], dict]:
+) -> tuple[list[TamMessage], TamMeta]:
     """Primary: TR-064 mit State-Restore. Fallback: Web-UI ohne Restore."""
     if audio_dir is None:
         audio_dir = Path(".") / "tam_audio"
