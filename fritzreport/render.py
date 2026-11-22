@@ -13,16 +13,37 @@ from __future__ import annotations
 import datetime as _dt
 import html
 from collections.abc import Callable, Iterable
-from typing import Any
+from typing import TypeVar
 
 from . import __version__
 from .bundle import QUELLE_RECORD, STATUS_MISSING, Bundle
-from .model import GRADE_LABEL, GRADE_SCHEMA, Model
+from .model import (
+    GRADE_LABEL,
+    GRADE_SCHEMA,
+    CallRec,
+    EventRec,
+    HostRec,
+    MeshNode,
+    Model,
+    PhonebookRec,
+    WifiRec,
+)
+from .records import FilterFields
+from .supportdata import Analysis, Proof, SystemKpi, Uptime
 
-#: Ein Datensatz des Modells, wie ihn die Zellen-Renderer bekommen.
-Rec = dict[str, Any]
-#: Eine Metadaten-Zeile: (Label, Wert[, Zusatz-HTML]).
-Row = tuple[Any, ...]
+#: Eine Metadaten-Zeile: (Label, Wert) oder (Label, Wert, Badge-HTML). Der Wert wird
+#: mit `esc` ausgegeben und darf deshalb alles sein, auch ein Rohwert aus dem Bundle.
+Row = tuple[str, object] | tuple[str, object, str]
+
+#: Datensatz einer Report-Tabelle; `render_rows` gibt ihn an den Zellen-Renderer weiter.
+R = TypeVar("R", bound=FilterFields)
+
+
+class TimelineEntry(FilterFields):
+    sortkey: str
+    display: str
+    quelle: str
+    detail: str
 
 # ───────────────────────── CSS (aus PoC, 3 Grade) ────────────────────────────
 CSS = """
@@ -419,7 +440,7 @@ def _secured_rows(bundle: Bundle, m: Model) -> list[Row]:
     bis = (bundle.secured_to.replace("T", " ").replace("Z", " UTC")
            if bundle.secured_to else "nicht protokolliert (Lauf abgebrochen)")
 
-    rows = [("Gesichert von", von, badge), ("Gesichert bis", bis, badge)]
+    rows: list[Row] = [("Gesichert von", von, badge), ("Gesichert bis", bis, badge)]
     dauer = _duration(bundle.secured_from, bundle.secured_to)
     if dauer:
         rows.append(("Dauer", dauer, " " + badges(["D3"])))
@@ -436,7 +457,7 @@ def _sek(wert: int) -> str:
     return f"{betrag // 3600} h {(betrag % 3600) // 60} min"
 
 
-def _uptime_block(up: dict[str, Any]) -> str:
+def _uptime_block(up: Uptime) -> str:
     """Die Betriebszeit-Tabelle — leer, wenn die Supportdaten keine Uptime führen.
 
     Ist die Form der ``uptime:``-Zeile unbekannt, steht die Rohzeile im „roh"-Feld,
@@ -461,7 +482,7 @@ def _uptime_block(up: dict[str, Any]) -> str:
     )
 
 
-def _system_kpi_block(kpi: dict[str, Any]) -> str:
+def _system_kpi_block(kpi: SystemKpi) -> str:
     """Kennzahlen aus ``system_kpi`` — leer, wo die Sektion fehlt (vor FRITZ!OS 08.25).
 
     Alles **roh**, kein Badge: Die drei Werte stehen wörtlich in der Datei, deren Hash
@@ -579,7 +600,7 @@ def _clock_rows(bundle: Bundle) -> list[Row]:
     return rows
 
 
-def data_attrs(rec: Rec) -> str:
+def data_attrs(rec: FilterFields) -> str:
     return (
         f' data-mac="{esc((rec.get("mac") or "").upper())}"'
         f' data-iso="{esc(rec.get("f_iso") or "")}"'
@@ -590,11 +611,12 @@ def data_attrs(rec: Rec) -> str:
     )
 
 
-def origin_row(rec: Rec, colspan: int) -> str:
+def origin_row(rec: FilterFields, colspan: int) -> str:
     o = rec["origin"]
-    if o.get("line"):
+    line = o["line"]
+    if line:
         body = "\n".join(
-            f"{o['line'] + n:>6} │ {ln}"
+            f"{line + n:>6} │ {ln}"
             for n, ln in enumerate(o["text"].split("\n"))
         )
         fundstelle = (f'Zeile {o["line"]}–{o["line_end"]}'
@@ -625,7 +647,7 @@ def origin_row(rec: Rec, colspan: int) -> str:
     )
 
 
-def render_rows(records: Iterable[Rec], cells_fn: Callable[[Rec], str], colspan: int) -> str:
+def render_rows(records: Iterable[R], cells_fn: Callable[[R], str], colspan: int) -> str:
     out: list[str] = []
     for rec in records:
         out.append(
@@ -701,7 +723,7 @@ def _calls_note(anzahl: int) -> str:
     )
 
 
-def _hosts_zeit_note(hosts: list[Rec]) -> str:
+def _hosts_zeit_note(hosts: list[HostRec]) -> str:
     """Hinweis zu den Spalten „Erstmals/Zuletzt gesehen" (Issue #38).
 
     Die Werte stammen aus ``query.lua``; die Box führt sie nicht für jedes Gerät und
@@ -734,7 +756,7 @@ def table(tid: str, headers: Iterable[str], rows_html: str) -> str:
 
 # ───────────────────────── Zellen-Renderer je Sektion ────────────────────────
 
-def c_hosts(h: Rec) -> str:
+def c_hosts(h: HostRec) -> str:
     return (f'<td class="mono">{esc(h["mac"])}</td><td class="mono">{esc(h["ip"])}</td>'
             f'<td>{esc(h["name"])}</td><td>{esc(h["iface"])}</td>'
             f'<td>{"aktiv" if h["active"] else "offline"}</td>'
@@ -743,32 +765,32 @@ def c_hosts(h: Rec) -> str:
             f'<td class="mono">{esc(h["last_seen"])}</td>')
 
 
-def c_mesh(n: Rec) -> str:
+def c_mesh(n: MeshNode) -> str:
     return (f'<td>{esc(n["name"])}</td><td>{esc(n["model"])}</td><td class="mono">{esc(n["mac"])}</td>'
             f'<td>{esc(n["role"])}</td>'
             f'<td>{"<strong>ja</strong>" if n["is_ap"] else "nein"}</td>'
             f'<td>{esc(n["firmware"])}</td>')
 
 
-def c_wifi(w: Rec) -> str:
+def c_wifi(w: WifiRec) -> str:
     return (f'<td class="mono">{esc(w["mac"])}</td><td>{esc(w["name"])}</td>'
             f'<td class="mono">{esc(w["ipv4"])}</td><td>{esc(w["interface"])}</td>'
             f'<td class="{"" if w["ap_is_mesh"] else "unknown"}">{esc(w["ap_display"])}</td>'
             f'<td>{esc(w["status"])}</td><td class="mono">{esc(w["last_seen_iso"])}</td>')
 
 
-def c_calls(c: Rec) -> str:
+def c_calls(c: CallRec) -> str:
     return (f'<td class="mono">{esc(c["iso"])}</td><td>{esc(c["typ"])}</td>'
             f'<td class="mono">{esc(c["rufnummer"])}</td><td>{esc(c["name"])}</td>'
             f'<td>{esc(c["region"])}</td><td>{esc(c["nebenstelle"])}</td>'
             f'<td>{esc(c["eigene"])}</td><td class="num">{esc(c["dauer"])}</td>')
 
 
-def c_pb(p: Rec) -> str:
+def c_pb(p: PhonebookRec) -> str:
     return (f'<td>{esc(p["name"])}</td><td class="mono">{esc(p["numbers"])}</td><td>{esc(p["book"])}</td>')
 
 
-def c_events(e: Rec) -> str:
+def c_events(e: EventRec) -> str:
     marke = ('<span class="acq" title="Liegt im Sicherungszeitraum — '
              'stammt vom Abzug, nicht vom Asservat">Sicherung</span>'
              if e.get("during_acquisition") else "")
@@ -777,24 +799,24 @@ def c_events(e: Rec) -> str:
             f'<td class="msg">{esc(e["message"])}</td>')
 
 
-def c_wlan(w: Rec) -> str:
+def c_wlan(w: Proof) -> str:
     return (f'<td class="mono">{esc(w["display"])}</td><td class="mono">{esc(w["mac"])}</td>'
             f'<td>{esc(w["event_de"])}</td><td>{esc(w["band"])}</td><td>{esc(w["ap"])}</td>')
 
 
-def c_timeline(t: Rec) -> str:
+def c_timeline(t: TimelineEntry) -> str:
     return (f'<td class="mono">{esc(t["display"])}</td><td>{esc(t["quelle"])}</td>'
             f'<td class="mono">{esc(t["mac"])}</td><td class="msg">{esc(t["detail"])}</td>')
 
 
 # ───────────────────────── Timeline (quellenübergreifend) ────────────────────
 
-def build_timeline(model: Model, proofs: list[Rec]) -> list[Rec]:
+def build_timeline(model: Model, proofs: list[Proof]) -> list[TimelineEntry]:
     """Alle zeitgestempelten Datenpunkte aus allen Quellen in einer Achse."""
-    tl: list[Rec] = []
+    tl: list[TimelineEntry] = []
 
     def add(sortkey: str, iso: str, display: str, quelle: str, mac: str, detail: str,
-            grades: list[str], rec: Rec) -> None:
+            grades: list[str], rec: FilterFields) -> None:
         tl.append({
             "sortkey": sortkey, "display": display, "quelle": quelle,
             "mac": (mac or "").upper(), "detail": detail, "grades": grades,
@@ -815,10 +837,10 @@ def build_timeline(model: Model, proofs: list[Rec]) -> list[Rec]:
     for w in proofs:
         det = " · ".join(x for x in (w["event_de"], w["band"], (f'AP {w["ap"]}' if w["ap"] else "")) if x)
         add(w["sortkey"], w["iso"], w["display"], "WLAN-Verbindung", w["mac"], det, w["grades"], w)
-    for w in model.wifi:
-        if w["last_seen_iso"]:
-            add(w["last_seen_iso"], w["last_seen_iso"], w["last_seen_iso"].replace("T", " "),
-                "Client zuletzt gesehen", w["mac"], w["name"], w["grades"], w)
+    for cl in model.wifi:
+        if cl["last_seen_iso"]:
+            add(cl["last_seen_iso"], cl["last_seen_iso"], cl["last_seen_iso"].replace("T", " "),
+                "Client zuletzt gesehen", cl["mac"], cl["name"], cl["grades"], cl)
 
     tl.sort(key=lambda x: x["sortkey"])
     return tl
@@ -841,7 +863,7 @@ def _hostname(host: str) -> str:
     return rest.split(":", 1)[0].lower()
 
 
-def _pick_device(mesh_nodes: list[Rec], host: str = "") -> Rec:
+def _pick_device(mesh_nodes: list[MeshNode], host: str = "") -> MeshNode | None:
     """Identität der **abgezogenen** Box robust wählen.
 
     Beste Quelle ist der Mesh-Knoten, dessen Name zum `host`-Feld passt (die Box,
@@ -865,7 +887,7 @@ def _pick_device(mesh_nodes: list[Rec], host: str = "") -> Rec:
                     if n.get("name") and n["name"].lower() in (hostname, label)), None)
         if hit:
             return hit
-    vorrang: tuple[Callable[[Rec], Any], ...] = (
+    vorrang: tuple[Callable[[MeshNode], object], ...] = (
         lambda n: n["role"] == "master" and n.get("model"),
         lambda n: n["is_ap"] and n.get("model"),
         lambda n: n.get("model"),
@@ -875,10 +897,10 @@ def _pick_device(mesh_nodes: list[Rec], host: str = "") -> Rec:
         hit = next((n for n in mesh_nodes if pred(n)), None)
         if hit:
             return hit
-    return mesh_nodes[0] if mesh_nodes else {}
+    return mesh_nodes[0] if mesh_nodes else None
 
 
-def build_html(bundle: Bundle, model: Model, support: dict[str, Any],
+def build_html(bundle: Bundle, model: Model, support: Analysis,
                header: dict[str, str]) -> str:
     m = model
     proofs = support.get("proofs", [])
@@ -914,8 +936,9 @@ def build_html(bundle: Bundle, model: Model, support: dict[str, Any],
     meta_rows = [
         ("Case-ID", header.get("case_id", "")), ("Asservat / Item-ID", header.get("item_id", "")),
         ("Sachbearbeiter (SB)", header.get("sb", "")), ("Datum", header.get("date", "")),
-        ("Gerät", device.get("model", "")), ("Firmware", device.get("firmware", "")),
-        ("Geräte-MAC", device.get("mac", "")),
+        ("Gerät", device["model"] if device else ""),
+        ("Firmware", device["firmware"] if device else ""),
+        ("Geräte-MAC", device["mac"] if device else ""),
         ("Host-URL", m.meta.get("host", "")),
         ("Extraktionswerkzeug", f'{m.meta.get("tool","?")} {m.meta.get("version","?")}'),
         *_deviceinfo_rows(bundle),
@@ -1131,7 +1154,7 @@ def build_html(bundle: Bundle, model: Model, support: dict[str, Any],
   neben dem Original-Report.
 </div>
 
-<h1>Forensik-Report — {esc(device.get('model','') or 'FRITZ!Box')}</h1>
+<h1>Forensik-Report — {esc((device["model"] if device else "") or 'FRITZ!Box')}</h1>
 <div class="sub">Case {esc(header.get('case_id',''))} · Item {esc(header.get('item_id',''))} · SB {esc(header.get('sb',''))} · erzeugt {esc(header.get('generated_at',''))}</div>
 
 {integrity_banner}

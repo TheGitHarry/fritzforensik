@@ -56,7 +56,7 @@ def test_grades_scheme(synth_bundle):
 def test_support_both_parsers_and_grades(synth_bundle):
     b = load_bundle(synth_bundle)
     m = build_model(b)
-    res = analyze(b, m.real_aps, m.master.get("name", ""))
+    res = analyze(b, m.real_aps, (m.master["name"] if m.master else ""))
     proofs = res["proofs"]
     assert proofs, "es müssen Verbindungsnachweise entstehen"
     grade_sets = {tuple(p["grades"]) for p in proofs}
@@ -74,7 +74,7 @@ def test_support_both_parsers_and_grades(synth_bundle):
 def test_timestamps_second_precision(synth_bundle):
     b = load_bundle(synth_bundle)
     m = build_model(b)
-    res = analyze(b, m.real_aps, m.master.get("name", ""))
+    res = analyze(b, m.real_aps, (m.master["name"] if m.master else ""))
     for p in res["proofs"]:
         # Anzeige ohne Millisekunden
         assert re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}", p["display"]), p["display"]
@@ -91,7 +91,7 @@ def test_provenance_exact(synth_bundle):
     excerpt = "\n".join(src[o["line"] - 1:o["line_end"]])
     assert excerpt == o["text"], "JSON-Herkunft muss zeichengenau sein"
 
-    res = analyze(b, m.real_aps, m.master.get("name", ""))
+    res = analyze(b, m.real_aps, (m.master["name"] if m.master else ""))
     p = next(pp for pp in res["proofs"] if "D3" in pp["grades"])
     sup = b.support["standard"]
     assert sup.lines[p["origin"]["line"] - 1] == p["origin"]["text"]
@@ -102,7 +102,7 @@ def test_provenance_exact(synth_bundle):
 def test_timeline_merges_sources(synth_bundle):
     b = load_bundle(synth_bundle)
     m = build_model(b)
-    res = analyze(b, m.real_aps, m.master.get("name", ""))
+    res = analyze(b, m.real_aps, (m.master["name"] if m.master else ""))
     tl = build_timeline(m, res["proofs"])
     assert "WLAN-Verbindung" in {t["quelle"] for t in tl}
     assert any(t["quelle"].startswith("Ereignis") for t in tl)
@@ -114,7 +114,7 @@ def test_timeline_merges_sources(synth_bundle):
 def test_render_structure(synth_bundle):
     b = load_bundle(synth_bundle)
     m = build_model(b)
-    res = analyze(b, m.real_aps, m.master.get("name", ""))
+    res = analyze(b, m.real_aps, (m.master["name"] if m.master else ""))
     html = build_html(b, m, res, {"case_id": "C-1", "item_id": "I-1", "sb": "Müller",
                                   "date": "2026-01-06", "generated_at": "2026-01-06T10:00:00Z"})
     assert html.count('class="section"') == 12
@@ -287,7 +287,7 @@ def test_real_boxes_end_to_end(real_boxes):
     for d in real_boxes:
         b = load_bundle(d)
         m = build_model(b)
-        res = analyze(b, m.real_aps, m.master.get("name", "") or (m.real_aps[0] if m.real_aps else ""))
+        res = analyze(b, m.real_aps, (m.master["name"] if m.master else "") or (m.real_aps[0] if m.real_aps else ""))
         html = build_html(b, m, res, {"case_id": "", "item_id": "", "sb": "",
                                       "date": "2026-01-01", "generated_at": "x"})
         assert html.count('class="section"') == 12
@@ -309,7 +309,7 @@ def test_report_zeigt_gerechneten_zeitraum_mit_d1(synth_bundle):
     assert b.secured_source == "berechnet"
 
     m = build_model(b)
-    res = analyze(b, m.real_aps, m.master.get("name", ""))
+    res = analyze(b, m.real_aps, (m.master["name"] if m.master else ""))
     html = build_html(b, m, res, {"case_id": "", "item_id": "", "sb": "",
                                   "date": "2026-01-06", "generated_at": "x"})
     assert "Gesichert von" in html
@@ -338,7 +338,7 @@ def test_report_zeigt_protokollierten_zeitraum_ohne_badge(synth_bundle):
     assert b.secured_from == "2026-01-06T09:55:00Z"
 
     m = build_model(b)
-    res = analyze(b, m.real_aps, m.master.get("name", ""))
+    res = analyze(b, m.real_aps, (m.master["name"] if m.master else ""))
     html = build_html(b, m, res, {"case_id": "", "item_id": "", "sb": "",
                                   "date": "2026-01-06", "generated_at": "x"})
     zeile = html.split("Gesichert von", 1)[1].split("</tr>", 1)[0]
@@ -355,7 +355,7 @@ def test_report_weist_fehlendes_ende_aus(synth_bundle):
 
     b = load_bundle(synth_bundle)
     m = build_model(b)
-    res = analyze(b, m.real_aps, m.master.get("name", ""))
+    res = analyze(b, m.real_aps, (m.master["name"] if m.master else ""))
     html = build_html(b, m, res, {"case_id": "", "item_id": "", "sb": "",
                                   "date": "2026-01-06", "generated_at": "x"})
     assert "nicht protokolliert" in html
@@ -373,7 +373,7 @@ def test_kein_irrefuehrender_report_hash_im_dokument(synth_bundle):
     """
     b = load_bundle(synth_bundle)
     m = build_model(b)
-    res = analyze(b, m.real_aps, m.master.get("name", ""))
+    res = analyze(b, m.real_aps, (m.master["name"] if m.master else ""))
     html = build_html(b, m, res, {"case_id": "C-1", "item_id": "A-1", "sb": "X",
                                   "date": "2026-01-06", "generated_at": "x"})
 
@@ -573,7 +573,7 @@ def test_ohne_system_kpi_bleibt_der_bericht_still(synth_bundle):
     darf keine leeren Zeilen erzeugen."""
     b = load_bundle(synth_bundle)
     m = build_model(b)
-    assert analyze(b, m.real_aps, m.master.get("name", ""))["system_kpi"] == {}
+    assert analyze(b, m.real_aps, (m.master["name"] if m.master else ""))["system_kpi"] == {}
     assert "system_kpi" not in _render(b)
 
 
@@ -655,7 +655,7 @@ def _offset(b, quelle: str):
 
 def _render(b):
     m = build_model(b)
-    res = analyze(b, m.real_aps, m.master.get("name", ""))
+    res = analyze(b, m.real_aps, (m.master["name"] if m.master else ""))
     return build_html(b, m, res, {"case_id": "C-1", "item_id": "A-1", "sb": "X",
                                   "date": "2026-01-06", "generated_at": "x"})
 
@@ -927,7 +927,7 @@ def test_report_weist_die_eigenen_spuren_im_ereignisprotokoll_aus(synth_bundle):
 
     b = load_bundle(synth_bundle)
     m = build_model(b)
-    res = analyze(b, m.real_aps, m.master.get("name", ""))
+    res = analyze(b, m.real_aps, (m.master["name"] if m.master else ""))
     html = build_html(b, m, res, {"case_id": "", "item_id": "", "sb": "",
                                   "date": "2026-01-06", "generated_at": "x"})
 
@@ -965,7 +965,7 @@ def test_ohne_bekannte_zeitzone_wird_nicht_markiert_sondern_gesagt(synth_bundle)
     m = build_model(b)
     assert [e["during_acquisition"] for e in m.events] == [False]
 
-    res = analyze(b, m.real_aps, m.master.get("name", ""))
+    res = analyze(b, m.real_aps, (m.master["name"] if m.master else ""))
     html = build_html(b, m, res, {"case_id": "", "item_id": "", "sb": "",
                                   "date": "2026-01-06", "generated_at": "x"})
     assert "nicht bestimmbar" in html

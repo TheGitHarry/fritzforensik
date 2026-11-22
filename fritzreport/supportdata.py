@@ -20,13 +20,77 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, TypedDict
+
+from .records import FilterFields
 
 if TYPE_CHECKING:
     from .bundle import Bundle, SupportFile
 
-#: Geräteregister der methode.md-Parser: MAC → {name, ip, connection_type, source, events}.
-Devices = dict[str, dict[str, Any]]
+
+class _DeviceEventExtra(TypedDict, total=False):
+    """Nur die Sektion ``Events Events`` kennt Mesh-Knoten und Frequenz."""
+    mesh_node: str
+    frequency: str
+
+
+class DeviceEvent(_DeviceEventExtra):
+    """Ein Verbindungsereignis aus einer der methode.md-Sektionen."""
+    timestamp: str
+    source: str
+    event_type: str
+    log_line_nr: int
+    log_line: str
+
+
+class Device(TypedDict):
+    name: str
+    ip: str
+    connection_type: str
+    source: str
+    events: list[DeviceEvent]
+
+
+#: Geräteregister der methode.md-Parser, nach MAC.
+Devices = dict[str, Device]
+
+
+class Proof(FilterFields):
+    """Ein vereinter Verbindungsnachweis (Sektion 6 und Zeitachse)."""
+    iso: str
+    sortkey: str
+    display: str
+    event: str
+    event_de: str
+    band: str
+    ap: str
+    sources: list[str]
+
+
+class Uptime(TypedDict, total=False):
+    """Betriebszeit aus der ``uptime:``-Zeile; leer, wenn keine Supportdaten da sind."""
+    file: str
+    uptime_text: str
+    up_line: int | None
+    wan_s: str
+    wan_line: int | None
+    wan_h: str
+    boot_derived: str
+
+
+class SystemKpi(TypedDict, total=False):
+    """Sektion ``system_kpi``; leer, wenn die Box sie nicht führt."""
+    starts: int | None
+    lifetime: str
+    uptime_s: int | None
+    file: str
+    line: int | None
+
+
+class Analysis(TypedDict):
+    proofs: list[Proof]
+    uptime: Uptime
+    system_kpi: SystemKpi
 
 # ───────────────────────── Konstanten / Regexes (aus fritz_processor.py) ─────
 
@@ -402,7 +466,7 @@ def _sec_display(dt: datetime | None, fallback: str) -> tuple[str, str]:
 
 # ───────────────────────── Vereinigung ───────────────────────────────────────
 
-def analyze(bundle: Bundle, real_aps: list[str], master_name: str) -> dict[str, Any]:
+def analyze(bundle: Bundle, real_aps: list[str], master_name: str) -> Analysis:
     """→ {'proofs': [...], 'uptime': {...}, 'system_kpi': {...}}.
 
     ``proofs`` = vereinte, deduplizierte Verbindungsnachweise (Sektion 6/Timeline).
@@ -417,7 +481,7 @@ def analyze(bundle: Bundle, real_aps: list[str], master_name: str) -> dict[str, 
         devices.update(parse_dhcpd(sf.text))
 
     # 2) methode.md-Event-Parser je Datei; neue Events der Datei zuordnen
-    methode_hits: list[tuple[str, dict[str, Any], SupportFile]] = []  # (mac, event, Datei)
+    methode_hits: list[tuple[str, DeviceEvent, SupportFile]] = []  # (mac, event, Datei)
     for sf in support_files:
         before = {mac: len(d["events"]) for mac, d in devices.items()}
         for fn in (parse_dhcp, parse_station_module, parse_wlan_events,
@@ -428,7 +492,7 @@ def analyze(bundle: Bundle, real_aps: list[str], master_name: str) -> dict[str, 
                 methode_hits.append((mac, ev, sf))
 
     # dedup + grade
-    unified: dict[tuple[str, str, str], dict[str, Any]] = {}   # key -> proof
+    unified: dict[tuple[str, str, str], Proof] = {}   # key -> proof
 
     def _add(mac: str, iso: str, sortkey: str, display: str, event: str, band: str, ap: str,
              grades: tuple[str, ...], sf: SupportFile, line: int | None,
@@ -439,12 +503,13 @@ def analyze(bundle: Bundle, real_aps: list[str], master_name: str) -> dict[str, 
             for g in grades:
                 if g not in p["grades"]:
                     p["grades"].append(g)
-            p["sources"].add(sf.name)
+            if sf.name not in p["sources"]:
+                p["sources"].append(sf.name)
             return
         unified[key] = {
             "iso": iso, "sortkey": sortkey, "display": display,
             "mac": mac.upper(), "event": event, "event_de": EVENT_DE.get(event, event),
-            "band": band, "ap": ap, "sources": {sf.name},
+            "band": band, "ap": ap, "sources": [sf.name],
             "grades": list(grades),
             "f_name": "", "f_phone": "", "f_ap": ap, "f_iso": iso,
             "origin": {"file": sf.name, "sha": sf.sha256, "idx": None, "total": None,
@@ -515,7 +580,7 @@ def _uptime_spanne(line: str) -> tuple[str, timedelta | None]:
     )
 
 
-def parse_system_kpi(sf: SupportFile) -> dict[str, Any]:
+def parse_system_kpi(sf: SupportFile) -> SystemKpi:
     """Sektion ``system_kpi`` → ``{starts, lifetime, uptime_s, file, line}``.
 
     Die Sektion gibt es erst **ab FRITZ!OS 08.25** — aber nicht auf jeder Plattform:
@@ -549,7 +614,7 @@ def parse_system_kpi(sf: SupportFile) -> dict[str, Any]:
         return {}
     if not isinstance(kpi, dict):
         return {}
-    befund = {
+    befund: SystemKpi = {
         "starts": kpi.get("starts"),
         "lifetime": kpi.get("lifetime") or "",
         "uptime_s": kpi.get("uptime"),
@@ -560,7 +625,7 @@ def parse_system_kpi(sf: SupportFile) -> dict[str, Any]:
                          for k in ("starts", "lifetime", "uptime_s")) else {}
 
 
-def _parse_uptime(sf: SupportFile, extracted_at: str) -> dict[str, Any]:
+def _parse_uptime(sf: SupportFile, extracted_at: str) -> Uptime:
     text = wan_s = ""
     spanne = None
     up_ln = wan_ln = None
