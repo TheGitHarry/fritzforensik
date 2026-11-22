@@ -428,7 +428,7 @@ PyInstaller-Bootstrap-Extract wird ebenfalls auf den Stick geschrieben
 python -m pytest              # vollständige Suite, offline, ohne Box
 python -m pytest -m golden    # zusätzlich gegen echte Bundles unter ~/testdata
 ruff check .                  # Lint, dieselbe Prüfung wie in der CI
-mypy                          # Typen, vorerst nur fritzformat
+mypy                          # Typen: fritzformat streng, fritzreport normal
 coverage run -m pytest && coverage report   # Testabdeckung, Untergrenze wie in der CI
 ```
 

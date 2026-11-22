@@ -151,7 +151,7 @@ def build_model(b: Bundle) -> Model:
         parent = raw.get("parent") if isinstance(raw.get("parent"), dict) else {}
         ap_reported = (parent or {}).get("name") or ""
         ap_is_mesh = ap_reported in m.real_aps
-        ts = _iso_from_epoch(r.get("last_seen"))
+        seen_iso = _iso_from_epoch(r.get("last_seen"))
         name = r.get("name") or ""
         if ap_is_mesh:
             ap_display = ap_reported
@@ -163,8 +163,8 @@ def build_model(b: Bundle) -> Model:
             "mac": mac, "name": name, "ipv4": r.get("ipv4") or "",
             "interface": r.get("interface") or "", "ap_display": ap_display,
             "ap_is_mesh": ap_is_mesh, "port": r.get("port") or "", "status": r.get("status") or "",
-            "last_seen_iso": ts,
-            "f_name": name, "f_phone": "", "f_ap": ap_reported if ap_is_mesh else "", "f_iso": ts,
+            "last_seen_iso": seen_iso,
+            "f_name": name, "f_phone": "", "f_ap": ap_reported if ap_is_mesh else "", "f_iso": seen_iso,
             "grades": (["D1"] if ap_is_mesh else []),   # alt D2 → D1
             "origin": origin(ds, i, len(ds.records)),
         })
