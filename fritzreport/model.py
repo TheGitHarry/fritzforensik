@@ -15,8 +15,10 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import TypedDict
 
-from .bundle import Bundle, Dataset
+from .bundle import Bundle, Dataset, RawJson
+from .records import FilterFields, Origin
 
 # Neues 3-Grade-System (kombinierbar).
 #
@@ -41,7 +43,72 @@ CALL_TYPES = {"1": "eingehend", "2": "verpasst", "3": "abgehend",
               "4": "aktiv eingehend", "10": "Anrufbeantworter", "11": "AB abgehört"}
 
 
-def origin(ds: Dataset, i: int, total: int) -> dict:
+class HostRec(FilterFields):
+    ip: str
+    name: str
+    iface: str
+    active: bool
+    guest: bool
+    first_seen: str
+    last_seen: str
+
+
+class MeshNode(FilterFields):
+    name: str
+    model: str
+    role: str
+    firmware: str
+    is_ap: bool
+
+
+class WifiRec(FilterFields):
+    name: str
+    ipv4: str
+    interface: str
+    ap_display: str
+    ap_is_mesh: bool
+    port: str
+    status: str
+    last_seen_iso: str
+
+
+class CallRec(FilterFields):
+    iso: str
+    typ: str
+    rufnummer: str
+    name: str
+    region: str
+    nebenstelle: str
+    eigene: str
+    dauer: str
+
+
+class PhonebookRec(FilterFields):
+    name: str
+    book: str
+    numbers: str
+
+
+class EventRec(FilterFields):
+    during_acquisition: bool
+    iso: str
+    category: str
+    id: int | str | None   # Zahl von der Box; "" bzw. None, wenn die Spalte fehlt
+    message: str
+
+
+class DhcpConfig(TypedDict):
+    enable: bool
+    min: str
+    max: str
+    mask: str
+    domain: str
+    router: str
+    dns: str
+    origin: Origin
+
+
+def origin(ds: Dataset, i: int, total: int) -> Origin:
     """Fundstelle eines Records. ``i`` 0-basiert; Anzeige zählt ab 1."""
     s = ds.slices[i] if i < len(ds.slices) else None
     return {
@@ -52,7 +119,7 @@ def origin(ds: Dataset, i: int, total: int) -> dict:
     }
 
 
-def _iso_from_epoch(v) -> str:
+def _iso_from_epoch(v: str | int | float | None) -> str:
     try:
         return datetime.fromtimestamp(int(v), tz=timezone.utc).isoformat() if v else ""
     except (ValueError, TypeError, OverflowError, OSError):
@@ -75,19 +142,19 @@ def _parse_dt_short(s: str) -> datetime | None:
 
 @dataclass
 class Model:
-    meta: dict = field(default_factory=dict)
-    real_aps: list = field(default_factory=list)
-    master: dict = field(default_factory=dict)
-    hosts: list = field(default_factory=list)
-    mesh_nodes: list = field(default_factory=list)
-    wifi: list = field(default_factory=list)
-    calls: list = field(default_factory=list)
-    phonebook: list = field(default_factory=list)
-    events: list = field(default_factory=list)
-    dhcp: dict | None = None
+    meta: RawJson = field(default_factory=dict)
+    real_aps: list[str] = field(default_factory=list)
+    master: MeshNode | None = None
+    hosts: list[HostRec] = field(default_factory=list)
+    mesh_nodes: list[MeshNode] = field(default_factory=list)
+    wifi: list[WifiRec] = field(default_factory=list)
+    calls: list[CallRec] = field(default_factory=list)
+    phonebook: list[PhonebookRec] = field(default_factory=list)
+    events: list[EventRec] = field(default_factory=list)
+    dhcp: DhcpConfig | None = None
     # Aggregate/Kennzahlen (D3)
-    stats: dict = field(default_factory=dict)
-    cat_counts: dict = field(default_factory=dict)
+    stats: dict[str, object] = field(default_factory=dict)
+    cat_counts: dict[str, int] = field(default_factory=dict)
 
 
 def build_model(b: Bundle) -> Model:
@@ -96,7 +163,7 @@ def build_model(b: Bundle) -> Model:
     # --- echte Mesh-Access-Points (nur is_meshed == true)
     mesh_records = b.ds("mesh").records
     m.real_aps = sorted({
-        r.get("device_name") for r in mesh_records
+        r["device_name"] for r in mesh_records
         if r.get("record_type") == "node" and r.get("is_meshed") and r.get("device_name")
     })
 
@@ -139,7 +206,7 @@ def build_model(b: Bundle) -> Model:
             "grades": (["D1"] if is_ap else []) + (["D2"] if is_master else []),
             "origin": origin(ds, i, len(ds.records)),
         })
-    m.master = next((n for n in m.mesh_nodes if n["role"] == "master"), {})
+    m.master = next((n for n in m.mesh_nodes if n["role"] == "master"), None)
 
     # --- WLAN-/LAN-Clients (wifi.json)
     ds = b.ds("wifi")
@@ -147,8 +214,8 @@ def build_model(b: Bundle) -> Model:
         mac = (r.get("mac") or "").upper()
         if not mac:
             continue
-        raw = r.get("raw") if isinstance(r.get("raw"), dict) else {}
-        parent = raw.get("parent") if isinstance(raw.get("parent"), dict) else {}
+        raw = v if isinstance(v := r.get("raw"), dict) else {}
+        parent = v if isinstance(v := raw.get("parent"), dict) else {}
         ap_reported = (parent or {}).get("name") or ""
         ap_is_mesh = ap_reported in m.real_aps
         seen_iso = _iso_from_epoch(r.get("last_seen"))
@@ -176,6 +243,7 @@ def build_model(b: Bundle) -> Model:
         nummer = r.get("Rufnummer") or ""
         name = r.get("Name") or ""
         m.calls.append({
+            "mac": "",   # Anrufe tragen keine MAC; das Feld gehört zum Filter jeder Tabelle
             "iso": ts.isoformat() if ts else "",
             "typ": CALL_TYPES.get(r.get("Typ") or "", r.get("Typ") or ""),
             "rufnummer": nummer, "name": name,
@@ -194,6 +262,7 @@ def build_model(b: Bundle) -> Model:
         num_str = ", ".join(f'{n.get("number","")} ({n.get("type","")})' for n in nums)
         name = r.get("name") or ""
         m.phonebook.append({
+            "mac": "",   # siehe Anrufe
             "name": name, "book": r.get("phonebook_name") or "", "numbers": num_str,
             "f_name": name, "f_phone": " ".join(n.get("number", "") for n in nums),
             "f_ap": "", "f_iso": "",

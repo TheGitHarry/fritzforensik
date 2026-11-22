@@ -17,6 +17,26 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any, TypedDict
+
+#: Inhalt einer Bundle-Datei, wie ``json.load`` ihn liefert: ungeprüfte Fremdeingabe.
+#: ``Any`` steht hier mit Absicht — was davon gilt, entscheidet erst ``model.py``,
+#: dort sind die Datensätze fest typisiert.
+RawJson = dict[str, Any]
+
+
+class Slice(TypedDict):
+    """Fundstelle eines Records in seiner Datei (siehe `record_slices`)."""
+    line: int
+    line_end: int
+    text: str
+
+
+class SourceRef(TypedDict):
+    """Datei, Hash und Zeile, aus der eine Uhr-Messung stammt."""
+    file: str
+    sha: str
+    line: int | None
 
 # Formatvertrag mit fritzexport — Dateinamen, Datenarten, Sidecar-Prüfung.
 from fritzformat import (
@@ -58,7 +78,7 @@ QUELLE_RECORD = "datensatz"
 _RECORDS_RE = re.compile(r'"records"\s*:\s*\[')
 
 
-def record_slices(text: str) -> list[dict]:
+def record_slices(text: str) -> list[Slice]:
     """Fundstelle jedes Records im ``records``-Array: Zeilennummern + Original-Auszug.
 
     Übernommen aus dem PoC (``build_report.py``): der Auszug wird auf volle Zeilen
@@ -72,10 +92,12 @@ def record_slices(text: str) -> list[dict]:
     for i, ch in enumerate(text):
         if ch == "\n":
             line_starts.append(i + 1)
-    line_of = lambda pos: bisect.bisect_right(line_starts, pos)
+    def line_of(pos: int) -> int:
+        return bisect.bisect_right(line_starts, pos)
 
     dec = json.JSONDecoder()
-    out, idx, n = [], m.end(), len(text)
+    out: list[Slice] = []
+    idx, n = m.end(), len(text)
     while idx < n:
         while idx < n and text[idx] in " \t\r\n,":
             idx += 1
@@ -108,14 +130,15 @@ class Dataset:
     type: str
     path: Path
     name: str = ""
-    data: dict = field(default_factory=dict)
+    data: RawJson = field(default_factory=dict)
     sha256: str = ""            # tatsächlich berechneter Hash
     status: str = "missing"     # ok | mismatch | no_sidecar | missing
-    slices: list = field(default_factory=list)
+    slices: list[Slice] = field(default_factory=list)
 
     @property
-    def records(self) -> list:
-        return (self.data or {}).get("records", [])
+    def records(self) -> list[RawJson]:
+        recs: list[RawJson] = (self.data or {}).get("records", [])
+        return recs
 
     @property
     def present(self) -> bool:
@@ -173,7 +196,7 @@ class ClockOffset:
     versatz_max_s: int
     beidseitig: bool
     herkunft: str        # "marker" = eng protokolliert · "berechnet" = Altbestand
-    fundstelle: dict = field(default_factory=dict)
+    fundstelle: SourceRef | None = None
 
     @property
     def klammer_s(self) -> int:
@@ -191,10 +214,10 @@ class ClockOffset:
 @dataclass
 class Bundle:
     dir: Path
-    datasets: dict = field(default_factory=dict)     # type -> Dataset
-    support: dict = field(default_factory=dict)      # variant -> SupportFile
-    coc: list = field(default_factory=list)          # CoCEntry
-    meta: dict = field(default_factory=dict)         # tool/version/host/extracted_at
+    datasets: dict[str, Dataset] = field(default_factory=dict)
+    support: dict[str, SupportFile] = field(default_factory=dict)
+    coc: list[CoCEntry] = field(default_factory=list)
+    meta: RawJson = field(default_factory=dict)   # tool/version/host/extracted_at
     session_log: str = ""
     tam_audio_dir: Path | None = None
 
@@ -206,7 +229,7 @@ class Bundle:
     secured_source: str = ""
 
     #: Abgleiche der Box-Uhr gegen die Referenzuhr, je Quelle einer.
-    clock_offsets: list = field(default_factory=list)   # ClockOffset
+    clock_offsets: list[ClockOffset] = field(default_factory=list)
 
     #: Sicherungszeitraum in der **Ortszeit der Box**, für den Vergleich mit den
     #: Ereigniszeiten. Nur gesetzt, wenn der UTC-Offset der Box bekannt ist.
@@ -383,7 +406,7 @@ _LOG_SAVED_RE = re.compile(r"^(\S+ \S+) INFO Supportdaten '(\w+)' gespeichert", 
 _LOG_HEAD_RE = re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}),\d+ ")
 
 
-def _iso_to_dt(iso: str):
+def _iso_to_dt(iso: str) -> datetime | None:
     """ISO-UTC (``…Z``) → naives datetime in UTC; ``None`` wenn unbrauchbar.
 
     Nimmt beide Schreibweisen: sekundengenau (``…:11Z``, wie ``extracted_at`` und die
@@ -400,7 +423,7 @@ def _iso_to_dt(iso: str):
     return None
 
 
-def _box_utc_offset(b: Bundle):
+def _box_utc_offset(b: Bundle) -> timedelta | None:
     """UTC-Offset der Box als ``timedelta``; ``None`` wenn nicht ermittelbar.
 
     Die Box liefert ihre Zeit mit Zonenangabe (``2026-01-06T11:00:02+01:00``) —
@@ -429,7 +452,7 @@ def _box_utc_offset(b: Bundle):
     return None
 
 
-def _session_start_utc(b: Bundle):
+def _session_start_utc(b: Bundle) -> datetime | None:
     """Beginn des Abzugs als naives UTC — die **erste Zeile** des Sitzungslogs.
 
     Nicht der erste Datenabruf: Das Werkzeug meldet sich davor an, und die Box
@@ -546,7 +569,7 @@ def _kopfzeile_woertlich(text: str) -> str:
     return m.group(1).strip() if m else ""
 
 
-def _parse_box_iso(wert: str):
+def _parse_box_iso(wert: str) -> datetime | None:
     """``2026-08-09T17:55:36+02:00`` → naives datetime in UTC."""
     if not wert:
         return None
@@ -560,8 +583,8 @@ def _parse_box_iso(wert: str):
     return (dt - offset).replace(tzinfo=None)
 
 
-def _add_offset(b, quelle, box_lokal, von, bis, box, *, beidseitig, herkunft,
-                fundstelle) -> None:
+def _add_offset(b: Bundle, quelle: str, box_lokal: str, von: str, bis: str, box: datetime,
+                *, beidseitig: bool, herkunft: str, fundstelle: SourceRef) -> None:
     dt_von, dt_bis = _iso_to_dt(von), _iso_to_dt(bis)
     if not (dt_von and dt_bis):
         return
@@ -612,7 +635,7 @@ def _altbestand_klammer(b: Bundle) -> tuple[str, str]:
     return ((t_req - versatz).strftime(fmt), (t_res - versatz).strftime(fmt))
 
 
-def _maschinen_versatz(b: Bundle):
+def _maschinen_versatz(b: Bundle) -> timedelta | None:
     """Offset Lokalzeit → UTC der Abzugsmaschine, als `timedelta`."""
     m = re.search(r"^(\S+ \S+) INFO SICHERUNG BEGINN\s+(\S+)", b.session_log, re.M)
     if m:
@@ -633,13 +656,13 @@ def _maschinen_versatz(b: Bundle):
     return None
 
 
-def _log_kopf_dt(wert: str):
+def _log_kopf_dt(wert: str) -> datetime | None:
     try:
         return datetime.strptime(wert, "%Y-%m-%d %H:%M:%S,%f")
     except ValueError:
         return None
 
 
-def _ds_fundstelle(ds, i: int) -> dict:
+def _ds_fundstelle(ds: Dataset, i: int) -> SourceRef:
     s = ds.slices[i] if i < len(ds.slices) else None
     return {"file": ds.name, "sha": ds.sha256, "line": s["line"] if s else None}

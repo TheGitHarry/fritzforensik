@@ -99,7 +99,7 @@ def resolve_bundle(arg: Path | None) -> Path:
 
 # ───────────────────────── Kopf-Felder ──────────────────────────────────────
 
-def collect_header(args, bundle_dir: Path | None = None) -> dict:
+def collect_header(args: argparse.Namespace, bundle_dir: Path | None = None) -> dict[str, str]:
     """Kopf-Felder erheben; eine ``case.json`` im Bundle belegt die Abfrage vor.
 
     Hat fritzexport den Fallkopf bereits erfasst, werden die Werte als Vorgabe
@@ -119,7 +119,7 @@ def collect_header(args, bundle_dir: Path | None = None) -> dict:
 
 # ───────────────────────── Ausgabename ──────────────────────────────────────
 
-def default_output_name(header: dict, extracted_at: str = "") -> Path:
+def default_output_name(header: dict[str, str], extracted_at: str = "") -> Path:
     """Sprechender Report-Name im aktuellen Arbeitsverzeichnis.
 
     ``<Case>_<Item>_<Abzugszeitpunkt>.html`` — **derselbe Namensstamm wie das
@@ -159,7 +159,7 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def main(argv=None) -> int:
+def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
     bundle_dir = resolve_bundle(args.bundle)
@@ -172,13 +172,13 @@ def main(argv=None) -> int:
     header = collect_header(args, bundle_dir)
 
     model = build_model(bundle)
-    master_name = model.master.get("name", "") or (model.real_aps[0] if model.real_aps else "")
+    master_name = (model.master["name"] if model.master else "") or (model.real_aps[0] if model.real_aps else "")
     support = analyze(bundle, model.real_aps, master_name)
 
     html = build_html(bundle, model, support, header)
 
     device = _pick_device(model.mesh_nodes, model.meta.get("host", ""))
-    box_label = device.get("model", "") or bundle_dir.name
+    box_label = (device["model"] if device else "") or bundle_dir.name
     out = args.output or default_output_name(header, bundle.meta.get("extracted_at", ""))
     # Über die kodierten Bytes gehen, damit die Sidecar exakt das beschreibt,
     # was auf der Platte liegt (write_text würde sonst zweimal kodieren).

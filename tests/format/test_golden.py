@@ -56,7 +56,7 @@ def test_integritaet_vollstaendig_ok(echtes_bundle: Path) -> None:
 def test_report_baut_durch(echtes_bundle: Path) -> None:
     b = load_bundle(echtes_bundle)
     model = build_model(b)
-    master = model.master.get("name", "") or (model.real_aps[0] if model.real_aps else "")
+    master = (model.master["name"] if model.master else "") or (model.real_aps[0] if model.real_aps else "")
     support = analyze(b, model.real_aps, master)
     html = build_html(b, model, support,
                       {"case_id": "", "item_id": "", "sb": "", "date": "2026-01-01",
@@ -124,7 +124,7 @@ def test_report_nennt_die_box_uhr(echtes_bundle: Path) -> None:
     """Der gerenderte Bericht darf die untere Schranke nicht als Messwert zeigen."""
     b = load_bundle(echtes_bundle)
     m = build_model(b)
-    res = analyze(b, m.real_aps, m.master.get("name", ""))
+    res = analyze(b, m.real_aps, (m.master["name"] if m.master else ""))
     html = build_html(b, m, res, {"case_id": "C", "item_id": "I", "sb": "X",
                                   "date": "2026-01-01", "generated_at": "x"})
 

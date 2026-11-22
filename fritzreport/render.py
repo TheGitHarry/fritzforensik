@@ -12,10 +12,38 @@ from __future__ import annotations
 
 import datetime as _dt
 import html
+from collections.abc import Callable, Iterable
+from typing import TypeVar
 
 from . import __version__
-from .bundle import QUELLE_RECORD, STATUS_MISSING
-from .model import GRADE_LABEL, GRADE_SCHEMA, Model
+from .bundle import QUELLE_RECORD, STATUS_MISSING, Bundle
+from .model import (
+    GRADE_LABEL,
+    GRADE_SCHEMA,
+    CallRec,
+    EventRec,
+    HostRec,
+    MeshNode,
+    Model,
+    PhonebookRec,
+    WifiRec,
+)
+from .records import FilterFields
+from .supportdata import Analysis, Proof, SystemKpi, Uptime
+
+#: Eine Metadaten-Zeile: (Label, Wert) oder (Label, Wert, Badge-HTML). Der Wert wird
+#: mit `esc` ausgegeben und darf deshalb alles sein, auch ein Rohwert aus dem Bundle.
+Row = tuple[str, object] | tuple[str, object, str]
+
+#: Datensatz einer Report-Tabelle; `render_rows` gibt ihn an den Zellen-Renderer weiter.
+R = TypeVar("R", bound=FilterFields)
+
+
+class TimelineEntry(FilterFields):
+    sortkey: str
+    display: str
+    quelle: str
+    detail: str
 
 # ───────────────────────── CSS (aus PoC, 3 Grade) ────────────────────────────
 CSS = """
@@ -360,11 +388,11 @@ JS = """
 
 # ───────────────────────── Render-Helfer ─────────────────────────────────────
 
-def esc(x) -> str:
+def esc(x: object) -> str:
     return html.escape(str(x)) if x is not None else ""
 
 
-def badges(grades) -> str:
+def badges(grades: Iterable[str]) -> str:
     return "".join(
         f'<span class="grade g{g}" title="{esc(GRADE_LABEL.get(g, g))}">{g}</span>'
         for g in grades
@@ -388,7 +416,7 @@ def _duration(von: str, bis: str) -> str:
     return f"{sek // 3600} h {(sek % 3600) // 60} min"
 
 
-def _secured_rows(bundle, m) -> list[tuple]:
+def _secured_rows(bundle: Bundle, m: Model) -> list[Row]:
     """Metadaten-Zeilen zum Sicherungszeitraum (erster bis letzter Datenabruf).
 
     Belegtheit nach derselben Regel wie beim Uptime-Block weiter unten (roh = ohne
@@ -412,7 +440,7 @@ def _secured_rows(bundle, m) -> list[tuple]:
     bis = (bundle.secured_to.replace("T", " ").replace("Z", " UTC")
            if bundle.secured_to else "nicht protokolliert (Lauf abgebrochen)")
 
-    rows = [("Gesichert von", von, badge), ("Gesichert bis", bis, badge)]
+    rows: list[Row] = [("Gesichert von", von, badge), ("Gesichert bis", bis, badge)]
     dauer = _duration(bundle.secured_from, bundle.secured_to)
     if dauer:
         rows.append(("Dauer", dauer, " " + badges(["D3"])))
@@ -429,7 +457,7 @@ def _sek(wert: int) -> str:
     return f"{betrag // 3600} h {(betrag % 3600) // 60} min"
 
 
-def _uptime_block(up: dict) -> str:
+def _uptime_block(up: Uptime) -> str:
     """Die Betriebszeit-Tabelle — leer, wenn die Supportdaten keine Uptime führen.
 
     Ist die Form der ``uptime:``-Zeile unbekannt, steht die Rohzeile im „roh"-Feld,
@@ -454,7 +482,7 @@ def _uptime_block(up: dict) -> str:
     )
 
 
-def _system_kpi_block(kpi: dict) -> str:
+def _system_kpi_block(kpi: SystemKpi) -> str:
     """Kennzahlen aus ``system_kpi`` — leer, wo die Sektion fehlt (vor FRITZ!OS 08.25).
 
     Alles **roh**, kein Badge: Die drei Werte stehen wörtlich in der Datei, deren Hash
@@ -486,7 +514,7 @@ def _system_kpi_block(kpi: dict) -> str:
               f" — Zeile {kpi.get('line')}</td></tr></table>")
 
 
-def _deviceinfo_rows(bundle) -> list[tuple]:
+def _deviceinfo_rows(bundle: Bundle) -> list[Row]:
     """Selbstauskunft der Box über TR-064 — Metadaten-Zeilen, alle roh.
 
     Zwei Angaben, die es sonst nicht gibt: der **Modellname im Klartext** (aus den
@@ -502,7 +530,7 @@ def _deviceinfo_rows(bundle) -> list[tuple]:
     rec = next((r for r in records if r.get("record_type") == "device_info"), None)
     if not rec:
         return []
-    rows: list[tuple] = []
+    rows: list[Row] = []
     if rec.get("model_name"):
         rows.append(("Modell laut TR-064", rec["model_name"]))
     if rec.get("software_version"):
@@ -512,7 +540,7 @@ def _deviceinfo_rows(bundle) -> list[tuple]:
     return rows
 
 
-def _clock_rows(bundle) -> list[tuple]:
+def _clock_rows(bundle: Bundle) -> list[Row]:
     """Metadaten-Zeilen zum Versatz der Box-Uhr — je Quelle eine.
 
     Belegtheit nach derselben Regel wie beim Sicherungszeitraum: Die Zeitangabe der
@@ -537,7 +565,7 @@ def _clock_rows(bundle) -> list[tuple]:
         return [("Box-Uhr", "nicht geprüft (weder TR-064 Time:1 noch Supportdaten "
                             "im Abzug)")]
 
-    rows: list[tuple] = []
+    rows: list[Row] = []
     # TR-064 zuerst: die schärfere Aussage steht oben.
     for c in sorted(offsets, key=lambda o: not o.beidseitig):
         herkunft = ("Supportdaten-Kopf" if c.quelle.startswith("supportdata")
@@ -572,7 +600,7 @@ def _clock_rows(bundle) -> list[tuple]:
     return rows
 
 
-def data_attrs(rec) -> str:
+def data_attrs(rec: FilterFields) -> str:
     return (
         f' data-mac="{esc((rec.get("mac") or "").upper())}"'
         f' data-iso="{esc(rec.get("f_iso") or "")}"'
@@ -583,11 +611,12 @@ def data_attrs(rec) -> str:
     )
 
 
-def origin_row(rec, colspan) -> str:
+def origin_row(rec: FilterFields, colspan: int) -> str:
     o = rec["origin"]
-    if o.get("line"):
+    line = o["line"]
+    if line:
         body = "\n".join(
-            f"{o['line'] + n:>6} │ {ln}"
+            f"{line + n:>6} │ {ln}"
             for n, ln in enumerate(o["text"].split("\n"))
         )
         fundstelle = (f'Zeile {o["line"]}–{o["line_end"]}'
@@ -618,8 +647,8 @@ def origin_row(rec, colspan) -> str:
     )
 
 
-def render_rows(records, cells_fn, colspan) -> str:
-    out = []
+def render_rows(records: Iterable[R], cells_fn: Callable[[R], str], colspan: int) -> str:
+    out: list[str] = []
     for rec in records:
         out.append(
             f'<tr class="datarow"{data_attrs(rec)}>'
@@ -631,7 +660,7 @@ def render_rows(records, cells_fn, colspan) -> str:
     return "".join(out)
 
 
-def ereignis_note(b, m) -> str:
+def ereignis_note(b: Bundle, m: Model) -> str:
     """Hinweis über der Ereignistabelle: der Abzug steht selbst im Protokoll.
 
     Das Werkzeug meldet sich an der Box an, um zu lesen — die Box protokolliert
@@ -654,7 +683,8 @@ def ereignis_note(b, m) -> str:
             'vom Abzug, nicht vom Asservat.')
 
 
-def section(sid, num, title, key, count, body, note="", noun="Zeilen") -> str:
+def section(sid: str, num: str, title: str, key: str, count: int | None, body: str,
+            note: str = "", noun: str = "Zeilen") -> str:
     note_html = f'<div class="notice notice-info">{note}</div>' if note else ""
     label = f"{count} {noun}" if count is not None else ""
     return (
@@ -693,7 +723,7 @@ def _calls_note(anzahl: int) -> str:
     )
 
 
-def _hosts_zeit_note(hosts) -> str:
+def _hosts_zeit_note(hosts: list[HostRec]) -> str:
     """Hinweis zu den Spalten „Erstmals/Zuletzt gesehen" (Issue #38).
 
     Die Werte stammen aus ``query.lua``; die Box führt sie nicht für jedes Gerät und
@@ -718,7 +748,7 @@ def _hosts_zeit_note(hosts) -> str:
     )
 
 
-def table(tid, headers, rows_html) -> str:
+def table(tid: str, headers: Iterable[str], rows_html: str) -> str:
     th = "".join(f"<th>{esc(h)}</th>" for h in headers)
     return (f'<table id="{tid}"><thead><tr><th class="exp"></th>{th}<th>Belegt</th></tr></thead>'
             f'<tbody>{rows_html}</tbody></table>')
@@ -726,7 +756,7 @@ def table(tid, headers, rows_html) -> str:
 
 # ───────────────────────── Zellen-Renderer je Sektion ────────────────────────
 
-def c_hosts(h):
+def c_hosts(h: HostRec) -> str:
     return (f'<td class="mono">{esc(h["mac"])}</td><td class="mono">{esc(h["ip"])}</td>'
             f'<td>{esc(h["name"])}</td><td>{esc(h["iface"])}</td>'
             f'<td>{"aktiv" if h["active"] else "offline"}</td>'
@@ -735,32 +765,32 @@ def c_hosts(h):
             f'<td class="mono">{esc(h["last_seen"])}</td>')
 
 
-def c_mesh(n):
+def c_mesh(n: MeshNode) -> str:
     return (f'<td>{esc(n["name"])}</td><td>{esc(n["model"])}</td><td class="mono">{esc(n["mac"])}</td>'
             f'<td>{esc(n["role"])}</td>'
             f'<td>{"<strong>ja</strong>" if n["is_ap"] else "nein"}</td>'
             f'<td>{esc(n["firmware"])}</td>')
 
 
-def c_wifi(w):
+def c_wifi(w: WifiRec) -> str:
     return (f'<td class="mono">{esc(w["mac"])}</td><td>{esc(w["name"])}</td>'
             f'<td class="mono">{esc(w["ipv4"])}</td><td>{esc(w["interface"])}</td>'
             f'<td class="{"" if w["ap_is_mesh"] else "unknown"}">{esc(w["ap_display"])}</td>'
             f'<td>{esc(w["status"])}</td><td class="mono">{esc(w["last_seen_iso"])}</td>')
 
 
-def c_calls(c):
+def c_calls(c: CallRec) -> str:
     return (f'<td class="mono">{esc(c["iso"])}</td><td>{esc(c["typ"])}</td>'
             f'<td class="mono">{esc(c["rufnummer"])}</td><td>{esc(c["name"])}</td>'
             f'<td>{esc(c["region"])}</td><td>{esc(c["nebenstelle"])}</td>'
             f'<td>{esc(c["eigene"])}</td><td class="num">{esc(c["dauer"])}</td>')
 
 
-def c_pb(p):
+def c_pb(p: PhonebookRec) -> str:
     return (f'<td>{esc(p["name"])}</td><td class="mono">{esc(p["numbers"])}</td><td>{esc(p["book"])}</td>')
 
 
-def c_events(e):
+def c_events(e: EventRec) -> str:
     marke = ('<span class="acq" title="Liegt im Sicherungszeitraum — '
              'stammt vom Abzug, nicht vom Asservat">Sicherung</span>'
              if e.get("during_acquisition") else "")
@@ -769,23 +799,24 @@ def c_events(e):
             f'<td class="msg">{esc(e["message"])}</td>')
 
 
-def c_wlan(w):
+def c_wlan(w: Proof) -> str:
     return (f'<td class="mono">{esc(w["display"])}</td><td class="mono">{esc(w["mac"])}</td>'
             f'<td>{esc(w["event_de"])}</td><td>{esc(w["band"])}</td><td>{esc(w["ap"])}</td>')
 
 
-def c_timeline(t):
+def c_timeline(t: TimelineEntry) -> str:
     return (f'<td class="mono">{esc(t["display"])}</td><td>{esc(t["quelle"])}</td>'
             f'<td class="mono">{esc(t["mac"])}</td><td class="msg">{esc(t["detail"])}</td>')
 
 
 # ───────────────────────── Timeline (quellenübergreifend) ────────────────────
 
-def build_timeline(model: Model, proofs: list) -> list:
+def build_timeline(model: Model, proofs: list[Proof]) -> list[TimelineEntry]:
     """Alle zeitgestempelten Datenpunkte aus allen Quellen in einer Achse."""
-    tl = []
+    tl: list[TimelineEntry] = []
 
-    def add(sortkey, iso, display, quelle, mac, detail, grades, rec):
+    def add(sortkey: str, iso: str, display: str, quelle: str, mac: str, detail: str,
+            grades: list[str], rec: FilterFields) -> None:
         tl.append({
             "sortkey": sortkey, "display": display, "quelle": quelle,
             "mac": (mac or "").upper(), "detail": detail, "grades": grades,
@@ -806,10 +837,10 @@ def build_timeline(model: Model, proofs: list) -> list:
     for w in proofs:
         det = " · ".join(x for x in (w["event_de"], w["band"], (f'AP {w["ap"]}' if w["ap"] else "")) if x)
         add(w["sortkey"], w["iso"], w["display"], "WLAN-Verbindung", w["mac"], det, w["grades"], w)
-    for w in model.wifi:
-        if w["last_seen_iso"]:
-            add(w["last_seen_iso"], w["last_seen_iso"], w["last_seen_iso"].replace("T", " "),
-                "Client zuletzt gesehen", w["mac"], w["name"], w["grades"], w)
+    for cl in model.wifi:
+        if cl["last_seen_iso"]:
+            add(cl["last_seen_iso"], cl["last_seen_iso"], cl["last_seen_iso"].replace("T", " "),
+                "Client zuletzt gesehen", cl["mac"], cl["name"], cl["grades"], cl)
 
     tl.sort(key=lambda x: x["sortkey"])
     return tl
@@ -832,7 +863,7 @@ def _hostname(host: str) -> str:
     return rest.split(":", 1)[0].lower()
 
 
-def _pick_device(mesh_nodes: list, host: str = "") -> dict:
+def _pick_device(mesh_nodes: list[MeshNode], host: str = "") -> MeshNode | None:
     """Identität der **abgezogenen** Box robust wählen.
 
     Beste Quelle ist der Mesh-Knoten, dessen Name zum `host`-Feld passt (die Box,
@@ -856,17 +887,21 @@ def _pick_device(mesh_nodes: list, host: str = "") -> dict:
                     if n.get("name") and n["name"].lower() in (hostname, label)), None)
         if hit:
             return hit
-    for pred in (lambda n: n["role"] == "master" and n.get("model"),
-                 lambda n: n["is_ap"] and n.get("model"),
-                 lambda n: n.get("model"),
-                 lambda n: n["role"] == "master"):
+    vorrang: tuple[Callable[[MeshNode], object], ...] = (
+        lambda n: n["role"] == "master" and n.get("model"),
+        lambda n: n["is_ap"] and n.get("model"),
+        lambda n: n.get("model"),
+        lambda n: n["role"] == "master",
+    )
+    for pred in vorrang:
         hit = next((n for n in mesh_nodes if pred(n)), None)
         if hit:
             return hit
-    return mesh_nodes[0] if mesh_nodes else {}
+    return mesh_nodes[0] if mesh_nodes else None
 
 
-def build_html(bundle, model: Model, support: dict, header: dict) -> str:
+def build_html(bundle: Bundle, model: Model, support: Analysis,
+               header: dict[str, str]) -> str:
     m = model
     proofs = support.get("proofs", [])
     up = support.get("uptime", {})
@@ -901,8 +936,9 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
     meta_rows = [
         ("Case-ID", header.get("case_id", "")), ("Asservat / Item-ID", header.get("item_id", "")),
         ("Sachbearbeiter (SB)", header.get("sb", "")), ("Datum", header.get("date", "")),
-        ("Gerät", device.get("model", "")), ("Firmware", device.get("firmware", "")),
-        ("Geräte-MAC", device.get("mac", "")),
+        ("Gerät", device["model"] if device else ""),
+        ("Firmware", device["firmware"] if device else ""),
+        ("Geräte-MAC", device["mac"] if device else ""),
         ("Host-URL", m.meta.get("host", "")),
         ("Extraktionswerkzeug", f'{m.meta.get("tool","?")} {m.meta.get("version","?")}'),
         *_deviceinfo_rows(bundle),
@@ -940,7 +976,7 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
         + _system_kpi_block(support.get("system_kpi", {}))
     )
 
-    def coc_badge(st):
+    def coc_badge(st: str) -> str:
         if st == "ok":
             return '<span class="ok">✔ verifiziert</span>'
         if st == "mismatch":
@@ -954,7 +990,7 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
     # höher — wer die WAV austauscht, müsste auch die JSON nachziehen und brächte
     # deren Sidecar zu Fall. Der Unterschied gehört in die Tabelle, sonst liest
     # sich beides gleich stark.
-    def coc_quelle(q):
+    def coc_quelle(q: str) -> str:
         return "Datensatz (tam)" if q == QUELLE_RECORD else "Sidecar"
     mism = sum(1 for e in bundle.coc if e.status == "mismatch")
     s2 = (
@@ -1118,7 +1154,7 @@ def build_html(bundle, model: Model, support: dict, header: dict) -> str:
   neben dem Original-Report.
 </div>
 
-<h1>Forensik-Report — {esc(device.get('model','') or 'FRITZ!Box')}</h1>
+<h1>Forensik-Report — {esc((device["model"] if device else "") or 'FRITZ!Box')}</h1>
 <div class="sub">Case {esc(header.get('case_id',''))} · Item {esc(header.get('item_id',''))} · SB {esc(header.get('sb',''))} · erzeugt {esc(header.get('generated_at',''))}</div>
 
 {integrity_banner}

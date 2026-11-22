@@ -60,7 +60,7 @@ def test_ip_host_faellt_in_die_bisherige_kette():
 
 
 def test_ohne_treffer_und_ohne_knoten():
-    assert _pick_device([], "https://fritz.box") == {}
+    assert _pick_device([], "https://fritz.box") is None
     fremd = _pick_device([FB7590MC], "https://ganz-andere-box.lan")
     assert fremd["name"] == "fb7590mc", "ohne Namenstreffer bleibt die pred-Kette"
 
