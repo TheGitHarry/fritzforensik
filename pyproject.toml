@@ -84,19 +84,16 @@ ignore = [
 "tests/**" = ["S"]
 
 [tool.mypy]
-# fritzformat streng: klein, von beiden Werkzeugen genutzt, und dort kostet ein
-# falscher Typ am meisten. Die Werkzeuge laufen im Normalmodus (Override unten),
-# --strict folgt paketweise.
+# Streng für fritzformat und fritzreport. fritzexport läuft noch im Normalmodus
+# (Override unten), bis es unter --strict sauber ist.
 files = ["fritzformat", "fritzreport", "fritzexport"]
 strict = true
 python_version = "3.10"
 
 [[tool.mypy.overrides]]
-# Normalmodus für die Werkzeuge. strict gilt in mypy nur global; die Schalter, die
-# es einschaltet (mypy --help), werden hier einzeln zurückgenommen. Unter --strict
-# melden fritzreport und fritzexport derzeit je über 100 Stellen, fast alle
-# fehlende Annotationen.
-module = ["fritzreport", "fritzreport.*", "fritzexport", "fritzexport.*"]
+# Normalmodus für fritzexport. strict gilt in mypy nur global; die Schalter, die es
+# einschaltet (mypy --help), werden hier einzeln zurückgenommen.
+module = ["fritzexport", "fritzexport.*"]
 disallow_any_generics = false
 disallow_subclassing_any = false
 disallow_untyped_calls = false

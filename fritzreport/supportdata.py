@@ -20,6 +20,13 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .bundle import Bundle, SupportFile
+
+#: Geräteregister der methode.md-Parser: MAC → {name, ip, connection_type, source, events}.
+Devices = dict[str, dict[str, Any]]
 
 # ───────────────────────── Konstanten / Regexes (aus fritz_processor.py) ─────
 
@@ -54,7 +61,7 @@ _TS_RE_DE_2Y = re.compile(r"^(\d{2})\.(\d{2})\.(\d{2})\s+(\d{2}):(\d{2}):(\d{2})
 
 # ───────────────────────── Helfer (aus fritz_processor.py) ───────────────────
 
-def extract_timestamp(line):
+def extract_timestamp(line: str) -> str:
     for rx in (TS_ISO_RE, TS_GER_FULL_RE, TS_GER_SHORT_RE):
         m = rx.search(line)
         if m:
@@ -62,14 +69,14 @@ def extract_timestamp(line):
     return ""
 
 
-def parse_wlan_timestamp(line):
+def parse_wlan_timestamp(line: str) -> str:
     m = WLAN_TS_RE.search(line)
     if m:
         return f"{m.group(1)}-{m.group(2)}-{m.group(3)} {m.group(4)}:{m.group(5)}:{m.group(6)}"
     return ""
 
 
-def extract_section(text, begin_marker, end_marker):
+def extract_section(text: str, begin_marker: str, end_marker: str) -> str | None:
     start = text.find(begin_marker)
     if start == -1:
         return None
@@ -78,7 +85,8 @@ def extract_section(text, begin_marker, end_marker):
     return text[start:] if end == -1 else text[start:end]
 
 
-def extract_section_ln(text, begin_marker, end_marker):
+def extract_section_ln(text: str, begin_marker: str,
+                       end_marker: str) -> tuple[str | None, int | None]:
     start = text.find(begin_marker)
     if start == -1:
         return None, None
@@ -88,7 +96,7 @@ def extract_section_ln(text, begin_marker, end_marker):
     return section, text[:start].count("\n") + 1
 
 
-def parse_event_ts(ts):
+def parse_event_ts(ts: object) -> datetime | None:
     """FRITZ-Zeitstempel → naives datetime (oder None)."""
     if not ts or ts in ("—", "-"):
         return None
@@ -139,7 +147,7 @@ TZ_OFFSETS = {
 }
 
 
-def parse_box_header_time(text):
+def parse_box_header_time(text: str) -> tuple[datetime | None, str, int | None]:
     """Kopfzeile der Supportdaten → ``(utc_datetime, tz_kuerzel, zeilennr)``.
 
     Gibt ``(None, kuerzel, zeilennr)`` zurück, wenn die Zeitzone unbekannt ist —
@@ -167,7 +175,7 @@ def parse_box_header_time(text):
     return lokal - timedelta(seconds=offset), tz, zeilennr
 
 
-def _classify_event(event_text):
+def _classify_event(event_text: str) -> tuple[str, bool]:
     t = event_text.lower()
     is_guest = "gastzugang" in t
     if "gescheitert" in t or "fehlgeschlagen" in t or "schlüssel" in t:
@@ -186,14 +194,14 @@ def _classify_event(event_text):
 # events_events / mesh_shringbuf / station_list). Sie füllen devices[mac]["events"]
 # mit {timestamp, source, event_type, log_line_nr, log_line}.
 
-def parse_dhcpd(text):
+def parse_dhcpd(text: str) -> Devices:
     section = extract_section(text, "##### BEGIN SECTION dhcpd", "##### END SECTION dhcpd")
     if not section:
         return {}
     guest_start = section.find("\n       is guest\n")
     if guest_start == -1:
         guest_start = section.find("\nSERVER guest:")
-    devices = {}
+    devices: Devices = {}
     lease_re = re.compile(r"^(w?lease)\s+([0-9a-fA-F:]{17})\s+(\S+)\s+\S+\s+(\S+)", re.MULTILINE)
     for m in lease_re.finditer(section):
         mac, ip, name = m.group(2).lower(), m.group(3), m.group(4).strip('"')
@@ -206,9 +214,9 @@ def parse_dhcpd(text):
     return devices
 
 
-def parse_dhcp(text, devices):
+def parse_dhcp(text: str, devices: Devices) -> None:
     section, sec_start = extract_section_ln(text, "##### BEGIN SECTION dhcp\n", "##### END SECTION dhcp")
-    if not section:
+    if not section or sec_start is None:
         return
     for off, line in enumerate(section.splitlines()):
         if not line.strip() or "<<<" not in line:
@@ -224,10 +232,10 @@ def parse_dhcp(text, devices):
             "event_type": "connect", "log_line_nr": sec_start + off, "log_line": line})
 
 
-def parse_station_module(text, devices):
+def parse_station_module(text: str, devices: Devices) -> None:
     section, sec_start = extract_section_ln(
         text, "##### BEGIN SECTION STATION_MODULE", "##### END SECTION STATION_MODULE")
-    if not section:
+    if not section or sec_start is None:
         return
     mac_line_re = re.compile(r"^\s*mac\s*=\s*([0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})\s*$",
                              re.MULTILINE | re.IGNORECASE)
@@ -260,10 +268,10 @@ def parse_station_module(text, devices):
                 "log_line_nr": ln, "log_line": line})
 
 
-def parse_wlan_events(text, devices):
+def parse_wlan_events(text: str, devices: Devices) -> None:
     section, sec_start = extract_section_ln(
         text, "##### BEGIN SECTION WLAN_EVENTS", "##### END SECTION WLAN_EVENTS")
-    if not section:
+    if not section or sec_start is None:
         return
     TRUSTED = {"30005": "connect", "752": "disconnect"}
     for off, line in enumerate(section.splitlines()):
@@ -283,10 +291,10 @@ def parse_wlan_events(text, devices):
             "event_type": TRUSTED[id_m.group(1)], "log_line_nr": sec_start + off, "log_line": line})
 
 
-def parse_events_events(text, devices):
+def parse_events_events(text: str, devices: Devices) -> None:
     section, sec_start = extract_section_ln(
         text, "##### BEGIN SECTION Events Events", "##### END SECTION Events")
-    if not section:
+    if not section or sec_start is None:
         return
     for off, line in enumerate(section.splitlines()):
         if not line.strip():
@@ -331,7 +339,7 @@ def parse_events_events(text, devices):
             "log_line_nr": sec_start + off, "log_line": line})
 
 
-def parse_mesh_shringbuf(text, devices):
+def parse_mesh_shringbuf(text: str, devices: Devices) -> None:
     start = text.find("===== Mesh Shringbuf Begin =====")
     if start == -1:
         return
@@ -394,7 +402,7 @@ def _sec_display(dt: datetime | None, fallback: str) -> tuple[str, str]:
 
 # ───────────────────────── Vereinigung ───────────────────────────────────────
 
-def analyze(bundle, real_aps, master_name) -> dict:
+def analyze(bundle: Bundle, real_aps: list[str], master_name: str) -> dict[str, Any]:
     """→ {'proofs': [...], 'uptime': {...}, 'system_kpi': {...}}.
 
     ``proofs`` = vereinte, deduplizierte Verbindungsnachweise (Sektion 6/Timeline).
@@ -404,12 +412,12 @@ def analyze(bundle, real_aps, master_name) -> dict:
     support_files = [sf for sf in bundle.support.values() if getattr(sf, "present", False)]
 
     # 1) Geräteregister aus dhcpd (über alle Supportdateien gemergt)
-    devices: dict = {}
+    devices: Devices = {}
     for sf in support_files:
         devices.update(parse_dhcpd(sf.text))
 
     # 2) methode.md-Event-Parser je Datei; neue Events der Datei zuordnen
-    methode_hits = []  # (event_dict, source_file)
+    methode_hits: list[tuple[str, dict[str, Any], SupportFile]] = []  # (mac, event, Datei)
     for sf in support_files:
         before = {mac: len(d["events"]) for mac, d in devices.items()}
         for fn in (parse_dhcp, parse_station_module, parse_wlan_events,
@@ -420,9 +428,11 @@ def analyze(bundle, real_aps, master_name) -> dict:
                 methode_hits.append((mac, ev, sf))
 
     # dedup + grade
-    unified: dict = {}   # key -> proof
+    unified: dict[tuple[str, str, str], dict[str, Any]] = {}   # key -> proof
 
-    def _add(mac, iso, sortkey, display, event, band, ap, grades, sf, line, line_text):
+    def _add(mac: str, iso: str, sortkey: str, display: str, event: str, band: str, ap: str,
+             grades: tuple[str, ...], sf: SupportFile, line: int | None,
+             line_text: str) -> None:
         key = (iso, mac.upper(), event)
         if key in unified:
             p = unified[key]
@@ -492,7 +502,7 @@ _UPTIME_RE = re.compile(
 )
 
 
-def _uptime_spanne(line: str):
+def _uptime_spanne(line: str) -> tuple[str, timedelta | None]:
     """``uptime:``-Zeile → (Laufzeit wörtlich, timedelta); ``("", None)`` bei Unbekanntem."""
     from datetime import timedelta
     m = _UPTIME_RE.search(line)
@@ -505,7 +515,7 @@ def _uptime_spanne(line: str):
     )
 
 
-def parse_system_kpi(sf) -> dict:
+def parse_system_kpi(sf: SupportFile) -> dict[str, Any]:
     """Sektion ``system_kpi`` → ``{starts, lifetime, uptime_s, file, line}``.
 
     Die Sektion gibt es erst **ab FRITZ!OS 08.25** — aber nicht auf jeder Plattform:
@@ -550,7 +560,7 @@ def parse_system_kpi(sf) -> dict:
                          for k in ("starts", "lifetime", "uptime_s")) else {}
 
 
-def _parse_uptime(sf, extracted_at: str) -> dict:
+def _parse_uptime(sf: SupportFile, extracted_at: str) -> dict[str, Any]:
     text = wan_s = ""
     spanne = None
     up_ln = wan_ln = None

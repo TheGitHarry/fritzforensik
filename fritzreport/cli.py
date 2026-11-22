@@ -99,7 +99,7 @@ def resolve_bundle(arg: Path | None) -> Path:
 
 # ───────────────────────── Kopf-Felder ──────────────────────────────────────
 
-def collect_header(args, bundle_dir: Path | None = None) -> dict:
+def collect_header(args: argparse.Namespace, bundle_dir: Path | None = None) -> dict[str, str]:
     """Kopf-Felder erheben; eine ``case.json`` im Bundle belegt die Abfrage vor.
 
     Hat fritzexport den Fallkopf bereits erfasst, werden die Werte als Vorgabe
@@ -119,7 +119,7 @@ def collect_header(args, bundle_dir: Path | None = None) -> dict:
 
 # ───────────────────────── Ausgabename ──────────────────────────────────────
 
-def default_output_name(header: dict, extracted_at: str = "") -> Path:
+def default_output_name(header: dict[str, str], extracted_at: str = "") -> Path:
     """Sprechender Report-Name im aktuellen Arbeitsverzeichnis.
 
     ``<Case>_<Item>_<Abzugszeitpunkt>.html`` — **derselbe Namensstamm wie das
@@ -159,7 +159,7 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def main(argv=None) -> int:
+def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
     bundle_dir = resolve_bundle(args.bundle)
