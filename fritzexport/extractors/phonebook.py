@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import re
 import xml.etree.ElementTree as ET
+from typing import Any
 
 from ..client import FritzClient
 from ..xmlsafe import parse_xml
@@ -37,8 +38,9 @@ def _parse_books_payload(text: str) -> list[dict]:
     for entry in books_raw:
         if not isinstance(entry, dict):
             continue
+        roh_id: Any = entry.get("uniqueid", entry.get("id", -1))
         try:
-            book_id = int(entry.get("uniqueid", entry.get("id", -1)))
+            book_id = int(roh_id)
         except (TypeError, ValueError):
             continue
         if book_id < 0:

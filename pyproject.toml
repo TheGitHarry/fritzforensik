@@ -30,9 +30,13 @@ fritzexport = "fritzexport.__main__:main"
 fritzreport = "fritzreport.__main__:main"
 
 [project.optional-dependencies]
-# lint trägt die einzige Versionsangabe der Prüfwerkzeuge (ruff, mypy, coverage);
-# CI installiert genau dieses Extra, dev zieht es mit. Anheben ist ein eigener Commit.
-lint = ["ruff==0.17.6", "mypy==2.4.1", "coverage==7.17.4"]
+# lint trägt die einzige Versionsangabe der Prüfwerkzeuge (ruff, mypy, coverage,
+# dazu die Typ-Stubs für mypy); CI installiert genau dieses Extra, dev zieht es mit.
+# Anheben ist ein eigener Commit.
+lint = [
+    "ruff==0.17.6", "mypy==2.4.1", "coverage==7.17.4",
+    "types-requests==2.33.0.20261030", "types-defusedxml==0.7.0.20260504",
+]
 dev = ["pyinstaller>=6", "pytest>=7", "certifi", "fritzforensik[lint]"]
 
 [tool.setuptools]
@@ -81,17 +85,18 @@ ignore = [
 
 [tool.mypy]
 # fritzformat streng: klein, von beiden Werkzeugen genutzt, und dort kostet ein
-# falscher Typ am meisten. Die Werkzeuge folgen paketweise, erst im Normalmodus
-# (Override unten), --strict später.
-files = ["fritzformat", "fritzreport"]
+# falscher Typ am meisten. Die Werkzeuge laufen im Normalmodus (Override unten),
+# --strict folgt paketweise.
+files = ["fritzformat", "fritzreport", "fritzexport"]
 strict = true
 python_version = "3.10"
 
 [[tool.mypy.overrides]]
-# Normalmodus für fritzreport. strict gilt in mypy nur global; die Schalter, die es
-# einschaltet (mypy --help), werden hier einzeln zurückgenommen. Unter --strict
-# meldet fritzreport derzeit gut 130 Stellen, fast alle fehlende Annotationen.
-module = ["fritzreport", "fritzreport.*"]
+# Normalmodus für die Werkzeuge. strict gilt in mypy nur global; die Schalter, die
+# es einschaltet (mypy --help), werden hier einzeln zurückgenommen. Unter --strict
+# melden fritzreport und fritzexport derzeit je über 100 Stellen, fast alle
+# fehlende Annotationen.
+module = ["fritzreport", "fritzreport.*", "fritzexport", "fritzexport.*"]
 disallow_any_generics = false
 disallow_subclassing_any = false
 disallow_untyped_calls = false

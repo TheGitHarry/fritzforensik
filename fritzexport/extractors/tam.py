@@ -311,7 +311,8 @@ def _parse_webui_rows(html: str, tam_index: int) -> list[dict]:
         for c in cells:
             href_m = _HREF_RE.search(c)
             if href_m and "download" in href_m.group(1).lower():
-                audio_path = _DOWNLOAD_RE.search(c).group(0) if _DOWNLOAD_RE.search(c) else href_m.group(1)
+                dl_m = _DOWNLOAD_RE.search(c)
+                audio_path = dl_m.group(0) if dl_m else href_m.group(1)
                 break
         # Heuristische Spaltenzuordnung: Datum / Anrufer / eigene Nummer / Dauer
         # Erste Spalte ist oft das "neu"-Icon
