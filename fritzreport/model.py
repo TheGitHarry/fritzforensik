@@ -55,21 +55,21 @@ def origin(ds: Dataset, i: int, total: int) -> dict:
 def _iso_from_epoch(v) -> str:
     try:
         return datetime.fromtimestamp(int(v), tz=timezone.utc).isoformat() if v else ""
-    except Exception:
+    except (ValueError, TypeError, OverflowError, OSError):
         return ""
 
 
 def _parse_dt(datum: str, zeit: str) -> datetime | None:
     try:
         return datetime.strptime(f"{datum} {zeit}", "%d.%m.%y %H:%M:%S").replace(tzinfo=timezone.utc)
-    except Exception:
+    except ValueError:   # der f-String ist immer str, TypeError kann nicht entstehen
         return None
 
 
 def _parse_dt_short(s: str) -> datetime | None:
     try:
         return datetime.strptime(s, "%d.%m.%y %H:%M").replace(tzinfo=timezone.utc)
-    except Exception:
+    except (ValueError, TypeError):
         return None
 
 

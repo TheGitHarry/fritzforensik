@@ -324,7 +324,7 @@ def extract(client: FritzClient) -> list[dict]:
     if path:
         try:
             xml_bytes = _fetch_hostlist_xml(client, path)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - Rückfall auf den Web-UI-Weg
             log.warning("Hosts-XML-Fetch (TR-064-Pfad) fehlgeschlagen: %s", e)
             xml_bytes = None
         if xml_bytes:
@@ -336,7 +336,7 @@ def extract(client: FritzClient) -> list[dict]:
     log.info("Hosts: TR-064-Pfad leer/nicht verfügbar — Fallback auf Port-49000-WebUI.")
     try:
         xml_bytes = _fetch_hostlist_xml_webui(client)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - Rückfall auf die generische Abfrage
         log.info("Hosts-XML-Fetch (Port-49000-WebUI) fehlgeschlagen: %s", e)
         xml_bytes = None
     if xml_bytes:

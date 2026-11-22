@@ -281,7 +281,7 @@ def _pause_if_double_clicked() -> None:
         import ctypes
         process_list = (ctypes.c_ulong * 4)()
         count = ctypes.windll.kernel32.GetConsoleProcessList(process_list, 4)
-    except Exception:
+    except Exception:  # noqa: BLE001 - Windows-API, hier nicht prüfbar; im Zweifel nicht warten
         return
     if count > 1:
         return
@@ -692,7 +692,7 @@ def main(argv: list[str] | None = None) -> int:
                 else:
                     records = EXTRACTORS[name](client)
                     extra_meta = None
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - ein Extractor bricht den Abzug nicht ab
                 log.error("Extractor '%s' fehlgeschlagen: %s", name, e)
                 failures.append(name)
                 continue

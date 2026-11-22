@@ -59,9 +59,10 @@ filterwarnings = ["error"]
 # wird, und das wechselt mit jedem Update. Die Version steht im Extra lint.
 # F = pyflakes (Ungenutztes, Tippfehler), B = bugbear (fehleranfällige Muster),
 # I = Importreihenfolge, S = Sicherheit (bandit), UP = veraltete Schreibweisen,
-# SIM = vereinfachbare Konstrukte, RUF = ruff-eigene Regeln. Zeilenlänge (E501) und
-# ruff format bewusst nicht: Beides schriebe fast jede Datei um.
-select = ["F", "B", "I", "S", "UP", "SIM", "RUF"]
+# SIM = vereinfachbare Konstrukte, RUF = ruff-eigene Regeln, BLE = pauschales
+# except Exception (gewollte Stellen tragen ein begründetes noqa). Zeilenlänge (E501)
+# und ruff format bewusst nicht: Beides schriebe fast jede Datei um.
+select = ["F", "B", "I", "S", "UP", "SIM", "RUF", "BLE"]
 ignore = [
     # Gedankenstrich und echtes Minuszeichen sind Typografie, keine Verwechslung;
     # der Report zeigt Versätze bewusst mit "−".
