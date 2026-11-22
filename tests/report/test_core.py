@@ -776,6 +776,21 @@ def test_tr064_klammer_wird_aus_boxtime_gebildet(synth_bundle):
     assert "geht nicht mehr als" not in zeile, "einseitige Formulierung bei TR-064"
 
 
+def test_uhr_messungen_zeigen_ihre_fundstelle(synth_bundle):
+    """G1: Jede Zeile nennt, woher sie stammt. Für die Uhr-Messungen erhebt
+    `bundle.py` die Fundstelle der Box-Zeit (Datensatz in ``boxtime.json`` bzw. Kopf
+    der Supportdaten); der Report muss sie auch zeigen, je Quelle eine Zeile."""
+    b = load_bundle(synth_bundle)
+    html = _render(b)
+    zeilen = _zeilen(html, "Fundstelle der Box-Uhr")
+    assert len(zeilen) == 2
+    for zeile, quelle in zip(zeilen, ("tr064:time", "supportdata:standard"), strict=True):
+        f = _offset(b, quelle).fundstelle
+        assert f is not None
+        assert f["file"] in zeile, f"{quelle}: Datei fehlt"
+        assert f"Zeile {f['line']}" in zeile, f"{quelle}: Zeilennummer fehlt"
+
+
 def test_beide_quellen_stehen_nebeneinander(synth_bundle):
     """Liegen TR-064 **und** Supportdaten vor, beantwortet der Report das mit zwei
     Zeilen — die schärfere zuerst. Dieser Fall trat in keinem Test je auf."""

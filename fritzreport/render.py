@@ -578,6 +578,12 @@ def _clock_rows(bundle: Bundle) -> list[Row]:
 
         rows.append((f"Box-Uhr laut {'TR-064' if c.beidseitig else 'Supportdaten'}",
                      c.box_lokal))
+        if c.fundstelle:
+            # G1: woher die Box-Zeit stammt — Datensatz in boxtime.json bzw. Kopf der
+            # Supportdaten. Die Prüfsumme der Datei steht in der Chain of Custody.
+            f = c.fundstelle
+            ort = f["file"] + (f" — Zeile {f['line']}" if f["line"] else "")
+            rows.append(("Fundstelle der Box-Uhr", ort))
         if c.beidseitig:
             wert = (f"Abweichung zwischen {c.versatz_min_s:+d} s und "
                     f"{c.versatz_max_s:+d} s ({herkunft}, Klammer {_sek(c.klammer_s)})")
