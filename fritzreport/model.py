@@ -155,7 +155,6 @@ class Model:
     events: list[EventRec] = field(default_factory=list)
     dhcp: DhcpConfig | None = None
     # Aggregate/Kennzahlen (D3)
-    stats: dict[str, object] = field(default_factory=dict)
     cat_counts: dict[str, int] = field(default_factory=dict)
 
 
